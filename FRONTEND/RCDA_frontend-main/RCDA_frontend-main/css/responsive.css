@@ -1,0 +1,18 @@
+/* ========== LANDING + LOGIN RESPONSIVE ========== */
+@media(max-width:980px){
+  .hero-inner,.about-grid,.contact-wrap,.login-wrap{grid-template-columns:1fr;}
+  .course-grid,.testi-grid{grid-template-columns:1fr;}
+  .nav,.section{padding-left:24px;padding-right:24px;}
+  .hero h1{font-size:38px;}
+  .login-art{display:none;}
+  .form-row{grid-template-columns:1fr;}
+  .footer-grid{grid-template-columns:1fr 1fr;}
+}
+@media(max-width:640px){
+  .nav{padding:14px 16px;}
+  .nav-links{display:none;}
+  .hero h1{font-size:30px;}
+  .hero-stats{flex-wrap:wrap;gap:20px;}
+  .footer-grid{grid-template-columns:1fr;}
+  .section{padding:64px 20px;}
+}

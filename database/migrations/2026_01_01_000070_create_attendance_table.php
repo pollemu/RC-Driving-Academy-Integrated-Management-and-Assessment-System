@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('schedule_id')->constrained('schedules')->onDelete('cascade');
             $table->foreignId('student_id')->constrained('students')->onDelete('cascade');
-            $table->enum('status', ['present', 'absent', 'late'])->default('absent');
+            $table->string('status')->default('absent');
             $table->text('notes')->nullable();
             $table->timestamp('recorded_at')->nullable();
             $table->unique(['schedule_id', 'student_id']);

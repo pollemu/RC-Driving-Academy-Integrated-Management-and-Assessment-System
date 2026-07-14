@@ -14,7 +14,7 @@ return new class extends Migration
             $table->string('phone')->nullable();
             $table->text('address')->nullable();
             $table->date('birthdate')->nullable();
-            $table->enum('license_type', ['non-pro', 'pro', 'student-permit'])->nullable();
+            $table->string('license_type')->nullable();
             $table->string('document_path')->nullable();
             $table->timestamps();
         });

@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('assessments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('feedback_id')->unique()->constrained('feedback')->onDelete('cascade');
-            $table->enum('classification', ['fast', 'average', 'needs']);
+            $table->string('classification');
             $table->decimal('confidence_score', 5, 2)->nullable();
             $table->text('recommendation')->nullable();
             $table->boolean('override_applied')->default(false);

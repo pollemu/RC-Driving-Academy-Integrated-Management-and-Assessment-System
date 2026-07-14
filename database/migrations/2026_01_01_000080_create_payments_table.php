@@ -13,11 +13,11 @@ return new class extends Migration
             $table->foreignId('student_id')->constrained('students')->onDelete('cascade');
             $table->foreignId('course_id')->constrained('courses')->onDelete('cascade');
             $table->decimal('amount', 10, 2)->default(0);
-            $table->enum('method', ['gcash', 'bdo']);
+            $table->string('method');
             $table->string('reference_no')->nullable();
             $table->string('paymongo_id')->nullable();
             $table->string('receipt_path')->nullable();
-            $table->enum('status', ['pending', 'verified', 'rejected'])->default('pending');
+            $table->string('status')->default('pending');
             $table->foreignId('verified_by')->nullable()->constrained('users')->onDelete('set null');
             $table->timestamp('verified_at')->nullable();
             $table->timestamps();

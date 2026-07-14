@@ -17,7 +17,7 @@ return new class extends Migration
             $table->time('time_end');
             $table->string('venue')->nullable();
             $table->integer('max_students')->default(1);
-            $table->enum('status', ['open', 'full', 'cancelled', 'done'])->default('open');
+            $table->string('status')->default('open');
             $table->timestamps();
         });
     }

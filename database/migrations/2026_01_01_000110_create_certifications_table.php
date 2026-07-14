@@ -15,7 +15,7 @@ return new class extends Migration
             $table->foreignId('issued_by')->constrained('users')->onDelete('cascade');
             $table->timestamp('issued_at')->nullable();
             $table->string('certificate_no')->unique();
-            $table->enum('status', ['active', 'revoked'])->default('active');
+            $table->string('status')->default('active');
             $table->timestamps();
         });
     }

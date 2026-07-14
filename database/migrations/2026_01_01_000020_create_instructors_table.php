@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
             $table->string('phone')->nullable();
-            $table->enum('specialization', ['TDC', 'PDC', 'TDC+PDC'])->default('TDC');
+            $table->string('specialization')->default('TDC');
             $table->string('license_no')->nullable();
             $table->timestamps();
         });

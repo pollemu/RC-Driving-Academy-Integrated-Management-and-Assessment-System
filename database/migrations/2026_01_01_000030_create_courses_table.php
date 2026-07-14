@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('courses', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->enum('type', ['TDC', 'PDC']);
+            $table->string('type');
             $table->string('format')->nullable();
             $table->decimal('fee', 10, 2)->default(0);
             $table->boolean('is_active')->default(true);

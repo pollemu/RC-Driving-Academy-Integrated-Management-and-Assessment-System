@@ -50,6 +50,40 @@ class CertificationController extends Controller
         return response()->json(['courses' => $courses->values()]);
     }
 
+    /* Students with a completed/active enrollment but no certificate yet
+       for that course — i.e. certificates the admin can issue now. */
+    public function ready()
+    {
+        $eligible = Student::query()
+            ->whereHas('enrollments', function ($q) {
+                $q->whereIn('status', ['active', 'completed']);
+            })
+            ->with(['user', 'enrollments' => function ($q) {
+                $q->whereIn('status', ['active', 'completed'])->with('course');
+            }, 'certifications'])
+            ->get()
+            ->flatMap(function (Student $student) {
+                $issued = $student->certifications->pluck('course_id')->toArray();
+
+                return $student->enrollments
+                    ->filter(function ($e) use ($issued) {
+                        return ! in_array($e->course_id, $issued);
+                    })
+                    ->map(function ($e) use ($student) {
+                        return [
+                            'student_id' => $student->id,
+                            'student_name' => $student->user->name,
+                            'course_id' => $e->course_id,
+                            'course_name' => $e->course->name,
+                            'course_type' => $e->course->type,
+                        ];
+                    });
+            })
+            ->values();
+
+        return response()->json(['ready' => $eligible]);
+    }
+
     public function store(Request $request)
     {
         $data = $request->validate([

@@ -49,14 +49,23 @@ class ScheduleController extends Controller
         return response()->json(['schedules' => $schedules, 'bookedIds' => $bookedIds]);
     }
 
-    /* A student may hold only ONE upcoming booking at a time. */
+    /* A student may hold only ONE upcoming booking at a time.
+       Portable across SQLite / MySQL: a session is "upcoming" when its
+       date is after today, or it is today and has not started yet. */
     protected function hasUpcomingBooking(Request $request): bool
     {
         $student = $request->user()->student;
+        $now = now();
 
         return $student->studentSchedules()
-            ->whereHas('schedule', function ($q) {
-                $q->whereRaw("datetime(substr(date,1,10) || ' ' || time_start) >= ?", [now()->format('Y-m-d H:i:s')]);
+            ->whereHas('schedule', function ($q) use ($now) {
+                $q->where(function ($inner) use ($now) {
+                    $inner->whereDate('date', '>', $now->toDateString())
+                        ->orWhere(function ($today) use ($now) {
+                            $today->whereDate('date', '=', $now->toDateString())
+                                ->whereTime('time_start', '>=', $now->format('H:i:s'));
+                        });
+                });
             })
             ->exists();
     }

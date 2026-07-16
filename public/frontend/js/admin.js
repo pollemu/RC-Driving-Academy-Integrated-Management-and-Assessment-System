@@ -81,43 +81,11 @@ function highlightToday(){
 }
 
 /* ============================================================
-   Payments — verify or reject a pending payment. Updates the
-   row's status badge and swaps the action buttons for a single
-   confirmation icon. Clicking that icon again undoes it, putting
-   the row back to Pending with both action buttons restored —
-   protects against accidental clicks.
+   Payments — verify or reject a pending payment. All actions are
+   API-backed (see verifyPayment / rejectPayment below); the table
+   is rendered from the server by loadPayments(), so there are no
+   hard-coded demo rows to keep in sync.
    ============================================================ */
-const PENDING_ACTIONS_HTML = '<button class="btn btn-sm btn-success" title="Verify payment" onclick="verifyPayment(this)">Accept</button><button class="btn btn-sm btn-danger" title="Reject payment" onclick="rejectPayment(this)">Reject</button>';
-
-function verifyPayment(btn){
-  const row = btn.closest('tr');
-  if (!row) return;
-  const badge = row.querySelector('.badge');
-  if (badge){ badge.textContent = 'Verified'; badge.className = 'badge verified'; }
-  row.dataset.status = 'Verified';
-  const actions = btn.closest('.pay-actions') || btn.parentElement;
-  if (actions) actions.innerHTML = '<button class="btn btn-sm btn-success" title="Click to undo" onclick="undoPayment(this)">Accepted</button>';
-}
-
-function rejectPayment(btn){
-  const row = btn.closest('tr');
-  if (!row) return;
-  const badge = row.querySelector('.badge');
-  if (badge){ badge.textContent = 'Rejected'; badge.className = 'badge needs'; }
-  row.dataset.status = 'Rejected';
-  const actions = btn.closest('.pay-actions') || btn.parentElement;
-  if (actions) actions.innerHTML = '<button class="btn btn-sm btn-danger" title="Click to undo" onclick="undoPayment(this)">Rejected</button>';
-}
-
-function undoPayment(btn){
-  const row = btn.closest('tr');
-  if (!row) return;
-  const badge = row.querySelector('.badge');
-  if (badge){ badge.textContent = 'Pending'; badge.className = 'badge pending'; }
-  row.dataset.status = 'Pending';
-  const actions = btn.closest('.pay-actions') || btn.parentElement;
-  if (actions) actions.innerHTML = PENDING_ACTIONS_HTML;
-}
 
 document.addEventListener('DOMContentLoaded', highlightToday);
 
@@ -131,6 +99,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   loadStudents();
   loadPayments();
   loadInstructors();
+  loadCertifications();
 });
 
 async function loadDashboardStats(){
@@ -252,7 +221,7 @@ async function loadPayments(page){
 }
 
 function renderPayments(payments, pagination){
-  const tbody = document.querySelector('#paymentsTable tbody');
+  const tbody = document.getElementById('paymentsTbody');
   if (!tbody) return;
   tbody.innerHTML = payments.map(p => paymentRowHtml(p)).join('') ||
     `<tr><td colspan="8" style="text-align:center;color:var(--gray);padding:20px;">No payments recorded.</td></tr>`;
@@ -693,9 +662,47 @@ function exportPaymentsPDF(){
    "Ready to Issue" to "Recently Issued", swaps the badge, and
    generates a Valid ID (RCDA-<COURSE>-2026-####).
    ============================================================ */
-function issueCertificate(btn){
+/* Loads the "Ready to Issue" and "Recently Issued" lists from the
+   API so certificates actually persist (previously client-only). */
+async function loadCertifications(){
+  const base = `${RCDA_CONFIG.getApiBaseUrl()}/admin/certifications`;
+  const [ready, issued] = await Promise.all([
+    RCDA.safeFetch(`${base}/ready`, { method: 'GET' }),
+    RCDA.safeFetch(base, { method: 'GET' }),
+  ]);
+  if (ready.ok && ready.data) renderReadyCerts(ready.data.ready || []);
+  if (issued.ok && issued.data) renderIssuedCerts(issued.data.certifications || []);
+}
+
+function renderReadyCerts(list){
+  const el = document.getElementById('certsReadyList');
+  if (!el) return;
+  el.innerHTML = list.length ? list.map(c => `
+    <div class="cert-row" data-student-id="${c.student_id}" data-course-id="${c.course_id}">
+      <div class="cert-info"><h4>${escapeHtml(c.student_name)} — ${escapeHtml(c.course_name)}</h4><span>Eligible · ${escapeHtml(c.course_type)}</span></div>
+      <div style="display:flex;gap:10px;align-items:center;"><span class="badge completed">Ready</span><button class="btn btn-sm btn-primary" onclick="issueCertificate(this)">Issue</button></div>
+    </div>`).join('')
+    : '<div style="font-size:12px;color:var(--gray);padding:14px 0;">No certificates ready to issue.</div>';
+}
+
+function renderIssuedCerts(list){
+  const el = document.getElementById('certsIssuedList');
+  if (!el) return;
+  el.innerHTML = list.length ? list.map(c => `
+    <div class="cert-row issued">
+      <div class="cert-info"><h4>${escapeHtml(c.student_name)} — ${escapeHtml(c.course.name)}</h4><span>Issued ${new Date(c.issued_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · Valid ID: ${escapeHtml(c.certificate_no)}</span></div>
+      <div><span class="badge verified">Issued</span></div>
+    </div>`).join('')
+    : '<div style="font-size:12px;color:var(--gray);padding:14px 0;">No certificates issued yet.</div>';
+}
+
+async function issueCertificate(btn){
   const row = btn.closest('.cert-row');
   if (!row) return;
+
+  const studentId = row.dataset.studentId;
+  const courseId = row.dataset.courseId;
+  if (!studentId || !courseId) { RCDA.showToast('Missing student or course for this certificate.', 'error'); return; }
 
   const titleEl = row.querySelector('h4');
   const title = titleEl ? titleEl.textContent.trim() : 'Student — Certificate';
@@ -703,25 +710,29 @@ function issueCertificate(btn){
   const courseCode = courseMatch ? courseMatch[1] : 'CERT';
   const studentName = title.split('—')[0].trim();
 
-  const infoSpan = row.querySelector('.cert-info span');
-  const infoText = infoSpan ? infoSpan.textContent.trim() : '';
-  const instructorMatch = infoText.match(/Instructor:\s*(.+)$/);
-  const instructor = instructorMatch ? instructorMatch[1].trim() : 'RC Driving Academy';
+  const { ok, data, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/certifications`, {
+    method: 'POST',
+    body: { student_id: Number(studentId), course_id: Number(courseId) },
+  });
 
-  const validId = `RCDA-${courseCode}-2026-${String(Math.floor(1000 + Math.random() * 9000))}`;
+  if (!ok) { RCDA.showToast(error || 'Could not issue certificate.', 'error'); return; }
+
+  const cert = data.certification || {};
+  const validId = cert.certificate_no || `RCDA-${courseCode}-${new Date().getFullYear()}`;
   const issuedDate = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const issuedDateFull = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
   const issuedRow = document.createElement('div');
   issuedRow.className = 'cert-row issued';
-  issuedRow.innerHTML = `<div class="cert-info"><h4>${title}</h4><span>Issued ${issuedDate} · Valid ID: ${validId}</span></div><div><span class="badge verified">Issued</span></div>`;
+  issuedRow.innerHTML = `<div class="cert-info"><h4>${escapeHtml(title)}</h4><span>Issued ${issuedDate} · Valid ID: ${escapeHtml(validId)}</span></div><div><span class="badge verified">Issued</span></div>`;
 
   const issuedList = document.getElementById('certsIssuedList');
   if (issuedList) issuedList.insertBefore(issuedRow, issuedList.firstChild);
 
   row.remove();
+  loadCertifications();
 
-  printCertificate(studentName, courseCode, validId, issuedDateFull, instructor);
+  printCertificate(studentName, courseCode, validId, issuedDateFull, 'RC Driving Academy');
 }
 
 /* ============================================================

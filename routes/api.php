@@ -39,6 +39,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/payments', [AdminPaymentController::class, 'index'])->name('api.admin.payments.index');
         Route::post('/payments/{payment}/verify', [AdminPaymentController::class, 'verify'])->name('api.admin.payments.verify');
         Route::post('/payments/{payment}/reject', [AdminPaymentController::class, 'reject'])->name('api.admin.payments.reject');
+        Route::get('/certifications/ready', [AdminCertificationController::class, 'ready'])->name('api.admin.certifications.ready');
         Route::apiResource('certifications', AdminCertificationController::class)->except(['create', 'edit', 'update']);
         Route::get('/certifications/courses-for/{student}', [AdminCertificationController::class, 'coursesFor'])->name('api.admin.certifications.courses-for');
         Route::post('/certifications/{certification}/revoke', [AdminCertificationController::class, 'revoke'])->name('api.admin.certifications.revoke');

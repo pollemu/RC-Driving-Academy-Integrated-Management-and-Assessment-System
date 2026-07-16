@@ -298,11 +298,8 @@
           <div style="overflow-x:auto;">
             <table id="paymentsTable">
               <thead><tr><th>Student</th><th>Course</th><th>Amount</th><th>Method</th><th>Reference</th><th>Date</th><th>Status</th><th></th></tr></thead>
-              <tbody>
-                <tr data-status="Verified"><td><b>Ana Reyes</b></td><td>TDC+PDC</td><td class="mono"><b>₱5,500</b></td><td>GCash + BDO</td><td class="mono" style="font-size:12px;color:var(--gray);">GC-443210</td><td>Apr 15</td><td><span class="badge verified">Verified</span></td><td><div class="pay-actions"><button class="btn btn-sm btn-success" title="Click to undo" onclick="undoPayment(this)">Accepted</button></div></td></tr>
-                <tr data-status="Verified"><td><b>Clara Lim</b></td><td>TDC</td><td class="mono"><b>₱1,500</b></td><td>GCash</td><td class="mono" style="font-size:12px;color:var(--gray);">GC-553211</td><td>Apr 17</td><td><span class="badge verified">Verified</span></td><td><div class="pay-actions"><button class="btn btn-sm btn-success" title="Click to undo" onclick="undoPayment(this)">Accepted</button></div></td></tr>
-                <tr data-status="Pending"><td><b>Ben Torres</b></td><td>PDC</td><td class="mono"><b>₱4,500</b></td><td>—</td><td class="mono" style="font-size:12px;color:var(--gray);">—</td><td>Apr 16</td><td><span class="badge pending">Pending</span></td><td><div class="pay-actions"><button class="btn btn-sm btn-success" title="Verify payment" onclick="verifyPayment(this)">Accept</button><button class="btn btn-sm btn-danger" title="Reject payment" onclick="rejectPayment(this)">Reject</button></div></td></tr>
-                <tr data-status="Pending"><td><b>Dave Ocampo</b></td><td>TDC+PDC</td><td class="mono"><b>₱6,000</b></td><td>—</td><td class="mono" style="font-size:12px;color:var(--gray);">—</td><td>Apr 18</td><td><span class="badge pending">Pending</span></td><td><div class="pay-actions"><button class="btn btn-sm btn-success" title="Verify payment" onclick="verifyPayment(this)">Accept</button><button class="btn btn-sm btn-danger" title="Reject payment" onclick="rejectPayment(this)">Reject</button></div></td></tr>
+              <tbody id="paymentsTbody">
+                <tr><td colspan="8" style="text-align:center;color:var(--gray);padding:20px;">Loading payments…</td></tr>
               </tbody>
             </table>
           </div>
@@ -314,15 +311,12 @@
         <div class="card">
           <div class="card-head"><h3>Certifications Ready to Issue</h3></div>
           <div id="certsReadyList">
-            <div class="cert-row"><div class="cert-info"><h4>Ana Reyes - TDC Certificate</h4><span>Completed Apr 20 · 2/2 sessions · Instructor: Mr. Santos</span></div><div style="display:flex;gap:10px;align-items:center;"><span class="badge completed">Ready</span><button class="btn btn-sm btn-primary" onclick="issueCertificate(this)">Issue</button></div></div>
-            <div class="cert-row"><div class="cert-info"><h4>Liza Cruz - TDC Certificate</h4><span>Completed Apr 22 · 5/5 sessions · Instructor: Mr. Dela Cruz</span></div><div style="display:flex;gap:10px;align-items:center;"><span class="badge completed">Ready</span><button class="btn btn-sm btn-primary" onclick="issueCertificate(this)">Issue</button></div></div>
-            <div class="cert-row"><div class="cert-info"><h4>Maria Santos - PDC Certificate</h4><span>Completed Apr 24 · 8/8 sessions · Instructor: Ms. Lim</span></div><div style="display:flex;gap:10px;align-items:center;"><span class="badge completed">Ready</span><button class="btn btn-sm btn-primary" onclick="issueCertificate(this)">Issue</button></div></div>
+            <div style="font-size:12px;color:var(--gray);padding:14px 0;">Loading…</div>
           </div>
           <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--gray-light);">
             <div class="card-head" style="margin-bottom:14px;"><h3 style="font-size:14px;">Recently Issued</h3></div>
             <div id="certsIssuedList">
-              <div class="cert-row issued"><div class="cert-info"><h4>Roberto Gomez - PDC Certificate</h4><span>Issued Apr 18 · Valid ID: RCDA-PDC-2026-0041</span></div><div><span class="badge verified">Issued</span></div></div>
-              <div class="cert-row issued"><div class="cert-info"><h4>Carla Dizon - TDC Certificate</h4><span>Issued Apr 15 · Valid ID: RCDA-TDC-2026-0040</span></div><div><span class="badge verified">Issued</span></div></div>
+              <div style="font-size:12px;color:var(--gray);padding:14px 0;">Loading…</div>
             </div>
           </div>
         </div>

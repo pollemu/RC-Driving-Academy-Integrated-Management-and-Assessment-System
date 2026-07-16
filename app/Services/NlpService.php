@@ -32,4 +32,19 @@ class NlpService
             return null;
         }
     }
+
+    /* Feeds a verified assessment back into the NLP service so its model
+       keeps improving. Silently no-ops when the service is unreachable. */
+    public function train(array $payload): bool
+    {
+        try {
+            $response = Http::timeout(5)->post($this->url . '/train', $payload);
+
+            return $response->successful();
+        } catch (\Throwable $e) {
+            Log::warning('NLP training feed unavailable: ' . $e->getMessage());
+
+            return false;
+        }
+    }
 }

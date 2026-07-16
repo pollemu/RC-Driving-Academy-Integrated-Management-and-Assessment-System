@@ -69,6 +69,12 @@ class AttendanceController extends Controller
         $this->authorizeSchedule($request, $schedule);
 
         $statuses = $request->input('status', []);
+        if (is_string($statuses)) {
+            // Frontend may send a single student's status for a one-off mark.
+            $statuses = $request->input('student_id')
+                ? [$request->input('student_id') => $statuses]
+                : [];
+        }
 
         foreach ($statuses as $studentId => $status) {
             if (! in_array($status, ['present', 'absent', 'late'])) {

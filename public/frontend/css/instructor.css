@@ -97,3 +97,6 @@
     .attend-btns{flex-wrap:wrap;}
     .week-grid{grid-template-columns:repeat(2,1fr);}
   }
+
+  /* Pill badge used in the "Recent Assessments" table after a save. */
+  .badge-pill{padding:4px 12px;border-radius:999px;font-size:11.5px;font-weight:600;}

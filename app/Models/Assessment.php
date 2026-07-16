@@ -5,8 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+#[Fillable(['feedback_id', 'classification', 'confidence_score', 'recommendation', 'override_applied', 'suggestions'])]
 
-#[Fillable(['feedback_id', 'classification', 'confidence_score', 'recommendation', 'override_applied'])]
 class Assessment extends Model
 {
     protected function casts(): array
@@ -14,6 +14,7 @@ class Assessment extends Model
         return [
             'confidence_score' => 'decimal:2',
             'override_applied' => 'boolean',
+            'suggestions' => 'array',
         ];
     }
 

@@ -18,6 +18,7 @@
   h1,h2,h3,h4{font-family:'Poppins',sans-serif;margin:0;}
   p{margin:0;line-height:1.6;color:var(--gray);}
   a{text-decoration:none;color:inherit;}
+  img{max-width:100%;height:auto;}
   button{font-family:'Inter',sans-serif;cursor:pointer;border:none;}
   ::selection{background:var(--orange);color:white;}
   :focus-visible{outline:3px solid var(--orange);outline-offset:3px;}
@@ -282,4 +283,29 @@
     .stat-cards{grid-template-columns:1fr 1fr;}
     table{font-size:12.5px;}
     th,td{padding:10px 10px;}
+
+  /* ========== RCDA LOADING SPINNER ========== */
+  .rcda-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:54px 0;color:var(--gray);font-size:14px;font-family:Inter,system-ui,sans-serif;}
+  .rcda-spinner{width:36px;height:36px;border:3px solid var(--gray-light);border-top-color:var(--orange);border-radius:50%;animation:rcda-spin .8s linear infinite;}
+  @keyframes rcda-spin{to{transform:rotate(360deg);}}
+
+  /* ========== RCDA TOASTS ========== */
+  #rcdaToastRoot{position:fixed;top:18px;right:18px;z-index:9999;display:flex;flex-direction:column;gap:10px;max-width:360px;pointer-events:none;}
+  .rcda-toast{position:relative;display:flex;align-items:flex-start;gap:10px;padding:12px 14px 14px;border-radius:12px;font-family:Inter,system-ui,sans-serif;line-height:1.4;border:1px solid transparent;box-shadow:0 12px 30px rgba(16,24,40,.16);transform:translateX(24px);opacity:0;transition:opacity .22s ease,transform .22s ease;max-width:360px;cursor:pointer;overflow:hidden;}
+  .rcda-toast.show{opacity:1;transform:translateX(0);}
+  .rcda-toast .ic{flex:0 0 auto;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:12px;margin-top:1px;}
+  .rcda-toast .body{flex:1 1 auto;min-width:0;}
+  .rcda-toast .title{font-weight:700;font-size:13px;margin-bottom:2px;}
+  .rcda-toast .msg{flex:1 1 auto;word-break:break-word;font-size:12.5px;opacity:.92;}
+  .rcda-toast .bar{position:absolute;left:0;bottom:0;height:3px;width:100%;transform-origin:left;animation:rcda-toast-bar 5s linear forwards;}
+  @keyframes rcda-toast-bar{from{transform:scaleX(1);}to{transform:scaleX(0);}}
+  .rcda-toast--success{background:#ECFDF3;border-color:#ABEFC7;color:#027A48;}
+  .rcda-toast--success .ic{background:#12B76A;}
+  .rcda-toast--success .bar{background:#12B76A;}
+  .rcda-toast--error{background:#FEF3F2;border-color:#FECDCA;color:#B42318;}
+  .rcda-toast--error .ic{background:#F04438;}
+  .rcda-toast--error .bar{background:#F04438;}
+  .rcda-toast--info{background:#EFF8FF;border-color:#B2DDFF;color:#175CD3;}
+  .rcda-toast--info .ic{background:#2E90FA;}
+  .rcda-toast--info .bar{background:#2E90FA;}
   }

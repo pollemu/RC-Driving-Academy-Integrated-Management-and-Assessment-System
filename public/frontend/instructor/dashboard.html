@@ -147,7 +147,7 @@
           <div class="card-head">
             <div>
               <h3>Assess a Student</h3>
-              <p style="font-size:12.5px;color:var(--gray);margin-top:3px;">Rate skills, add notes, and let AI classify the student's proficiency level.</p>
+              <p style="font-size:12.5px;color:var(--gray);margin-top:3px;">Rate each driving skill, then pick a quick note (Perfect / Average / Low) per category. The student's training suggestion is generated from these.</p>
             </div>
           </div>
           <div class="two-col">
@@ -162,38 +162,20 @@
               </div>
 
               <p style="font-size:12.5px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 12px;">Skills Rating</p>
-              <div class="skills-rating-grid">
-                <div class="skill-rate-row"><label>Steering Control</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span></div></div>
-                <div class="skill-rate-row"><label>Speed Management</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span></div></div>
-                <div class="skill-rate-row"><label>Lane Discipline</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span></div></div>
-                <div class="skill-rate-row"><label>Parking</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span></div></div>
-                <div class="skill-rate-row"><label>Safety Awareness</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span></div></div>
+              <div class="skills-rating-grid" id="skillsGrid">
+                <div class="skill-rate-row" data-cat="steering"><label>Steering Control</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span></div><div class="preset-btns"><button type="button" class="pbtn" onclick="pickNote(this,'steering')">Perfect</button><button type="button" class="pbtn" onclick="pickNote(this,'steering')">Average</button><button type="button" class="pbtn" onclick="pickNote(this,'steering')">Low</button></div></div>
+                <div class="skill-rate-row" data-cat="speed"><label>Speed Management</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span></div><div class="preset-btns"><button type="button" class="pbtn" onclick="pickNote(this,'speed')">Perfect</button><button type="button" class="pbtn" onclick="pickNote(this,'speed')">Average</button><button type="button" class="pbtn" onclick="pickNote(this,'speed')">Low</button></div></div>
+                <div class="skill-rate-row" data-cat="lane"><label>Lane Discipline</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span></div><div class="preset-btns"><button type="button" class="pbtn" onclick="pickNote(this,'lane')">Perfect</button><button type="button" class="pbtn" onclick="pickNote(this,'lane')">Average</button><button type="button" class="pbtn" onclick="pickNote(this,'lane')">Low</button></div></div>
+                <div class="skill-rate-row" data-cat="parking"><label>Parking</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span></div><div class="preset-btns"><button type="button" class="pbtn" onclick="pickNote(this,'parking')">Perfect</button><button type="button" class="pbtn" onclick="pickNote(this,'parking')">Average</button><button type="button" class="pbtn" onclick="pickNote(this,'parking')">Low</button></div></div>
+                <div class="skill-rate-row" data-cat="safety"><label>Safety Awareness</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span></div><div class="preset-btns"><button type="button" class="pbtn" onclick="pickNote(this,'safety')">Perfect</button><button type="button" class="pbtn" onclick="pickNote(this,'safety')">Average</button><button type="button" class="pbtn" onclick="pickNote(this,'safety')">Low</button></div></div>
+                <div class="skill-rate-row" data-cat="mirror"><label>Mirror &amp; Observation</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span></div><div class="preset-btns"><button type="button" class="pbtn" onclick="pickNote(this,'mirror')">Perfect</button><button type="button" class="pbtn" onclick="pickNote(this,'mirror')">Average</button><button type="button" class="pbtn" onclick="pickNote(this,'mirror')">Low</button></div></div>
               </div>
 
               <div class="field" style="margin-top:18px;"><label>Qualitative Feedback</label><textarea id="nlpInput2" rows="4" placeholder="Describe the student's performance in detail..." style="width:100%;padding:13px 15px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);resize:vertical;"></textarea></div>
-              <div style="display:flex;gap:8px;margin-bottom:16px;">
-                <button class="btn btn-sm btn-ghost" onclick="sampleNLP2('fast')">Sample: Fast</button>
-                <button class="btn btn-sm btn-ghost" onclick="sampleNLP2('avg')">Sample: Avg</button>
-                <button class="btn btn-sm btn-ghost" onclick="sampleNLP2('needs')">Sample: Needs</button>
-              </div>
-              <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="analyzeNLP2()">Analyze & Save Assessment ➜</button>
+              <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:8px;" onclick="saveAssessment()">Save Assessment ➜</button>
             </div>
 
             <div>
-              <div id="nlpEmpty2" class="nlp-empty">
-                <p><b>No assessment yet</b></p>
-                <p>Fill in the skills rating and feedback, then click <b>Analyze &amp; Save Assessment</b> to get an instant AI-generated proficiency classification.</p>
-              </div>
-              <div id="nlpResult2" style="display:none;" class="nlp-result">
-                <p style="color:rgba(255,255,255,0.5);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;">AI Classification</p>
-                <div class="nlp-classification">
-                  <div class="nlp-badge" id="nlpBadge2">—</div>
-                  <div class="nlp-score" id="nlpScore2">—%</div>
-                </div>
-                <p style="color:rgba(255,255,255,0.6);font-size:13px;" id="nlpMsg2"></p>
-                <div class="nlp-tokens" id="nlpTokens2"></div>
-              </div>
-
               <div class="card" style="margin-top:16px;border:1px solid var(--gray-light);">
                 <div class="card-head"><h3>Recent Assessments</h3></div>
                 <table>

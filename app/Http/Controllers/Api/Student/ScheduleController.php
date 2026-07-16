@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
 use App\Models\Schedule;
 use App\Models\StudentSchedule;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class ScheduleController extends Controller
@@ -48,6 +49,18 @@ class ScheduleController extends Controller
         return response()->json(['schedules' => $schedules, 'bookedIds' => $bookedIds]);
     }
 
+    /* A student may hold only ONE upcoming booking at a time. */
+    protected function hasUpcomingBooking(Request $request): bool
+    {
+        $student = $request->user()->student;
+
+        return $student->studentSchedules()
+            ->whereHas('schedule', function ($q) {
+                $q->whereRaw("datetime(substr(date,1,10) || ' ' || time_start) >= ?", [now()->format('Y-m-d H:i:s')]);
+            })
+            ->exists();
+    }
+
     public function book(Request $request, Schedule $schedule)
     {
         $student = $request->user()->student;
@@ -59,6 +72,13 @@ class ScheduleController extends Controller
 
         if (! $enrollment) {
             return response()->json(['message' => 'Payment must be verified before booking.'], 422);
+        }
+
+        if ($this->hasUpcomingBooking($request)) {
+            return response()->json(
+                ['message' => 'You already have an upcoming session booked. Cancel it first to book another.'],
+                422
+            );
         }
 
         $bookedIds = $student->studentSchedules()->pluck('schedule_id')->toArray();
@@ -79,6 +99,34 @@ class ScheduleController extends Controller
 
         if ($schedule->isFull()) {
             $schedule->update(['status' => 'full']);
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
+    /* Cancel a booking — allowed only at least 1 hour before the session starts. */
+    public function cancel(Request $request, Schedule $schedule)
+    {
+        $student = $request->user()->student;
+
+        $booking = $student->studentSchedules()->where('schedule_id', $schedule->id)->first();
+
+        if (! $booking) {
+            return response()->json(['message' => 'You have not booked this session.'], 422);
+        }
+
+        $startsAt = Carbon::parse($schedule->date->format('Y-m-d') . ' ' . $schedule->time_start);
+        if (now()->addHour()->gte($startsAt)) {
+            return response()->json(
+                ['message' => 'Cancellation is only allowed at least 1 hour before the session starts.'],
+                422
+            );
+        }
+
+        $booking->delete();
+
+        if ($schedule->status === 'full') {
+            $schedule->update(['status' => 'open']);
         }
 
         return response()->json(['ok' => true]);

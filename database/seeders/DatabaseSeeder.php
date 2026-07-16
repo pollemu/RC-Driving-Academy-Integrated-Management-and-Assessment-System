@@ -40,17 +40,21 @@ class DatabaseSeeder extends Seeder
         );
 
         // Courses
+        // downpayment = amount required to activate scheduling (TDC & PDC 2W = full;
+        // PDC 4 Wheels = 50% downpayment, balance payable later).
         $coursesData = [
-            ['name' => 'TDC Face to Face', 'type' => 'TDC', 'format' => 'Face to Face', 'fee' => 799.00],
-            ['name' => 'TDC Online', 'type' => 'TDC', 'format' => 'Online', 'fee' => 999.00],
-            ['name' => 'PDC 4 Wheels Down Payment', 'type' => 'PDC', 'format' => '4 Wheels', 'fee' => 2000.00],
-            ['name' => 'PDC 4 Wheels Full Payment', 'type' => 'PDC', 'format' => '4 Wheels', 'fee' => 4000.00],
-            ['name' => 'PDC 2 Wheels', 'type' => 'PDC', 'format' => '2 Wheels', 'fee' => 1499.00],
+            ['name' => 'TDC Face to Face', 'type' => 'TDC', 'format' => 'Face to Face', 'fee' => 799.00, 'downpayment' => 799.00],
+            ['name' => 'TDC Online', 'type' => 'TDC', 'format' => 'Online', 'fee' => 999.00, 'downpayment' => 999.00],
+            ['name' => 'PDC 4 Wheels', 'type' => 'PDC', 'format' => '4 Wheels', 'fee' => 4000.00, 'downpayment' => 2000.00],
+            ['name' => 'PDC 2 Wheels', 'type' => 'PDC', 'format' => '2 Wheels', 'fee' => 1499.00, 'downpayment' => 1499.00],
         ];
+        // Deactivate the old split PDC rows if they still exist from a prior seed.
+        Course::whereIn('name', ['PDC 4 Wheels Down Payment', 'PDC 4 Wheels Full Payment'])
+            ->update(['is_active' => false]);
         foreach ($coursesData as $course) {
             Course::updateOrCreate(['name' => $course['name']], array_merge($course, ['is_active' => true]));
         }
-        $courses = Course::all();
+        $courses = Course::where('is_active', true)->get();
 
         // Idempotency guard — skip the demo data if students already exist.
         if (Student::count() > 0) {
@@ -101,7 +105,7 @@ class DatabaseSeeder extends Seeder
                     'course_id' => $course->id,
                     'instructor_id' => $instr->id,
                     'date' => now()->addDays(rand(1, 30))->format('Y-m-d'),
-                    'time_start' => '08:00:00',
+                    'time_start' => '08:00',
                     'time_end' => '10:00:00',
                     'venue' => fake()->randomElement(['Room 1', 'Room 2', 'Driving Range A', 'Driving Range B']),
                     'max_students' => rand(3, 8),

@@ -48,7 +48,7 @@
 
       <div class="login-art-mid">
         <h2>Start your journey behind the wheel, the right way.</h2>
-        <p>Create your student account to enroll in a course, book your sessions, and track your progress from day one.</p>
+        <p>Create your student account, then enroll in TDC and PDC courses and track every session from your dashboard.</p>
       </div>
 
       <div class="login-art-foot">
@@ -63,21 +63,21 @@
 
     <div class="login-side">
 
-      <!-- ===== STEP 1: ACCOUNT DETAILS ===== -->
+      <!-- ACCOUNT DETAILS -->
       <div class="login-box" id="signupBox">
 
-        <div class="lockup">
-          <img src="images/RCDA logo.jpg" alt="RC Driving Academy" class="lockup-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-          <div class="lockup-fallback" style="display:none">RC</div>
-          <div class="lockup-text">
+        <div class="look">
+          <img src="images/RCDA logo.jpg" alt="RC Driving Academy" class="look-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="look-fallback" style="display:none">RC</div>
+          <div class="look-text">
             <b>RC Driving Academy</b>
             <small>Integrated Management and Assessment System</small>
           </div>
         </div>
 
-        <div class="eyebrow-orange">Student Sign Up · Step 1 of 2</div>
+        <div class="eyebrow-orange">Student Sign Up</div>
         <h1 class="title">Create your account</h1>
-        <p class="sub">Fill in your details to enroll at RC Driving Academy.</p>
+        <p class="sub">Fill in your details to join RC Driving Academy.</p>
 
         <div class="su-row">
           <div class="login-field" style="margin-bottom:0">
@@ -112,19 +112,6 @@
           </div>
         </div>
 
-        <div class="login-field">
-          <label>Course</label>
-          <div class="input-wrap">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
-            <select id="regCourse">
-              <option value="">Select a course...</option>
-              <option value="TDC">Theoretical Driving Course (TDC)</option>
-              <option value="PDC">Practical Driving Course (PDC)</option>
-              <option value="TDC+PDC">TDC + PDC (Complete Package)</option>
-            </select>
-          </div>
-        </div>
-
         <div class="su-row">
           <div class="login-field" style="margin-bottom:0">
             <label>Password</label>
@@ -149,108 +136,12 @@
 
         <p id="regError" style="display:none;color:#dc2626;font-size:13px;margin:14px 0 0;background:#fef2f2;border-radius:8px;padding:9px 12px;"></p>
 
-        <button class="btn btn-primary login-btn" style="margin-top:22px;" onclick="goToPayment()">
-          Continue to Payment
+        <button class="btn btn-primary login-btn" style="margin-top:22px;" id="regSubmitBtn" onclick="registerAccount()">
+          Create Account
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         </button>
 
         <p class="signup-row">Already have an account? <a href="login.html">Sign in</a></p>
-      </div>
-
-      <!-- ===== STEP 2: PAYMENT METHOD ===== -->
-      <div class="login-box" id="paymentBox" style="display:none;">
-
-        <div class="lockup">
-          <img src="images/RCDA logo.jpg" alt="RC Driving Academy" class="lockup-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-          <div class="lockup-fallback" style="display:none">RC</div>
-          <div class="lockup-text">
-            <b>RC Driving Academy</b>
-            <small>Integrated Management and Assessment System</small>
-          </div>
-        </div>
-
-        <div class="eyebrow-orange">Student Sign Up · Step 2 of 2</div>
-        <h1 class="title">Choose your payment method</h1>
-        <p class="sub">You're enrolling in <b id="paySummaryCourse">—</b>. Amount due: <b id="paySummaryAmount">—</b></p>
-
-        <div class="pay-methods">
-          <button type="button" class="pay-method" id="payOnlineTab" onclick="selectPayMethod('online')">
-            <span class="pay-method-ico"><img src="images/onlinebank.png" alt="Pay Online" style="width:100%;height:100%;object-fit:cover;"></span>
-            <span class="pay-method-text">
-              <b>Pay Online</b>
-              <span>GCash, Maya, or debit/credit card</span>
-              </span>
-            </span>
-          </button>
-          <button type="button" class="pay-method" id="payFtfTab" onclick="selectPayMethod('ftf')">
-            <span class="pay-method-ico"><img src="images/RCDA logo.jpg" alt="Pay at the Center" style="width:100%;height:100%;object-fit:cover;"></span>
-            <span class="pay-method-text">
-              <b>Pay at the Center</b>
-              <span>Face-to-face cash payment on-site</span>
-            </span>
-          </button>
-        </div>
-
-        <!-- Online payment panel -->
-        <div id="onlinePanel" class="pay-panel" style="display:none;">
-          <div class="login-field">
-            <label>E-wallet or Card Number</label>
-            <div class="input-wrap">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>
-              <input type="text" placeholder="09XX-XXX-XXXX or 4242 4242 4242 4242" id="payNumber">
-            </div>
-          </div>
-          <div class="su-row">
-            <div class="login-field" style="margin-bottom:0">
-              <label>Expiry / Valid Thru</label>
-              <div class="input-wrap">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-                <input type="text" placeholder="MM/YY" id="payExpiry">
-              </div>
-            </div>
-            <div class="login-field" style="margin-bottom:0">
-              <label>CVV / PIN</label>
-              <div class="input-wrap">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 118 0v4"/></svg>
-                <input type="password" placeholder="•••" id="payCvv">
-              </div>
-            </div>
-          </div>
-          <p id="payError" style="display:none;color:#dc2626;font-size:13px;margin:4px 0 0;background:#fef2f2;border-radius:8px;padding:9px 12px;"></p>
-          <button class="btn btn-primary login-btn" style="margin-top:18px;" onclick="payOnline()">
-            <span id="payOnlineLabel">Pay Now</span>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-          </button>
-        </div>
-
-        <!-- Face-to-face panel -->
-        <div id="ftfPanel" class="pay-panel" style="display:none;">
-          <div class="pay-note">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b45309" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-            <p>No payment is collected now. Your enrollment will be marked <b>Pending</b> until you pay in cash at the RC Driving Academy center. Bring your reference code below.</p>
-          </div>
-          <button class="btn btn-primary login-btn" style="margin-top:6px;" onclick="confirmFtf()">
-            Confirm Enrollment
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-          </button>
-        </div>
-
-        <p class="signup-row"><a href="#" onclick="backToDetails();return false;">&larr; Back to account details</a></p>
-      </div>
-
-      <!-- ===== SUCCESS STATE (shown after payment / enrollment confirmation) ===== -->
-      <div class="login-box su-success" id="signupSuccess" style="display:none;">
-        <div class="su-success-icon" id="successIcon">
-          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
-        </div>
-        <span class="badge" id="successBadge" style="margin-bottom:12px;">Paid</span>
-        <h1 class="title" style="font-size:23px;">All done!</h1>
-        <p class="sub" id="signupSuccessMsg">Your student account has been submitted.</p>
-        <div class="ref-box">
-          <span>Reference Code</span>
-          <b id="refCode">—</b>
-        </div>
-        <a href="login.html" class="btn btn-primary login-btn" style="margin-top:18px;">Back to Sign In</a>
       </div>
 
     </div>
@@ -344,15 +235,15 @@
 
       <h2>2. Enrollment &amp; Courses</h2>
       <ul>
-        <li>Course pricing shown at sign-up (TDC, PDC, or the combined package) is subject to change without prior notice; the price in effect at the time of your enrollment applies.</li>
-        <li>Enrollment via <b>Pay Online</b> is confirmed once payment is verified by our processor.</li>
-        <li>Enrollment via <b>Pay at the Center</b> is marked <i>Pending</i> and is only confirmed once cash payment is received and recorded by an administrator at the RCDA center.</li>
-        <li>A reference code is issued upon sign-up and should be kept for verification purposes.</li>
+        <li>You may enroll in one Theoretical Driving Course (TDC) — either Face-to-Face or Online — and any Practical Driving Course (PDC) once your TDC is completed.</li>
+        <li>Full payment is required to attend TDC; PDC 4 Wheels requires a 50% downpayment to begin scheduling (balance payable later); PDC 2 Wheels requires full payment.</li>
+        <li>Enrollment via <b>GCash / BDO</b> is confirmed once payment is verified by our administrator.</li>
+        <li>A reference code is issued upon enrollment and should be kept for verification purposes.</li>
       </ul>
 
       <h2>3. Payments &amp; Refunds</h2>
       <ul>
-        <li>Online payments are processed through third-party payment providers (e.g. GCash, Maya, card networks). RCDA does not store your full card or e-wallet credentials.</li>
+        <li>Online payments are processed through third-party payment providers (e.g. GCash, BDO). RCDA does not store your full card or e-wallet credentials.</li>
         <li>Refund eligibility, if any, is subject to RCDA's separate refund policy available at the center and is not governed by this System.</li>
         <li>Fraudulent or disputed transactions may result in enrollment suspension pending resolution.</li>
       </ul>

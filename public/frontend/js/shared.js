@@ -6,6 +6,12 @@
 function openModal(id){ const m = document.getElementById(id); if(m) m.classList.add('open'); }
 function closeModal(id){ const m = document.getElementById(id); if(m) m.classList.remove('open'); }
 
+/* Reusable spinner/loading placeholder (CSS in base.css).
+   Labels are app-controlled literals, so no escaping needed. */
+function rcdaLoading(label){
+  return '<div class="rcda-loading"><div class="rcda-spinner"></div><div>' + (label || 'Loading…') + '</div></div>';
+}
+
 /* ---- AUTH GUARD (dashboards) ----
    Verifies the stored token against /api/me, redirecting to login
    when missing/invalid, and to the correct role dashboard when the

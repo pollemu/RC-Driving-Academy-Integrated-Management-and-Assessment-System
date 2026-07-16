@@ -7,7 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-#[Fillable(['instructor_id', 'student_id', 'schedule_id', 'raw_text', 'star_steering', 'star_speed', 'star_lane', 'star_parking', 'star_safety', 'star_mirror'])]
+#[Fillable(['instructor_id', 'student_id', 'schedule_id', 'raw_text',
+    'star_steering', 'star_speed', 'star_lane', 'star_parking', 'star_safety', 'star_mirror',
+    'note_steering', 'note_speed', 'note_lane', 'note_parking', 'note_safety', 'note_mirror'])]
 class Feedback extends Model
 {
     public function instructor(): BelongsTo

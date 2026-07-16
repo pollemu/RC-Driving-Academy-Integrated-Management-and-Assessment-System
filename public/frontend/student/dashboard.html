@@ -45,6 +45,10 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
         My Results
       </div>
+      <div class="nav-item" onclick="showPanel('enroll',this)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5a2 2 0 012-2h8l6 6v10a2 2 0 01-2 2H6a2 2 0 01-2-2z"/><path d="M14 3v6h6"/><path d="M12 11v6M9 14h6"/></svg>
+        Enroll
+      </div>
       <div class="nav-item" onclick="showPanel('payment',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
         Payment
@@ -79,10 +83,10 @@
 
        <!-- PROFILE PANEL -->
        <div class="panel active" id="stud-profile">
-         <div class="two-col" id="studProfileBody">
-           <div class="card">Loading your profile…</div>
-         </div>
-       </div>
+          <div class="two-col" id="studProfileBody">
+            <div class="rcda-loading"><div class="rcda-spinner"></div><div>Loading your profile…</div></div>
+          </div>
+        </div>
 
       <!-- HANDBOOK PANEL -->
       <div class="panel" id="stud-handbook">
@@ -287,8 +291,27 @@
          <div id="studPaymentBody"></div>
        </div>
 
+       <!-- ENROLL PANEL -->
+       <div class="panel" id="stud-enroll">
+         <div id="studEnrollBody"></div>
+       </div>
+
     </div><!-- /dash-body -->
   </main>
+</div>
+
+<!-- ===== PAYMENT MODAL (cart / dues) ===== -->
+<div class="modal-overlay" id="payModal">
+  <div class="modal-box" style="max-width:460px;">
+    <div class="modal-head">
+      <h3>Complete Payment</h3>
+      <button class="modal-close" onclick="closeModal('payModal')" aria-label="Close">✕</button>
+    </div>
+    <p style="font-size:13px;color:var(--gray);margin:-6px 0 14px;">You'll be redirected to PayMongo to pay securely with GCash, Card, or over-the-counter — no need to type a reference number.</p>
+    <div id="payModalItems" class="cart-lines"></div>
+    <div class="cart-total" style="margin-top:14px;"><span>Total due now</span><span id="payModalTotal">—</span></div>
+    <button id="payModalPayBtn" class="btn btn-primary" style="margin-top:14px;width:100%;" onclick="processPay()">Pay with PayMongo</button>
+  </div>
 </div>
 
 <script src="../js/config.js"></script>

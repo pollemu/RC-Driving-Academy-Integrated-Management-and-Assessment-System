@@ -296,14 +296,38 @@ document.addEventListener('keydown', function (e) {
 });
 
 /* ============================================================
-   NLP assessment — client preview + save to backend
+   Assessment — per-category star rating + preset notes,
+   saved to the backend (training suggestion is rule-based).
    ============================================================ */
-function sampleNLP2(type) {
-  const el = document.getElementById('nlpInput2');
-  if (el) el.value = (window.nlpData && window.nlpData[type] && window.nlpData[type].text) || '';
+const NOTE_LABELS = { perfect: 'Perfect driving skills', average: 'Average driving skills', low: 'Low driving skills' };
+
+function pickNote(btn, cat) {
+  const row = btn.closest('.skill-rate-row');
+  if (!row) return;
+  row.querySelectorAll('.pbtn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
 }
 
-function analyzeNLP2() {
+function readStars() {
+  const map = {};
+  document.querySelectorAll('.skills-rating-grid .skill-rate-row').forEach(row => {
+    const cat = row.getAttribute('data-cat');
+    map[cat] = row.querySelectorAll('.star-row .star.lit').length;
+  });
+  return map;
+}
+
+function readNotes() {
+  const map = {};
+  document.querySelectorAll('.skills-rating-grid .skill-rate-row').forEach(row => {
+    const cat = row.getAttribute('data-cat');
+    const active = row.querySelector('.pbtn.active');
+    map[cat] = active ? NOTE_LABELS[active.textContent.trim().toLowerCase()] || null : null;
+  });
+  return map;
+}
+
+function saveAssessment() {
   const scheduleId = (document.getElementById('assessSchedule') || {}).value;
   const studentId = (document.getElementById('assessStudent') || {}).value;
   if (!scheduleId || !studentId) { RCDA.showToast('Select a session and student first.'); return; }
@@ -311,38 +335,45 @@ function analyzeNLP2() {
   const txt = (document.getElementById('nlpInput2') || {}).value || '';
   if (txt.trim().length < 10) { RCDA.showToast('Please enter at least 10 characters of feedback.'); return; }
 
-  const stars = Array.from(document.querySelectorAll('.skills-rating-grid .star-row'))
-    .map(row => row.querySelectorAll('.star.lit').length);
-
-  const type = classifyNLP(txt);
-  const d = window.nlpData[type];
-  const badge = document.getElementById('nlpBadge2');
-  const score = document.getElementById('nlpScore2');
-  const msg = document.getElementById('nlpMsg2');
-  const tokens = document.getElementById('nlpTokens2');
-  const result = document.getElementById('nlpResult2');
-  if (badge) { badge.textContent = d.badge; badge.className = 'nlp-badge ' + d.cls; }
-  if (score) score.textContent = d.score + '%';
-  if (msg) msg.textContent = d.msg;
-  if (tokens) tokens.innerHTML = d.tokens.map(t => `<span class="token-chip ${t.c}">${escapeHtml(t.t)}</span>`).join('');
-  if (result) result.style.display = 'block';
-  const empty = document.getElementById('nlpEmpty2');
-  if (empty) empty.style.display = 'none';
+  const stars = readStars();
+  const notes = readNotes();
 
   RCDA.safeFetch(INSTR_API() + `/instructor/feedback/${scheduleId}/${studentId}`, {
     method: 'POST',
     body: {
       raw_text: txt,
-      star_steering: stars[0] || null,
-      star_speed: stars[1] || null,
-      star_lane: stars[2] || null,
-      star_parking: stars[3] || null,
-      star_safety: stars[4] || null,
+      star_steering: stars.steering || null,
+      star_speed: stars.speed || null,
+      star_lane: stars.lane || null,
+      star_parking: stars.parking || null,
+      star_safety: stars.safety || null,
+      star_mirror: stars.mirror || null,
+      note_steering: notes.steering || null,
+      note_speed: notes.speed || null,
+      note_lane: notes.lane || null,
+      note_parking: notes.parking || null,
+      note_safety: notes.safety || null,
+      note_mirror: notes.mirror || null,
     }
   }).then(({ ok, data, error }) => {
     if (!ok) { RCDA.showToast(error || 'Could not save assessment.'); return; }
-    RCDA.showToast(data && data.queued ? 'Assessment saved and queued for AI analysis.' : 'Assessment saved.', 'success');
+    RCDA.showToast('Assessment saved — training suggestion generated.', 'success');
+    loadRecentAssessments();
   });
+}
+
+function loadRecentAssessments() {
+  const body = document.getElementById('recentAssessBody');
+  if (!body) return;
+  const schedSel = document.getElementById('assessSchedule');
+  const stuSel = document.getElementById('assessStudent');
+  const schedTxt = schedSel ? (schedSel.options[schedSel.selectedIndex]?.text || 'this session') : 'this session';
+  const stuTxt = stuSel ? (stuSel.options[stuSel.selectedIndex]?.text || 'student') : 'student';
+  const now = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const row = `<tr><td>${escapeHtml(stuTxt)}</td><td>${now}</td><td>—</td><td><span class="badge badge-pill" style="background:var(--green-light);color:#15803d;">Saved</span></td></tr>`;
+  const placeholder = body.querySelector('td[colspan="4"]');
+  if (placeholder) body.innerHTML = row;
+  else body.insertAdjacentHTML('afterbegin', row);
 }
 
 /* ---- INIT ---- */

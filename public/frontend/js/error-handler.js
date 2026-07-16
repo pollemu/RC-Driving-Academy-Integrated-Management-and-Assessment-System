@@ -31,35 +31,51 @@ window.RCDA = window.RCDA || {};
 
   RCDA.showToast = function (message, type) {
     type = type || 'error'; // 'error' | 'success' | 'info'
-    const colors = {
-      error:   { bg:'#fef2f2', border:'#fecaca', text:'#b91c1c' },
-      success: { bg:'#dcfce7', border:'#bbf7d0', text:'#15803d' },
-      info:    { bg:'#eff6ff', border:'#bfdbfe', text:'#1d4ed8' }
-    };
-    const c = colors[type] || colors.error;
-
+    const icons = { error: '!', success: '✓', info: 'i' };
+    const titles = { error: 'Something went wrong', success: 'All set', info: 'Heads up' };
     const root = ensureToastRoot();
+
     const el = document.createElement('div');
-    el.textContent = message;
-    el.style.cssText = [
-      `background:${c.bg}`, `border:1px solid ${c.border}`, `color:${c.text}`,
-      'padding:12px 16px', 'border-radius:10px', 'font-size:13.5px',
-      'font-family:Inter,sans-serif', 'box-shadow:0 8px 24px rgba(0,0,0,0.12)',
-      'pointer-events:auto', 'opacity:0', 'transform:translateY(-8px)',
-      'transition:opacity .2s ease, transform .2s ease'
-    ].join(';');
+    el.className = 'rcda-toast rcda-toast--' + type;
+    el.setAttribute('role', 'status');
+
+    const ic = document.createElement('span');
+    ic.className = 'ic';
+    ic.textContent = icons[type] || icons.error;
+
+    const body = document.createElement('div');
+    body.className = 'body';
+
+    const title = document.createElement('div');
+    title.className = 'title';
+    title.textContent = titles[type] || titles.error;
+
+    const msg = document.createElement('div');
+    msg.className = 'msg';
+    msg.textContent = (message === null || message === undefined) ? '' : String(message);
+
+    body.appendChild(title);
+    body.appendChild(msg);
+
+    const bar = document.createElement('span');
+    bar.className = 'bar';
+
+    el.appendChild(ic);
+    el.appendChild(body);
+    el.appendChild(bar);
     root.appendChild(el);
 
-    requestAnimationFrame(() => {
-      el.style.opacity = '1';
-      el.style.transform = 'translateY(0)';
-    });
+    requestAnimationFrame(() => el.classList.add('show'));
 
-    setTimeout(() => {
-      el.style.opacity = '0';
-      el.style.transform = 'translateY(-8px)';
-      setTimeout(() => el.remove(), 200);
-    }, 4200);
+    const hide = () => {
+      el.classList.remove('show');
+      setTimeout(() => el.remove(), 240);
+    };
+    el.addEventListener('click', hide);
+    const timer = setTimeout(hide, 5000);
+    el.addEventListener('mouseenter', () => clearTimeout(timer));
+
+    return el;
   };
 
   /* ---- Safe fetch: timeout + consistent error shape ----

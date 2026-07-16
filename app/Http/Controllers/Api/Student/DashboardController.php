@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Student;
 use App\Http\Controllers\Controller;
 use App\Models\Certification;
 use App\Models\StudentSchedule;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
@@ -36,11 +37,17 @@ class DashboardController extends Controller
 
                 return [
                     'id' => $booking->id,
+                    'schedule_id' => $s->id,
                     'course' => ['name' => $s->course->name],
                     'date' => $s->date,
                     'time_start' => $s->time_start,
                     'time_end' => $s->time_end,
                     'instructor_name' => $s->instructor->user->name,
+                    'cancelable' => $s->date && $s->time_start
+                        ? now()->addHour()->lt(
+                            Carbon::parse($s->date->format('Y-m-d') . ' ' . $s->time_start)
+                          )
+                        : false,
                 ];
             });
 

@@ -51,12 +51,33 @@ class ProgressController extends Controller
             ->latest()
             ->get()
             ->map(function (Assessment $a) {
+                $f = $a->feedback;
+                $cats = [
+                    'steering' => ['Steering Control', $f->star_steering, $f->note_steering],
+                    'speed'    => ['Speed Management', $f->star_speed, $f->note_speed],
+                    'lane'     => ['Lane Discipline', $f->star_lane, $f->note_lane],
+                    'parking'  => ['Parking', $f->star_parking, $f->note_parking],
+                    'safety'   => ['Safety Awareness', $f->star_safety, $f->note_safety],
+                    'mirror'   => ['Mirror & Observation', $f->star_mirror, $f->note_mirror],
+                ];
+                $categories = [];
+                foreach ($cats as $key => [$label, $score, $note]) {
+                    $categories[] = [
+                        'key'   => $key,
+                        'label' => $label,
+                        'score' => $score,
+                        'note'  => $note,
+                    ];
+                }
+
                 return [
-                    'course_name' => $a->feedback->schedule->course->name,
-                    'classification' => $a->classification,
+                    'course_name'    => $a->feedback->schedule->course->name,
+                    'classification'  => $a->classification,
                     'confidence_score' => $a->confidence_score,
                     'override_applied' => $a->override_applied,
                     'recommendation' => $a->recommendation,
+                    'categories'     => $categories,
+                    'suggestions'    => $a->suggestions ?? [],
                 ];
             });
 

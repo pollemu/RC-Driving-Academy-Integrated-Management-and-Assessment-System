@@ -32,4 +32,27 @@ class Payment extends Model
     {
         return $this->belongsTo(User::class, 'verified_by');
     }
+
+    /* Mark this payment verified and activate the linked enrollment once the
+       verified amount covers the course's required downpayment. */
+    public function markVerified(?int $by = null): void
+    {
+        $this->update([
+            'status' => 'verified',
+            'verified_by' => $by,
+            'verified_at' => now(),
+        ]);
+
+        $enrollment = Enrollment::firstOrNew([
+            'student_id' => $this->student_id,
+            'course_id' => $this->course_id,
+        ]);
+
+        $course = $this->course;
+        if ($course && $this->amount >= $course->downpayment && $enrollment->status !== 'completed') {
+            $enrollment->status = 'active';
+        }
+        $enrollment->enrolled_at = $enrollment->enrolled_at ?? now();
+        $enrollment->save();
+    }
 }

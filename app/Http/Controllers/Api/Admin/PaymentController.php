@@ -59,7 +59,13 @@ class PaymentController extends Controller
             'student_id' => $payment->student_id,
             'course_id' => $payment->course_id,
         ]);
-        $enrollment->status = 'active';
+        $course = $payment->course;
+        // Activate (make schedulable) only once the verified amount covers the
+        // required downpayment. TDC / PDC 2W require the full fee; PDC 4W
+        // activates on its 50% downpayment (balance payable later).
+        if ($course && $payment->amount >= $course->downpayment && $enrollment->status !== 'completed') {
+            $enrollment->status = 'active';
+        }
         $enrollment->enrolled_at = $enrollment->enrolled_at ?? now();
         $enrollment->save();
 
@@ -75,6 +81,18 @@ class PaymentController extends Controller
             'verified_by' => auth()->id(),
             'verified_at' => now(),
         ]);
+
+        // Revert the linked enrollment to "pending" so scheduling re-locks and the
+        // student can pay again. (PayMongo auto-verifies on success; a manual
+        // reject means that payment did not go through.)
+        $enrollment = Enrollment::firstOrNew([
+            'student_id' => $payment->student_id,
+            'course_id' => $payment->course_id,
+        ]);
+        if ($enrollment->exists && $enrollment->status === 'active') {
+            $enrollment->status = 'pending';
+            $enrollment->save();
+        }
 
         $payment->load(['student.user', 'course']);
 

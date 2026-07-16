@@ -42,6 +42,16 @@ class PayMongoService
 
     public function createPaymentIntentWithCheckout(int $amountCentavos, string $description, string $reference, string $successUrl, string $cancelUrl): ?string
     {
+        $session = $this->createCheckoutSession($amountCentavos, $description, $reference, $successUrl, $cancelUrl);
+
+        return $session ? $session['url'] : null;
+    }
+
+    /* Creates a PayMongo Checkout Session and returns ['id' => sessionId, 'url' => hostedCheckoutUrl].
+       The student is redirected to `url` (GCash / Card / OTC) and PayMongo appends
+       ?checkout_session_id=...&payment_id=... to the success URL on completion. */
+    public function createCheckoutSession(int $amountCentavos, string $description, string $reference, string $successUrl, string $cancelUrl): ?array
+    {
         $intent = $this->createPaymentIntent($amountCentavos, $description, $reference);
 
         if (! $intent) {
@@ -72,7 +82,32 @@ class PayMongoService
             return null;
         }
 
-        return $response->json('data.attributes.checkout_url');
+        $data = $response->json('data');
+
+        return [
+            'id' => $data['id'] ?? null,
+            'url' => $data['attributes']['checkout_url'] ?? null,
+        ];
+    }
+
+    /* Retrieves a Checkout Session. Returns ['id','payment_id'(null until paid),'status'] or null. */
+    public function getCheckoutSession(string $sessionId): ?array
+    {
+        $response = Http::withBasicAuth($this->secret, '')
+            ->get($this->base . '/checkout_sessions/' . $sessionId);
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        $data = $response->json('data');
+        $attrs = $data['attributes'] ?? [];
+
+        return [
+            'id' => $data['id'] ?? $sessionId,
+            'payment_id' => $attrs['payment_id'] ?? null,
+            'status' => $attrs['status'] ?? null,
+        ];
     }
 
     public function verifyWebhookSignature(string $payload, string $signature): bool

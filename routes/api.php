@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\Student\EnrollController as StudentEnrollController
 use App\Http\Controllers\Api\Student\PaymentController as StudentPaymentController;
 use App\Http\Controllers\Api\Student\ScheduleController as StudentScheduleController;
 use App\Http\Controllers\Api\Student\ProgressController as StudentProgressController;
+use App\Http\Controllers\Api\WebhookController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login']);
@@ -56,12 +57,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('api.role:student')->prefix('student')->group(function () {
         Route::get('/dashboard', [StudentDashboardController::class, 'index'])->name('api.student.dashboard');
         Route::get('/enroll', [StudentEnrollController::class, 'index'])->name('api.student.enroll.index');
+        Route::post('/enroll/cart', [StudentEnrollController::class, 'cartEnroll'])->name('api.student.enroll.cart');
         Route::post('/enroll/{course}', [StudentEnrollController::class, 'enroll'])->name('api.student.enroll.store');
         Route::get('/payments', [StudentPaymentController::class, 'index'])->name('api.student.payments.index');
+        Route::post('/payments/cart', [StudentPaymentController::class, 'cartStore'])->name('api.student.payments.cart');
+        Route::get('/payments/return', [StudentPaymentController::class, 'returnVerify'])->name('api.student.payments.return');
         Route::get('/payments/{enrollment}/create', [StudentPaymentController::class, 'create'])->name('api.student.payments.create');
         Route::post('/payments/{enrollment}', [StudentPaymentController::class, 'store'])->name('api.student.payments.store');
         Route::get('/schedules', [StudentScheduleController::class, 'index'])->name('api.student.schedules.index');
         Route::post('/schedules/{schedule}/book', [StudentScheduleController::class, 'book'])->name('api.student.schedules.book');
+        Route::delete('/schedules/{schedule}/book', [StudentScheduleController::class, 'cancel'])->name('api.student.schedules.cancel');
         Route::get('/progress', [StudentProgressController::class, 'index'])->name('api.student.progress');
     });
 });
+
+/* Public PayMongo webhook (no auth). */
+Route::post('/webhooks/paymongo', [WebhookController::class, 'paymongo'])->name('api.webhooks.paymongo');

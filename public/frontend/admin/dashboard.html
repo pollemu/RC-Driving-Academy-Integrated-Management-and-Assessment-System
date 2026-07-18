@@ -304,6 +304,7 @@
               </div>
             </div>
             <button class="btn btn-sm btn-ghost" onclick="exportPaymentsPDF()">Export PDF</button>
+            <button class="btn btn-sm btn-primary" onclick="openRecordPaymentModal()">+ Record Payment</button>
           </div></div>
           <div style="overflow-x:auto;">
             <table id="paymentsTable">
@@ -522,6 +523,50 @@
     <div class="pay-modal-footer">
       <button class="btn btn-sm btn-ghost" onclick="closeModal('assignInstructorModal')">Cancel</button>
       <button class="btn btn-sm btn-primary" onclick="submitAssignInstructor()">Save Assignment</button>
+    </div>
+  </div>
+</div>
+
+<!-- RECORD PAYMENT MODAL -->
+<div class="modal-overlay" id="recordPaymentModal">
+  <div class="modal-box" style="max-width:460px;">
+    <div class="modal-head">
+      <h3>Record Payment</h3>
+      <button class="modal-close" onclick="closeModal('recordPaymentModal')">✕</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div class="field">
+        <label>Student</label>
+        <select id="payStudent" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);"></select>
+      </div>
+      <div class="field">
+        <label>Course</label>
+        <select id="payCourse" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);"></select>
+      </div>
+      <div class="two-col" style="gap:14px;">
+        <div class="field">
+          <label>Amount (₱)</label>
+          <input id="payAmount" type="number" min="0" step="0.01" placeholder="0.00" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);">
+        </div>
+        <div class="field">
+          <label>Method</label>
+          <select id="payMethod" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);">
+            <option value="cash">Cash</option>
+            <option value="gcash">GCash</option>
+            <option value="bdo">BDO</option>
+            <option value="otc">Over the Counter</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Reference No. (optional)</label>
+        <input id="payRef" type="text" placeholder="e.g. CASH-001" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);">
+      </div>
+      <p id="payError" style="display:none;color:#dc2626;font-size:12.5px;margin:0;"></p>
+    </div>
+    <div class="pay-modal-footer">
+      <button class="btn btn-sm btn-ghost" onclick="closeModal('recordPaymentModal')">Cancel</button>
+      <button class="btn btn-sm btn-primary" onclick="submitRecordPayment()">Record &amp; Verify</button>
     </div>
   </div>
 </div>

@@ -257,6 +257,59 @@ async function submitAssignInstructor(){
 }
 
 /* ============================================================
+   Record Payment — admin takes a cash / OTC payment at the
+   counter and verifies it immediately so the student can book.
+   ============================================================ */
+let RECORD_PAYMENT_STUDENTS = [];
+let RECORD_PAYMENT_COURSES = [];
+
+async function openRecordPaymentModal(){
+  const err = document.getElementById('payError');
+  if (err) err.style.display = 'none';
+  const [stuRes, courseRes] = await Promise.all([
+    RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/students?per_page=100`, { method: 'GET' }),
+    RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/courses`, { method: 'GET' }).catch(() => ({ ok: false })),
+  ]);
+  RECORD_PAYMENT_STUDENTS = (stuRes.ok && stuRes.data.students) || [];
+  RECORD_PAYMENT_COURSES = (courseRes.ok && courseRes.data && courseRes.data.courses) || [];
+  const stuSel = document.getElementById('payStudent');
+  const courseSel = document.getElementById('payCourse');
+  if (stuSel) stuSel.innerHTML = RECORD_PAYMENT_STUDENTS.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+  if (courseSel) {
+    if (RECORD_PAYMENT_COURSES.length) {
+      courseSel.innerHTML = RECORD_PAYMENT_COURSES.map(c => `<option value="${c.id}" data-fee="${c.fee}">${escapeHtml(c.name)} — ₱${Number(c.fee).toFixed(2)}</option>`).join('');
+    } else {
+      courseSel.innerHTML = '<option value="">— no courses —</option>';
+    }
+  }
+  const amt = document.getElementById('payAmount');
+  if (amt && courseSel && courseSel.selectedOptions[0]) amt.value = courseSel.selectedOptions[0].dataset.fee || '';
+  openModal('recordPaymentModal');
+}
+
+async function submitRecordPayment(){
+  const err = document.getElementById('payError');
+  if (err) err.style.display = 'none';
+  const studentId = Number(document.getElementById('payStudent').value);
+  const courseId = Number(document.getElementById('payCourse').value);
+  const amount = parseFloat(document.getElementById('payAmount').value);
+  const method = document.getElementById('payMethod').value;
+  const reference = document.getElementById('payRef').value || ('CASH-' + Date.now());
+  if (!studentId || !courseId || isNaN(amount) || amount < 0) {
+    if (err) { err.textContent = 'Please choose a student, course, and a valid amount.'; err.style.display = 'block'; }
+    return;
+  }
+  const { ok, error, data } = await RCDA.safeFetch(
+    `${RCDA_CONFIG.getApiBaseUrl()}/admin/payments`,
+    { method: 'POST', body: { student_id: studentId, course_id: courseId, amount, method, reference_no: reference } }
+  );
+  if (!ok) { if (err) { err.textContent = error || 'Could not record payment.'; err.style.display = 'block'; } return; }
+  RCDA.showToast('Payment recorded and verified. Student can now book.', 'success');
+  closeModal('recordPaymentModal');
+  loadPayments();
+}
+
+/* ============================================================
    Pending Bookings — admin accepts the instructor assigned to
    each session (booking sits 'pending' until accepted).
    ============================================================ */

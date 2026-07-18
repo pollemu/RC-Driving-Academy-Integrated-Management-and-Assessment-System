@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Course;
 use App\Models\Schedule;
 use App\Models\StudentSchedule;
 use Illuminate\Http\Request;
@@ -36,6 +37,21 @@ class ScheduleController extends Controller
         });
 
         return response()->json(['schedules' => $data]);
+    }
+
+    public function courses()
+    {
+        $courses = Course::where('is_active', true)->get()->map(function (Course $course) {
+            return [
+                'id' => $course->id,
+                'name' => $course->name,
+                'type' => $course->type,
+                'fee' => $course->fee,
+                'downpayment' => $course->downpayment,
+            ];
+        });
+
+        return response()->json(['courses' => $courses]);
     }
 
     public function show(Schedule $schedule)

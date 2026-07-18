@@ -39,9 +39,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('instructors', AdminInstructorController::class)->except(['create', 'edit', 'show', 'update']);
         Route::post('/instructors/{instructor}/toggle-active', [AdminInstructorController::class, 'toggleActive'])->name('api.admin.instructors.toggle');
         Route::get('/schedules', [AdminScheduleController::class, 'index'])->name('api.admin.schedules.index');
+        Route::get('/courses', [AdminScheduleController::class, 'courses'])->name('api.admin.courses');
         Route::post('/schedules', [AdminScheduleController::class, 'store'])->name('api.admin.schedules.store');
         Route::post('/schedules/{schedule}/cancel', [AdminScheduleController::class, 'cancel'])->name('api.admin.schedules.cancel');
         Route::get('/payments', [AdminPaymentController::class, 'index'])->name('api.admin.payments.index');
+        Route::post('/payments', [AdminPaymentController::class, 'store'])->name('api.admin.payments.store');
         Route::post('/payments/{payment}/verify', [AdminPaymentController::class, 'verify'])->name('api.admin.payments.verify');
         Route::post('/payments/{payment}/reject', [AdminPaymentController::class, 'reject'])->name('api.admin.payments.reject');
         Route::get('/certifications/ready', [AdminCertificationController::class, 'ready'])->name('api.admin.certifications.ready');

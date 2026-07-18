@@ -44,6 +44,10 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
         Attendance
       </div>
+      <div class="nav-item" onclick="showPanel('bookings',this)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        Pending Bookings
+      </div>
       <div class="sidebar-section-label">Operations</div>
       <div class="nav-item" onclick="showPanel('instructors',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 3"/></svg>
@@ -156,7 +160,7 @@
           </div>
           <div style="overflow-x:auto;">
             <table id="studentsTable">
-              <thead><tr><th>ID</th><th>Student</th><th>Course</th><th>Payment</th><th>Status</th><th></th></tr></thead>
+              <thead><tr><th>ID</th><th>Student</th><th>Course</th><th>Payment</th><th>Status</th><th>Instructor</th><th></th></tr></thead>
               <tbody>
                 <tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">Loading students…</td></tr>
               </tbody>
@@ -202,32 +206,38 @@
         </div>
       </div>
 
-      <!-- ATTENDANCE PANEL -->
+      <!-- ATTENDANCE PANEL (Instructor Attendance Oversight) -->
       <div class="panel" id="admin-attendance">
         <div class="card">
           <div class="two-col">
             <div>
-              <div class="card-head" style="margin-bottom:14px;">
-                <h3>Attendance - TDC Face to Face</h3>
-                <span style="font-size:15px;font-weight:600;color:var(--charcoal);">Apr 28, 2026 · Mr. Santos</span>
+              <h4 style="margin:0 0 12px;font-size:14px;color:var(--charcoal);">Sessions</h4>
+              <div id="attendanceScheduleList" style="display:flex;flex-direction:column;gap:10px;">
+                <div style="color:var(--gray);padding:14px;">Loading sessions…</div>
               </div>
-              <div class="attend-row"><div class="attend-avatar">AR</div><div class="attend-name">Ana Reyes <span>RC-001</span></div><div class="attend-btns"><button class="attend-btn present sel" onclick="markAttend(this,'present')">Present</button><button class="attend-btn late" onclick="markAttend(this,'late')">Late</button><button class="attend-btn absent" onclick="markAttend(this,'absent')">Absent</button></div></div>
-              <div class="attend-row"><div class="attend-avatar">CM</div><div class="attend-name">Carlo Manalo <span>RC-002</span></div><div class="attend-btns"><button class="attend-btn present" onclick="markAttend(this,'present')">Present</button><button class="attend-btn late sel" onclick="markAttend(this,'late')">Late</button><button class="attend-btn absent" onclick="markAttend(this,'absent')">Absent</button></div></div>
-              <div class="attend-row"><div class="attend-avatar">BT</div><div class="attend-name">Ben Torres <span>RC-003</span></div><div class="attend-btns"><button class="attend-btn present" onclick="markAttend(this,'present')">Present</button><button class="attend-btn late" onclick="markAttend(this,'late')">Late</button><button class="attend-btn absent sel" onclick="markAttend(this,'absent')">Absent</button></div></div>
             </div>
 
             <div>
-              <div class="card-head" style="margin-bottom:14px;">
-                <h3>Attendance - PDC (4-Wheel)</h3>
-                <span style="font-size:15px;font-weight:600;color:var(--charcoal);">Apr 28, 2026 · Ms. Lim</span>
+              <h4 style="margin:0 0 12px;font-size:14px;color:var(--charcoal);">Attendance Records</h4>
+              <div id="attendanceDetail" style="display:flex;flex-direction:column;gap:8px;">
+                <div style="color:var(--gray);padding:12px;">Select a session to view its attendance.</div>
               </div>
-              <div class="attend-row"><div class="attend-avatar">JR</div><div class="attend-name">Joel Ramos <span>RC-005</span></div><div class="attend-btns"><button class="attend-btn present" onclick="markAttend(this,'present')">Present</button><button class="attend-btn late" onclick="markAttend(this,'late')">Late</button><button class="attend-btn absent sel" onclick="markAttend(this,'absent')">Absent</button></div></div>
-              <div class="attend-row"><div class="attend-avatar">CL</div><div class="attend-name">Clara Lim <span>RC-004</span></div><div class="attend-btns"><button class="attend-btn present sel" onclick="markAttend(this,'present')">Present</button><button class="attend-btn late" onclick="markAttend(this,'late')">Late</button><button class="attend-btn absent" onclick="markAttend(this,'absent')">Absent</button></div></div>
-              <div class="attend-row"><div class="attend-avatar">MJ</div><div class="attend-name">Michael Jackson <span>RC-001</span></div><div class="attend-btns"><button class="attend-btn present sel" onclick="markAttend(this,'present')">Present</button><button class="attend-btn late" onclick="markAttend(this,'late')">Late</button><button class="attend-btn absent" onclick="markAttend(this,'absent')">Absent</button></div></div>
             </div>
           </div>
-          <div style="display:flex;justify-content:flex-end;margin-top:20px;padding-top:20px;border-top:1px solid var(--gray-light);">
-            <button class="btn btn-primary">Save Attendance</button>
+        </div>
+      </div>
+
+      <!-- PENDING BOOKINGS PANEL -->
+      <div class="panel" id="admin-bookings">
+        <div class="card">
+          <div class="card-head"><h3>Pending Bookings</h3><span style="font-size:13px;color:var(--gray);">Accept the instructor assigned to each session</span></div>
+          <div style="overflow-x:auto;">
+            <table id="bookingsTable">
+              <thead><tr><th>Student</th><th>Course</th><th>Session</th><th>Venue</th><th>Instructor</th><th></th></tr></thead>
+              <tbody id="bookingsTbody">
+                <tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">Loading pending bookings…</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -490,6 +500,28 @@
     <div class="pay-modal-footer">
       <button class="btn btn-sm btn-ghost" onclick="closeModal('addStudentModal')">Cancel</button>
       <button class="btn btn-sm btn-primary" onclick="addStudent()">+ Add Student</button>
+    </div>
+  </div>
+</div>
+
+<!-- ASSIGN INSTRUCTOR MODAL -->
+<div class="modal-overlay" id="assignInstructorModal">
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-head">
+      <h3>Assign Instructor</h3>
+      <button class="modal-close" onclick="closeModal('assignInstructorModal')">✕</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div class="field">
+        <label>Instructor</label>
+        <select id="assignInstrSelect" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);">
+          <option value="">— Unassigned —</option>
+        </select>
+      </div>
+    </div>
+    <div class="pay-modal-footer">
+      <button class="btn btn-sm btn-ghost" onclick="closeModal('assignInstructorModal')">Cancel</button>
+      <button class="btn btn-sm btn-primary" onclick="submitAssignInstructor()">Save Assignment</button>
     </div>
   </div>
 </div>

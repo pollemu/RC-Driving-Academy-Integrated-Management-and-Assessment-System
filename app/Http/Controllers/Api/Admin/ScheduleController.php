@@ -113,4 +113,70 @@ class ScheduleController extends Controller
             })
             ->exists();
     }
+
+    /* Admin oversight: every session with its instructor and attendance summary. */
+    public function attendanceIndex()
+    {
+        $schedules = Schedule::with(['course', 'instructor.user'])
+            ->where('status', '!=', 'cancelled')
+            ->orderBy('date')
+            ->get();
+
+        $data = $schedules->map(function (Schedule $schedule) {
+            $attendance = $schedule->attendance()->get();
+            $counts = [
+                'present' => $attendance->where('status', 'present')->count(),
+                'absent' => $attendance->where('status', 'absent')->count(),
+                'late' => $attendance->where('status', 'late')->count(),
+                'recorded' => $attendance->count(),
+                'students' => $schedule->studentSchedules()->where('status', 'confirmed')->count(),
+            ];
+
+            return [
+                'id' => $schedule->id,
+                'course' => ['name' => $schedule->course->name, 'type' => $schedule->course->type],
+                'instructor' => [
+                    'id' => $schedule->instructor->id,
+                    'name' => $schedule->instructor->user->name,
+                ],
+                'date' => $schedule->date,
+                'time_start' => $schedule->time_start,
+                'time_end' => $schedule->time_end,
+                'venue' => $schedule->venue,
+                'status' => $schedule->status,
+                'attendance' => $counts,
+            ];
+        });
+
+        return response()->json(['schedules' => $data]);
+    }
+
+    /* Admin oversight: full attendance records for one session, recorded by instructor. */
+    public function attendanceShow(Schedule $schedule)
+    {
+        $schedule->load(['course', 'instructor.user']);
+
+        $attendance = $schedule->attendance()->with('student.user')->get()->map(function ($a) {
+            return [
+                'student_id' => $a->student_id,
+                'student_name' => $a->student->user->name ?? null,
+                'status' => $a->status,
+                'notes' => $a->notes,
+                'recorded_at' => $a->recorded_at,
+            ];
+        });
+
+        return response()->json([
+            'schedule' => [
+                'id' => $schedule->id,
+                'course' => ['name' => $schedule->course->name],
+                'instructor' => ['name' => $schedule->instructor->user->name],
+                'date' => $schedule->date,
+                'time_start' => $schedule->time_start,
+                'time_end' => $schedule->time_end,
+                'venue' => $schedule->venue,
+            ],
+            'attendance' => $attendance,
+        ]);
+    }
 }

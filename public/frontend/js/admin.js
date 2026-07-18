@@ -4,8 +4,9 @@
 
 const ADMIN_TITLES = {
   dashboard:'Dashboard', students:'Students', schedule:'Schedule',
-  attendance:'Attendance', instructors:'Instructors',
-  payments:'Payments', certifications:'Certifications', reports:'Reports'
+  attendance:'Instructor Attendance', instructors:'Instructors',
+  payments:'Payments', certifications:'Certifications', reports:'Reports',
+  bookings:'Pending Bookings'
 };
 
 function showPanel(panel, el){
@@ -92,6 +93,9 @@ document.addEventListener('DOMContentLoaded', highlightToday);
 /* ============================================================
    API-backed data loading (real Laravel backend)
    ============================================================ */
+/* Cached instructor list for the Assign Instructor dropdown. */
+let ADMIN_INSTRUCTORS = [];
+
 document.addEventListener('DOMContentLoaded', async () => {
   const ok = await requireAuth('admin');
   if (!ok) return;
@@ -100,7 +104,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   loadPayments();
   loadInstructors();
   loadCertifications();
+  loadInstructorList();
+  loadBookings();
+  loadInstructorAttendance();
 });
+
+async function loadInstructorList(){
+  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/instructors?per_page=100`, { method: 'GET' });
+  if (ok && data) ADMIN_INSTRUCTORS = data.instructors || [];
+}
 
 async function loadDashboardStats(){
   const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/dashboard`, { method: 'GET' });
@@ -128,15 +140,17 @@ function renderStudents(students, pagination){
     const status = st.is_active ? 'Active' : 'Inactive';
     const statusBadge = st.is_active ? 'active' : 'pending';
     const payBadge = st.payment_status === 'Paid' ? 'verified' : (st.payment_status === 'Pending' ? 'pending' : 'pending');
+    const instructor = st.instructor_name ? escapeHtml(st.instructor_name) : '<span style="color:var(--gray);font-size:12px;">—</span>';
     return `<tr data-status="${status}" data-id="${st.id}">
       <td class="mono" style="color:var(--gray);font-size:12px;">#${st.id}</td>
       <td><b>${escapeHtml(st.name)}</b><br><span style="font-size:11.5px;color:var(--gray);">${maskEmail(st.email)}</span></td>
       <td>${escapeHtml(st.course)}</td>
       <td><span class="badge ${payBadge}">${escapeHtml(st.payment_status)}</span></td>
       <td><span class="badge ${statusBadge}">${status}</span></td>
-      <td><div style="display:flex;gap:6px;"><button class="btn btn-sm btn-ghost" onclick="viewStudent(this)">View</button><button class="btn btn-sm btn-danger" onclick="deleteStudent(this)">Delete</button></div></td>
+      <td>${instructor}</td>
+      <td><div style="display:flex;gap:6px;"><button class="btn btn-sm btn-ghost" onclick="viewStudent(this)">View</button><button class="btn btn-sm btn-primary" onclick="openAssignInstructorModal(${st.id})">Assign</button><button class="btn btn-sm btn-danger" onclick="deleteStudent(this)">Delete</button></div></td>
     </tr>`;
-  }).join('') || `<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">No students yet.</td></tr>`;
+  }).join('') || `<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">No students yet.</td></tr>`;
   filterStudents();
   renderPagination(document.getElementById('studentsTable'), 'studentsPagination', pagination, 'loadStudents');
 }
@@ -212,6 +226,128 @@ function renderPagination(tableEl, containerId, pagination, onPage){
 
 function escapeHtml(str){
   return String(str == null ? '' : str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ============================================================
+   Assign Instructor — admin gives a student to an instructor.
+   ============================================================ */
+async function openAssignInstructorModal(studentId){
+  window._assignStudentId = studentId;
+  const sel = document.getElementById('assignInstrSelect');
+  if (sel && ADMIN_INSTRUCTORS.length) {
+    sel.innerHTML = '<option value="">— Unassigned —</option>' +
+      ADMIN_INSTRUCTORS.map(i => `<option value="${i.id}">${escapeHtml(i.name)}</option>`).join('');
+  }
+  openModal('assignInstructorModal');
+}
+
+async function submitAssignInstructor(){
+  const id = window._assignStudentId;
+  const sel = document.getElementById('assignInstrSelect');
+  if (!id || !sel) return;
+  const instructorId = sel.value ? Number(sel.value) : null;
+  const { ok, error } = await RCDA.safeFetch(
+    `${RCDA_CONFIG.getApiBaseUrl()}/admin/students/${id}/assign-instructor`,
+    { method: 'POST', body: { instructor_id: instructorId } }
+  );
+  if (!ok) { RCDA.showToast(error || 'Could not assign instructor.', 'error'); return; }
+  RCDA.showToast('Instructor assigned.', 'success');
+  closeModal('assignInstructorModal');
+  loadStudents();
+}
+
+/* ============================================================
+   Pending Bookings — admin accepts the instructor assigned to
+   each session (booking sits 'pending' until accepted).
+   ============================================================ */
+async function loadBookings(){
+  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/bookings`, { method: 'GET' });
+  if (ok && data) renderBookings(data.bookings || []);
+}
+
+function renderBookings(list){
+  const tb = document.getElementById('bookingsTbody');
+  if (!tb) return;
+  if (!list.length) {
+    tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">No pending bookings.</td></tr>';
+    return;
+  }
+  tb.innerHTML = list.map(b => {
+    const s = b.schedule || {};
+    const session = `${escapeHtml(String(s.date || ''))} ${escapeHtml(String(s.time_start || ''))}–${escapeHtml(String(s.time_end || ''))}`;
+    return `<tr data-id="${b.id}">
+      <td><b>${escapeHtml(b.student?.name || '')}</b><br><span style="font-size:11.5px;color:var(--gray);">${escapeHtml(b.student?.email || '')}</span></td>
+      <td>${escapeHtml(s.course || '')}</td>
+      <td>${session}</td>
+      <td>${escapeHtml(s.venue || '—')}</td>
+      <td>${escapeHtml(s.instructor?.name || '—')}</td>
+      <td><div style="display:flex;gap:6px;">
+        <button class="btn btn-sm btn-success" onclick="acceptBooking(${b.id},this)">Accept</button>
+        <button class="btn btn-sm btn-danger" onclick="rejectBooking(${b.id},this)">Reject</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+async function acceptBooking(id, btn){
+  const { ok, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/bookings/${id}/accept`, { method: 'POST' });
+  if (!ok) { RCDA.showToast(error || 'Could not accept booking.', 'error'); return; }
+  RCDA.showToast('Booking accepted. Slot confirmed.', 'success');
+  if (btn) btn.closest('tr')?.remove();
+}
+
+async function rejectBooking(id, btn){
+  const { ok, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/bookings/${id}/reject`, { method: 'POST' });
+  if (!ok) { RCDA.showToast(error || 'Could not reject booking.', 'error'); return; }
+  RCDA.showToast('Booking rejected.', 'success');
+  if (btn) btn.closest('tr')?.remove();
+}
+
+/* ============================================================
+   Instructor Attendance Oversight — admin views the attendance
+   that instructors record, per session.
+   ============================================================ */
+async function loadInstructorAttendance(){
+  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/attendance`, { method: 'GET' });
+  const list = document.getElementById('attendanceScheduleList');
+  if (!list) return;
+  if (!ok || !data || !data.schedules || !data.schedules.length) {
+    list.innerHTML = '<div style="color:var(--gray);padding:14px;">No sessions yet.</div>';
+    return;
+  }
+  list.innerHTML = data.schedules.map(s => {
+    const a = s.attendance || {};
+    return `<div class="cert-row" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border:1px solid var(--gray-light);border-radius:12px;background:var(--cream);">
+      <div>
+        <b>${escapeHtml(s.course?.name || '')}</b> · ${escapeHtml(s.instructor?.name || '')}<br>
+        <span style="font-size:12px;color:var(--gray);">${escapeHtml(String(s.date || ''))} · ${a.present || 0}P / ${a.late || 0}L / ${a.absent || 0}A</span>
+      </div>
+      <button class="btn btn-sm btn-primary" onclick="viewScheduleAttendance(${s.id})">View</button>
+    </div>`;
+  }).join('');
+}
+
+async function viewScheduleAttendance(id){
+  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/attendance/${id}`, { method: 'GET' });
+  const el = document.getElementById('attendanceDetail');
+  if (!el) return;
+  if (!ok || !data) { el.innerHTML = '<div style="color:var(--gray);padding:12px;">Could not load attendance.</div>'; return; }
+  const recs = data.attendance || [];
+  const sch = data.schedule || {};
+  let html = `<div style="margin-bottom:8px;"><b>${escapeHtml(sch.course?.name || '')}</b> — ${escapeHtml(sch.instructor?.name || '')}<br>
+    <span style="font-size:12px;color:var(--gray);">${escapeHtml(String(sch.date || ''))} · ${escapeHtml(String(sch.time_start || ''))}–${escapeHtml(String(sch.time_end || ''))} · ${escapeHtml(sch.venue || '')}</span></div>`;
+  if (!recs.length) {
+    html += '<div style="color:var(--gray);padding:12px;">No attendance recorded yet.</div>';
+  } else {
+    html += recs.map(r => {
+      const cls = r.status === 'present' ? 'active' : (r.status === 'late' ? 'pending' : 'needs');
+      return `<div class="attend-row" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--gray-light);border-radius:10px;">
+        <div class="attend-name"><b>${escapeHtml(r.student_name || 'Unknown')}</b></div>
+        <span class="badge ${cls}">${escapeHtml(r.status || '—')}</span>
+      </div>`;
+    }).join('');
+  }
+  el.innerHTML = html;
 }
 
 async function loadPayments(page){

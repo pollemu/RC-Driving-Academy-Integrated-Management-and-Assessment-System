@@ -58,6 +58,7 @@ class ScheduleController extends Controller
         $now = now();
 
         return $student->studentSchedules()
+            ->where('status', 'confirmed')
             ->whereHas('schedule', function ($q) use ($now) {
                 $q->where(function ($inner) use ($now) {
                     $inner->whereDate('date', '>', $now->toDateString())
@@ -96,7 +97,8 @@ class ScheduleController extends Controller
             return response()->json(['message' => 'You have already booked this session.'], 422);
         }
 
-        if ($schedule->isFull()) {
+        $confirmedCount = $schedule->studentSchedules()->where('status', 'confirmed')->count();
+        if ($confirmedCount >= $schedule->max_students) {
             return response()->json(['message' => 'This session is already full.'], 422);
         }
 
@@ -104,13 +106,13 @@ class ScheduleController extends Controller
             'student_id' => $student->id,
             'schedule_id' => $schedule->id,
             'booked_at' => now(),
+            'status' => 'pending',
         ]);
 
-        if ($schedule->isFull()) {
-            $schedule->update(['status' => 'full']);
-        }
-
-        return response()->json(['ok' => true]);
+        return response()->json([
+            'ok' => true,
+            'message' => 'Booking submitted. The admin must accept the assigned instructor before your slot is confirmed.',
+        ]);
     }
 
     /* Cancel a booking — allowed only at least 1 hour before the session starts. */

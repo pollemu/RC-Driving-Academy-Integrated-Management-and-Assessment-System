@@ -200,9 +200,11 @@ async function loadStudentSessions() {
       <td>${escapeHtml((b.time_start || '') + (b.time_end ? ' – ' + b.time_end : ''))}</td>
       <td>${escapeHtml(b.instructor_name || '—')}</td>
       <td>—</td>
-      <td>${b.cancelable
-        ? `<button class="btn btn-sm" style="border:1px solid #dc2626;color:#dc2626;background:#fff;" onclick="cancelBooking(${b.schedule_id})">Cancel</button>`
-        : `<span class="badge confirmed">Booked</span>`}</td>
+      <td>${b.status === 'pending'
+        ? `<span class="badge pending">Pending acceptance</span>`
+        : (b.cancelable
+          ? `<button class="btn btn-sm" style="border:1px solid #dc2626;color:#dc2626;background:#fff;" onclick="cancelBooking(${b.schedule_id})">Cancel</button>`
+          : `<span class="badge confirmed">Booked</span>`)}</td>
     </tr>`).join('')
     : '<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:18px;">No sessions booked yet.</td></tr>';
 
@@ -253,7 +255,7 @@ async function loadStudentSessions() {
 async function bookSession(id) {
   const { ok, error } = await RCDA.safeFetch(STUD_API() + `/student/schedules/${id}/book`, { method: 'POST' });
   if (!ok) { RCDA.showToast(error || 'We couldn’t book that session. Please try again.'); return; }
-  RCDA.showToast('You’re booked! See you at the session.', 'success');
+  RCDA.showToast('Booking submitted — the admin must accept the instructor before your slot is confirmed.', 'success');
   loadStudentSessions();
 }
 

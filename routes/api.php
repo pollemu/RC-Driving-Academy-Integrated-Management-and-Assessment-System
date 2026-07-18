@@ -31,6 +31,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('api.admin.dashboard');
         Route::apiResource('students', AdminStudentController::class)->except(['create', 'edit']);
         Route::post('/students/{student}/toggle-active', [AdminStudentController::class, 'toggleActive'])->name('api.admin.students.toggle');
+        Route::post('/students/{student}/assign-instructor', [AdminStudentController::class, 'assignInstructor'])->name('api.admin.students.assign');
+        Route::get('/bookings', [AdminStudentController::class, 'pendingBookings'])->name('api.admin.bookings.index');
+        Route::post('/bookings/{studentSchedule}/accept', [AdminStudentController::class, 'acceptBooking'])->name('api.admin.bookings.accept');
+        Route::post('/bookings/{studentSchedule}/reject', [AdminStudentController::class, 'rejectBooking'])->name('api.admin.bookings.reject');
         Route::post('/users/{user}/set-role', [AdminUserController::class, 'setRole'])->name('api.admin.users.set-role');
         Route::apiResource('instructors', AdminInstructorController::class)->except(['create', 'edit', 'show', 'update']);
         Route::post('/instructors/{instructor}/toggle-active', [AdminInstructorController::class, 'toggleActive'])->name('api.admin.instructors.toggle');
@@ -46,6 +50,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/certifications/courses-for/{student}', [AdminCertificationController::class, 'coursesFor'])->name('api.admin.certifications.courses-for');
         Route::post('/certifications/{certification}/revoke', [AdminCertificationController::class, 'revoke'])->name('api.admin.certifications.revoke');
         Route::get('/reports', [AdminReportController::class, 'index'])->name('api.admin.reports');
+        Route::get('/attendance', [AdminScheduleController::class, 'attendanceIndex'])->name('api.admin.attendance.index');
+        Route::get('/attendance/{schedule}', [AdminScheduleController::class, 'attendanceShow'])->name('api.admin.attendance.show');
     });
 
     Route::middleware('api.role:instructor')->prefix('instructor')->group(function () {
@@ -53,6 +59,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/attendance', [InstructorAttendanceController::class, 'index'])->name('api.instructor.attendance.index');
         Route::get('/attendance/{schedule}', [InstructorAttendanceController::class, 'show'])->name('api.instructor.attendance.show');
         Route::post('/attendance/{schedule}', [InstructorAttendanceController::class, 'store'])->name('api.instructor.attendance.store');
+        Route::get('/students', [InstructorDashboardController::class, 'students'])->name('api.instructor.students');
         Route::get('/feedback', [InstructorFeedbackController::class, 'index'])->name('api.instructor.feedback.index');
         Route::post('/feedback/{schedule}/{student}', [InstructorFeedbackController::class, 'store'])->name('api.instructor.feedback.store');
     });

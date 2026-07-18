@@ -44,6 +44,6 @@ class Schedule extends Model
 
     public function isFull(): bool
     {
-        return $this->studentSchedules()->count() >= $this->max_students;
+        return $this->studentSchedules()->where('status', 'confirmed')->count() >= $this->max_students;
     }
 }

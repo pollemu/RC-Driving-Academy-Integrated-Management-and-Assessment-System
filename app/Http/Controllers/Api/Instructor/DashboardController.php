@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Instructor;
 
 use App\Http\Controllers\Controller;
 use App\Models\Schedule;
+use App\Models\StudentSchedule;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
@@ -39,5 +40,44 @@ class DashboardController extends Controller
             'venue' => $schedule->venue,
             'status' => $schedule->status,
         ];
+    }
+
+    /* Students assigned to this instructor plus those booked into their sessions. */
+    public function students(Request $request)
+    {
+        $instructor = $request->user()->instructor;
+
+        $assigned = $instructor->students()->with('user')->get()->map(function ($s) {
+            return [
+                'id' => $s->id,
+                'name' => $s->user->name,
+                'email' => $s->user->email,
+                'phone' => $s->phone,
+                'source' => 'assigned',
+            ];
+        });
+
+        $booked = StudentSchedule::with('student.user')
+            ->where('status', 'confirmed')
+            ->whereHas('schedule', fn ($q) => $q->where('instructor_id', $instructor->id))
+            ->get()
+            ->map(fn ($b) => $b->student)
+            ->unique('id')
+            ->values()
+            ->map(function ($s) {
+                return [
+                    'id' => $s->id,
+                    'name' => $s->user->name,
+                    'email' => $s->user->email,
+                    'phone' => $s->phone,
+                    'source' => 'session',
+                ];
+            });
+
+        $merged = $assigned->concat($booked)
+            ->unique('id')
+            ->values();
+
+        return response()->json(['students' => $merged]);
     }
 }

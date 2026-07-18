@@ -137,9 +137,15 @@ async function loadInstructorDashboard() {
 
 /* ---- MY STUDENTS ---- */
 async function loadInstructorStudents() {
-  const { ok, data } = await RCDA.safeFetch(INSTR_API() + '/instructor/feedback');
-  const schedules = (ok && data.schedules) || [];
-  renderStudentRows('studentsTableBody', buildStudents(schedules));
+  const { ok, data } = await RCDA.safeFetch(INSTR_API() + '/instructor/students');
+  const students = (ok && data.students) || [];
+  const rows = students.map(s => ({
+    id: s.id,
+    name: s.name,
+    courses: new Set([s.source === 'assigned' ? 'Assigned' : 'Session']),
+    lastDate: '—',
+  }));
+  renderStudentRows('studentsTableBody', rows);
   filterStudents();
 }
 
@@ -376,6 +382,76 @@ function loadRecentAssessments() {
   else body.insertAdjacentHTML('afterbegin', row);
 }
 
+/* ---- ATTENDANCE (instructor records their own students) ---- */
+let INSTR_ATTEND_SCHEDULE = null;
+
+async function loadInstructorAttendance(){
+  const { ok, data } = await RCDA.safeFetch(INSTR_API() + '/instructor/attendance');
+  const list = document.getElementById('instrSessionList');
+  if (!list) return;
+  if (!ok || !data || !data.schedules || !data.schedules.length) {
+    list.innerHTML = '<div style="color:var(--gray);padding:14px;">No sessions yet.</div>';
+    return;
+  }
+  list.innerHTML = data.schedules.map(s => `
+    <div class="cert-row" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border:1px solid var(--gray-light);border-radius:12px;background:var(--cream);">
+      <div>
+        <b>${escapeHtml(s.course?.name || '')}</b><br>
+        <span style="font-size:12px;color:var(--gray);">${escapeHtml(String(s.date || ''))} · ${statusBadge(s.status)}</span>
+      </div>
+      <button class="btn btn-sm btn-primary" onclick="openInstructorAttendance(${s.id})">Open</button>
+    </div>`).join('');
+}
+
+async function openInstructorAttendance(id){
+  const { ok, data } = await RCDA.safeFetch(INSTR_API() + `/instructor/attendance/${id}`);
+  const el = document.getElementById('instrAttendanceBody');
+  if (!el) return;
+  if (!ok || !data) { el.innerHTML = '<div style="color:var(--gray);padding:12px;">Could not load session.</div>'; return; }
+  INSTR_ATTEND_SCHEDULE = id;
+  const bookings = data.bookings || [];
+  const records = data.records || {};
+  if (!bookings.length) {
+    el.innerHTML = '<div style="color:var(--gray);padding:12px;">No students booked for this session.</div>';
+    return;
+  }
+  const opts = (cur) => ['present','late','absent'].map(st =>
+    `<button type="button" class="attend-btn ${st} ${cur === st ? 'sel' : ''}" onclick="markInstrAttend(this,'${st}',${id})">${st.charAt(0).toUpperCase()+st.slice(1)}</button>`
+  ).join('');
+  el.innerHTML = bookings.map(b => `
+    <div class="attend-row" data-student="${b.student_id}" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--gray-light);border-radius:10px;">
+      <div class="attend-name"><b>${escapeHtml(b.student_name || 'Student')}</b></div>
+      <div class="attend-btns" data-student="${b.student_id}">${opts(records[b.student_id] || 'present')}</div>
+    </div>`).join('');
+}
+
+function markInstrAttend(btn, type, scheduleId){
+  const row = btn.closest('.attend-btns');
+  if (!row) return;
+  row.querySelectorAll('.attend-btn').forEach(b => {
+    b.classList.remove('sel');
+    if (b.classList.contains(type)) b.classList.add('sel');
+  });
+}
+
+async function saveInstructorAttendance(){
+  if (INSTR_ATTEND_SCHEDULE == null) { RCDA.showToast('Open a session first.', 'error'); return; }
+  const body = document.getElementById('instrAttendanceBody');
+  if (!body) return;
+  const status = {};
+  body.querySelectorAll('.attend-btns').forEach(btns => {
+    const sid = btns.dataset.student;
+    const sel = btns.querySelector('.attend-btn.sel');
+    if (sid && sel) status[sid] = sel.classList.contains('present') ? 'present' : (sel.classList.contains('late') ? 'late' : 'absent');
+  });
+  const { ok, error } = await RCDA.safeFetch(INSTR_API() + `/instructor/attendance/${INSTR_ATTEND_SCHEDULE}`, {
+    method: 'POST', body: { status, mark_done: true }
+  });
+  if (!ok) { RCDA.showToast(error || 'Could not save attendance.', 'error'); return; }
+  RCDA.showToast('Attendance saved.', 'success');
+  loadInstructorAttendance();
+}
+
 /* ---- INIT ---- */
 document.addEventListener('DOMContentLoaded', async () => {
   if (!await requireAuth('instructor')) return;
@@ -386,6 +462,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       loadInstructorSchedule(),
     ]);
     setupAssessForm();
+    loadInstructorAttendance();
   } catch (e) {
     console.error('[RCDA instructor]', e);
     RCDA.showToast('Some of your data failed to load.');

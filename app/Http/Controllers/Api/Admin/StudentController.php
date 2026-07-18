@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
 use App\Models\Student;
+use App\Models\StudentSchedule;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -42,6 +43,7 @@ class StudentController extends Controller
                 'course' => $courseLabel,
                 'payment_status' => $paymentStatus,
                 'is_active' => $student->user->is_active,
+                'instructor_name' => optional($student->instructor)->user->name ?? null,
                 'created_at' => $student->user->created_at,
             ];
         });
@@ -140,5 +142,85 @@ class StudentController extends Controller
         $student->load('user');
 
         return response()->json(['student' => $student]);
+    }
+
+    public function assignInstructor(Request $request, Student $student)
+    {
+        $data = $request->validate([
+            'instructor_id' => ['nullable', 'exists:instructors,id'],
+        ]);
+
+        $student->update(['instructor_id' => $data['instructor_id']]);
+
+        $student->load(['user', 'instructor.user']);
+
+        return response()->json(['student' => $student]);
+    }
+
+    /* Bookings awaiting admin acceptance of the assigned instructor. */
+    public function pendingBookings()
+    {
+        $bookings = StudentSchedule::with(['student.user', 'schedule.course', 'schedule.instructor.user'])
+            ->where('status', 'pending')
+            ->orderByDesc('booked_at')
+            ->get()
+            ->map(function (StudentSchedule $booking) {
+                return [
+                    'id' => $booking->id,
+                    'booked_at' => $booking->booked_at,
+                    'status' => $booking->status,
+                    'student' => [
+                        'id' => $booking->student->id,
+                        'name' => $booking->student->user->name,
+                        'email' => $booking->student->user->email,
+                    ],
+                    'schedule' => [
+                        'id' => $booking->schedule->id,
+                        'date' => $booking->schedule->date,
+                        'time_start' => $booking->schedule->time_start,
+                        'time_end' => $booking->schedule->time_end,
+                        'venue' => $booking->schedule->venue,
+                        'course' => $booking->schedule->course->name,
+                        'instructor' => [
+                            'id' => $booking->schedule->instructor->id,
+                            'name' => $booking->schedule->instructor->user->name,
+                        ],
+                    ],
+                ];
+            });
+
+        return response()->json(['bookings' => $bookings]);
+    }
+
+    public function acceptBooking(Request $request, StudentSchedule $studentSchedule)
+    {
+        if ($studentSchedule->status !== 'pending') {
+            return response()->json(['message' => 'This booking is not pending acceptance.'], 422);
+        }
+
+        $confirmedCount = $studentSchedule->schedule->studentSchedules()->where('status', 'confirmed')->count();
+        if ($confirmedCount >= $studentSchedule->schedule->max_students) {
+            return response()->json(['message' => 'This session is already full.'], 422);
+        }
+
+        $studentSchedule->update(['status' => 'confirmed']);
+
+        $schedule = $studentSchedule->schedule;
+        if ($schedule->isFull()) {
+            $schedule->update(['status' => 'full']);
+        }
+
+        return response()->json(['booking' => $studentSchedule->load(['student.user', 'schedule'])]);
+    }
+
+    public function rejectBooking(Request $request, StudentSchedule $studentSchedule)
+    {
+        if ($studentSchedule->status !== 'pending') {
+            return response()->json(['message' => 'This booking is not pending acceptance.'], 422);
+        }
+
+        $studentSchedule->delete();
+
+        return response()->json(['ok' => true]);
     }
 }

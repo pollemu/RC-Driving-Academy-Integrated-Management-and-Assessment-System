@@ -43,6 +43,7 @@ class DashboardController extends Controller
                     'time_start' => $s->time_start,
                     'time_end' => $s->time_end,
                     'instructor_name' => $s->instructor->user->name,
+                    'status' => $booking->status,
                     'cancelable' => $s->date && $s->time_start
                         ? now()->addHour()->lt(
                             Carbon::parse($s->date->format('Y-m-d') . ' ' . $s->time_start)

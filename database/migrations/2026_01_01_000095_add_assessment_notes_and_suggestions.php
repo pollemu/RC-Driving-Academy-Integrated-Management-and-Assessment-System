@@ -16,10 +16,6 @@ return new class extends Migration
             $table->string('note_safety', 120)->nullable()->after('star_safety');
             $table->string('note_mirror', 120)->nullable()->after('star_mirror');
         });
-
-        Schema::table('assessments', function (Blueprint $table) {
-            $table->json('suggestions')->nullable()->after('recommendation');
-        });
     }
 
     public function down(): void
@@ -29,10 +25,6 @@ return new class extends Migration
                 'note_steering', 'note_speed', 'note_lane',
                 'note_parking', 'note_safety', 'note_mirror',
             ]);
-        });
-
-        Schema::table('assessments', function (Blueprint $table) {
-            $table->dropColumn('suggestions');
         });
     }
 };

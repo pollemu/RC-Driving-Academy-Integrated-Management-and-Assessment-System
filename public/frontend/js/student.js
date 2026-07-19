@@ -271,8 +271,8 @@ function renderTdcWeek() {
   for (let i = 0; i < 7; i++) { const d = new Date(monday); d.setDate(monday.getDate() + i); week.push(d); }
 
   const cells = week.map(d => {
-    const key = d.toISOString().slice(0, 10);
-    const daySched = tdc.filter(s => s.date === key);
+    const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const daySched = tdc.filter(s => String(s.date).slice(0, 10) === key);
     const slots = daySched.length ? daySched.map(s => {
       const full = s.booked >= s.max_students;
       const isBooked = bookedIds.includes(s.id);
@@ -303,12 +303,12 @@ function renderPdcDatePicker() {
   const pdc = schedules.filter(s => s.course.type === 'PDC');
   if (!pdc.length) return '<div style="font-size:13px;color:var(--gray);">No open PDC sessions scheduled right now.</div>';
 
-  const dates = [...new Set(pdc.map(s => s.date))].sort();
+  const dates = [...new Set(pdc.map(s => String(s.date).slice(0, 10)))].sort();
   if (SESSIONS_CACHE._pdcDate == null || !dates.includes(SESSIONS_CACHE._pdcDate)) SESSIONS_CACHE._pdcDate = dates[0];
 
   const dateTabs = dates.map(d => `<button class="btn btn-sm ${SESSIONS_CACHE._pdcDate === d ? 'btn-primary' : 'btn-ghost'}" onclick="setPdcDate('${d}')">${formatDate(d)}</button>`).join(' ');
 
-  const daySched = pdc.filter(s => s.date === SESSIONS_CACHE._pdcDate);
+  const daySched = pdc.filter(s => String(s.date).slice(0, 10) === SESSIONS_CACHE._pdcDate);
   const rows = daySched.map(s => {
     const full = s.booked >= s.max_students;
     const isBooked = bookedIds.includes(s.id);

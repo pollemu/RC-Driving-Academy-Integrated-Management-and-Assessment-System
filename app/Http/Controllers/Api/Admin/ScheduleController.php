@@ -96,6 +96,13 @@ class ScheduleController extends Controller
             'max_students' => ['required', 'integer', 'min:1'],
         ]);
 
+        // Academy operates Monday–Saturday only (no sessions on Sunday).
+        if (Carbon::parse($data['date'])->dayOfWeek === Carbon::SUNDAY) {
+            return response()->json([
+                'message' => 'The academy is closed on Sundays. Please pick a Monday–Saturday date.',
+            ], 422);
+        }
+
         if ($this->hasConflict($data)) {
             return response()->json([
                 'message' => 'This instructor already has a session at the same date/time.',

@@ -170,6 +170,10 @@ async function createAdminSchedule() {
     RCDA.showToast('Fill course, instructor, date and time.', 'error');
     return;
   }
+  if (new Date(date + 'T00:00:00').getDay() === 0) {
+    RCDA.showToast('The academy is closed on Sundays. Pick a Monday–Saturday date.', 'error');
+    return;
+  }
   const { ok, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/schedules`, {
     method: 'POST',
     body: { course_id, instructor_id, date, time_start, time_end, venue, max_students }

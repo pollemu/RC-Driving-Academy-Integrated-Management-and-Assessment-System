@@ -172,37 +172,9 @@ async function loadStudentProfile() {
       </div>
     </div>
     <div class="card">
-      <div class="card-head"><h3>My Preferences</h3></div>
-      <div style="display:flex;flex-direction:column;gap:12px;margin-top:6px;">
-        <div>
-          <label style="font-size:12.5px;color:var(--gray);">My gender</label>
-          <select id="prefGender" class="sched-pick">
-            <option value="">— prefer not to say —</option>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
-        <button class="btn btn-primary" style="width:100%;" onclick="saveStudentPrefs()">Save Preferences</button>
-        <p style="font-size:12px;color:var(--gray);">Want a preferred instructor gender instead? Request it from the Requests tab.</p>
-      </div>
-    </div>
-    <div class="card">
       <div class="card-head"><h3>Enrollments</h3></div>
       ${progressHtml}
     </div>`;
-
-  const g = document.getElementById('prefGender');
-  if (g && meData.gender) g.value = meData.gender;
-}
-
-async function saveStudentPrefs() {
-  const gender = document.getElementById('prefGender') ? document.getElementById('prefGender').value : '';
-  const { ok, error } = await RCDA.safeFetch(STUD_API() + '/me/preferences', {
-    method: 'POST', body: { gender: gender || null }
-  });
-  if (!ok) { RCDA.showToast(error || 'Could not save preferences.'); return; }
-  RCDA.showToast('Preferences saved.', 'success');
 }
 
 /* ---- SESSIONS ---- */

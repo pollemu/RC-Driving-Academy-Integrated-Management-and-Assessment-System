@@ -836,7 +836,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadStudentProfile();
   } catch (e) {
     console.error('[RCDA student]', e);
-    RCDA.showToast('Something went wrong while loading this page. Please refresh.');
+    RCDA.showToast('Something went wrong: ' + (e && e.message ? e.message : e) + '. Please refresh.');
   } finally {
     RCDA.hidePageLoading();
   }

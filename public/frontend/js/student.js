@@ -159,7 +159,6 @@ async function loadStudentProfile() {
         </div>`).join('')
     : '<div style="font-size:13.5px;color:var(--gray);">You are not enrolled in any course yet.</div>';
 
-  const body = document.getElementById('studProfileBody');
   if (body) body.innerHTML = `
     <div class="card">
       <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">

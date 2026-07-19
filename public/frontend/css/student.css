@@ -248,6 +248,7 @@
 .cal-cell{min-height:46px;border:1px solid var(--gray-light);border-radius:10px;display:flex;align-items:center;justify-content:center;background:#f6f6f6;color:var(--gray);}
 .cal-empty{background:transparent;border:none;}
 .cal-past{opacity:.45;}
+.cal-sunday{background:#fdecea;border-color:#e0a8a3;color:#c0392b;cursor:not-allowed;}
 .cal-green{background:#eafaf0;border-color:#7bc89a;color:var(--charcoal);cursor:pointer;}
 .cal-sel{outline:2px solid var(--orange);outline-offset:-2px;}
 .cal-day{font-size:14px;font-weight:600;}
@@ -255,5 +256,6 @@
 .cal-day-btn:hover{background:#d4f1df;}
 .cal-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle;}
 .cal-dot-green{background:#7bc89a;}
+.cal-dot-red{background:#e0a8a3;border:1px solid #c0392b;}
 .cal-dot-muted{background:#cfcfcf;}
 @media(max-width:520px){.cal-cell{min-height:38px;}.cal-day,.cal-day-btn{font-size:12px;}}

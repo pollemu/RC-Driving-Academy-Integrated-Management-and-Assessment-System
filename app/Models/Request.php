@@ -6,12 +6,13 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['type', 'student_id', 'schedule_id', 'from_schedule_id', 'preferred_gender', 'note', 'status', 'handled_by', 'admin_note'])]
+#[Fillable(['type', 'student_id', 'schedule_id', 'from_schedule_id', 'preferred_gender', 'preferred_date', 'preferred_instructor_id', 'note', 'status', 'handled_by', 'admin_note'])]
 class Request extends Model
 {
     protected function casts(): array
     {
         return [
+            'preferred_date' => 'date',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
@@ -19,6 +20,7 @@ class Request extends Model
 
     public const TYPE_RESCHEDULE = 'reschedule';
     public const TYPE_INSTRUCTOR_PREFERENCE = 'instructor_preference';
+    public const TYPE_BOOKING = 'booking';
 
     public const STATUS_PENDING = 'pending';
     public const STATUS_ACCEPTED = 'accepted';
@@ -37,6 +39,11 @@ class Request extends Model
     public function fromSchedule(): BelongsTo
     {
         return $this->belongsTo(Schedule::class, 'from_schedule_id');
+    }
+
+    public function preferredInstructor(): BelongsTo
+    {
+        return $this->belongsTo(Instructor::class, 'preferred_instructor_id');
     }
 
     public function handledBy(): BelongsTo

@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Course;
 use App\Models\Request as StudentRequest;
+use App\Models\Schedule;
 use App\Models\StudentSchedule;
 use App\Notifications\NotificationService;
 use Illuminate\Http\Request;
@@ -15,7 +17,7 @@ class RequestController extends Controller
     {
         $status = $request->input('status');
 
-        $items = StudentRequest::with(['student.user', 'schedule.course', 'fromSchedule.course', 'handledBy'])
+        $items = StudentRequest::with(['student.user', 'schedule.course', 'fromSchedule.course', 'preferredInstructor.user', 'handledBy'])
             ->when(in_array($status, ['pending', 'accepted', 'rejected']), fn ($q) => $q->where('status', $status))
             ->latest()
             ->paginate(15);
@@ -28,6 +30,11 @@ class RequestController extends Controller
                 'student_name' => $r->student?->user?->name,
                 'student_id' => $r->student_id,
                 'preferred_gender' => $r->preferred_gender,
+                'preferred_date' => $r->preferred_date,
+                'preferred_instructor' => $r->preferredInstructor ? [
+                    'id' => $r->preferredInstructor->id,
+                    'name' => $r->preferredInstructor->user?->name,
+                ] : null,
                 'note' => $r->note,
                 'admin_note' => $r->admin_note,
                 'from_schedule' => $r->fromSchedule ? [
@@ -92,6 +99,38 @@ class RequestController extends Controller
                     $source->update(['schedule_id' => $toId, 'status' => 'confirmed']);
                 }
             }
+        } elseif ($studentRequest->type === StudentRequest::TYPE_BOOKING) {
+            // Create the session on the requested day with the requested instructor,
+            // then book the student into it.
+            $course = Course::where('type', 'PDC')
+                ->whereHas('enrollments', fn ($q) => $q
+                    ->where('student_id', $studentRequest->student_id)
+                    ->where('status', 'active'))
+                ->first();
+
+            if (! $course) {
+                return response()->json(['message' => 'The student has no active PDC enrollment to book into.'], 422);
+            }
+
+            $schedule = Schedule::create([
+                'course_id' => $course->id,
+                'instructor_id' => $studentRequest->preferred_instructor_id,
+                'date' => $studentRequest->preferred_date->format('Y-m-d'),
+                'time_start' => '09:00',
+                'time_end' => '11:00',
+                'venue' => 'RC Driving Academy — Driving Range',
+                'max_students' => 1,
+                'status' => 'open',
+            ]);
+
+            StudentSchedule::create([
+                'student_id' => $studentRequest->student_id,
+                'schedule_id' => $schedule->id,
+                'booked_at' => now(),
+                'status' => 'confirmed',
+            ]);
+
+            $studentRequest->update(['schedule_id' => $schedule->id]);
         }
 
         $studentRequest->update([
@@ -133,7 +172,9 @@ class RequestController extends Controller
             if ($student) {
                 $summary = $req->type === StudentRequest::TYPE_RESCHEDULE
                     ? "Your reschedule request was $decision."
-                    : "Your instructor preference request was $decision.";
+                    : ($req->type === StudentRequest::TYPE_BOOKING
+                        ? "Your PDC session request for {$req->preferred_date} was $decision."
+                        : "Your instructor preference request was $decision.");
                 (new NotificationService())->requestReceived($student, $summary);
             }
         } catch (\Throwable $e) {

@@ -93,6 +93,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/progress', [StudentProgressController::class, 'index'])->name('api.student.progress');
         Route::get('/requests', [StudentRequestController::class, 'index'])->name('api.student.requests.index');
         Route::post('/requests/instructor-preference', [StudentRequestController::class, 'instructorPreference'])->name('api.student.requests.preference');
+        Route::post('/requests/booking', [StudentRequestController::class, 'bookingRequest'])->name('api.student.requests.booking');
         Route::post('/requests/reschedule', [StudentRequestController::class, 'reschedule'])->name('api.student.requests.reschedule');
         Route::delete('/requests/{studentRequest}', [StudentRequestController::class, 'destroy'])->name('api.student.requests.destroy');
         Route::get('/chat', [StudentChatController::class, 'index'])->name('api.student.chat.index');

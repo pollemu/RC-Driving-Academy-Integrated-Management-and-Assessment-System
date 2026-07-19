@@ -336,13 +336,18 @@ function renderPdcCalendar() {
     const date = new Date(y, m - 1, d); date.setHours(0, 0, 0, 0);
     const key = y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
     const isPast = date < today;
-    const isGreen = greenDays.has(key) && !isPast;
+    const isSunday = date.getDay() === 0;
+    const isGreen = greenDays.has(key) && !isPast && !isSunday;
     const isSel = SESSIONS_CACHE._pdcDay === key;
     const cls = ['cal-cell'];
-    if (isPast) cls.push('cal-past');
+    if (isSunday) cls.push('cal-sunday');
+    else if (isPast) cls.push('cal-past');
     else if (isGreen) cls.push('cal-green');
     if (isSel) cls.push('cal-sel');
-    const label = isGreen ? `<button class="cal-day-btn" onclick="setPdcDay('${key}')">${d}</button>` : `<span class="cal-day">${d}</span>`;
+    let label;
+    if (isGreen) label = `<button class="cal-day-btn" onclick="setPdcDay('${key}')">${d}</button>`;
+    else if (isSunday) label = `<span class="cal-day">${d}</span>`;
+    else label = `<span class="cal-day">${d}</span>`;
     cellHtml.push(`<div class="${cls.join(' ')}">${label}</div>`);
   }
 
@@ -362,7 +367,8 @@ function renderPdcCalendar() {
     </div>
     <div class="cal-grid">${dow}${cellHtml.join('')}</div>
     <div style="display:flex;gap:14px;font-size:12px;color:var(--gray);margin:8px 0 4px;">
-      <span><span class="cal-dot cal-dot-green"></span>Open day (pick a slot)</span>
+      <span><span class="cal-dot cal-dot-green"></span>Free day (request a slot)</span>
+      <span><span class="cal-dot cal-dot-red"></span>Sunday (closed)</span>
       <span><span class="cal-dot cal-dot-muted"></span>Unavailable</span>
     </div>
     <div id="pdcDayPanel" style="margin-top:10px;">${dayPanel}</div>`;
@@ -371,23 +377,37 @@ function renderPdcCalendar() {
 function renderPdcDayInstructors() {
   const list = SESSIONS_CACHE._pdcInstructors || [];
   if (SESSIONS_CACHE._pdcDay == null) {
-    return '<div style="font-size:13px;color:var(--gray);">Pick a green day to see instructors available that day.</div>';
+    return '<div style="font-size:13px;color:var(--gray);">Pick a green (free) day to see instructors available that day.</div>';
   }
   if (!list.length) {
-    return `<div style="font-size:13px;color:var(--gray);">No instructors available on ${formatDate(SESSIONS_CACHE._pdcDay)} — every instructor is already booked that day. Try another green day.</div>`;
+    return `<div style="font-size:13px;color:var(--gray);">No instructors are free on ${formatDate(SESSIONS_CACHE._pdcDay)} — every instructor already has a session that day. Try another green day.</div>`;
   }
   const rows = list.map(s => `<tr>
       <td>${escapeHtml(s.instructor_name)}</td>
-      <td>${escapeHtml((s.time_start || '') + (s.time_end ? ' – ' + s.time_end : ''))}</td>
-      <td>${escapeHtml(s.venue || '—')}</td>
-      <td>${s.booked}/${s.max_students}</td>
-      <td><button class="btn btn-sm btn-primary" onclick="bookSession(${s.schedule_id})">Book</button></td>
+      <td>${escapeHtml(s.specialization ? (s.specialization + ' instructor') : 'Instructor')}</td>
+      <td><button class="btn btn-sm btn-primary" onclick="requestPdcBooking(${s.instructor_id}, '${SESSIONS_CACHE._pdcDay}')">Request</button></td>
     </tr>`).join('');
   return `<div style="overflow-x:auto;">
-      <table><thead><tr><th>Instructor</th><th>Time</th><th>Venue</th><th>Slots</th><th></th></tr></thead>
+      <table><thead><tr><th>Instructor</th><th>Specialization</th><th></th></tr></thead>
       <tbody>${rows}</tbody></table>
     </div>
-    <p style="font-size:12px;color:var(--gray);margin-top:8px;">An instructor is available only if they have no bookings yet on the day you pick. Choose one to book your PDC session.</p>`;
+    <p style="font-size:12px;color:var(--gray);margin-top:8px;">An instructor is free if they have no session yet on the day you pick. Choose one to send a booking request — the admin will confirm the slot.</p>`;
+}
+
+async function requestPdcBooking(instructorId, date) {
+  const { ok, error, data } = await RCDA.safeFetch(STUD_API() + `/student/requests/booking`, {
+    method: 'POST',
+    body: JSON.stringify({ preferred_date: date, preferred_instructor_id: instructorId })
+  });
+  if (!ok) {
+    RCDA.showToast(error || 'We couldn’t send that request. Please try again.');
+    return;
+  }
+  RCDA.showToast('Booking request sent. The admin will confirm your PDC slot.', 'success');
+  SESSIONS_CACHE._pdcDay = null;
+  SESSIONS_CACHE._pdcInstructors = [];
+  renderBookWizard();
+  loadPdcCalendar();
 }
 
 function shiftPdcMonth(dir) {

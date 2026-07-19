@@ -50,6 +50,55 @@ class RequestController extends Controller
         return response()->json(['request' => $this->shape($req)], 201);
     }
 
+    /* Request a new PDC session on a free day with a free instructor. The admin
+       reviews and accepts (which creates the session + booking) or rejects. */
+    public function bookingRequest(Request $request)
+    {
+        $data = $request->validate([
+            'preferred_date' => ['required', 'date', 'after_or_equal:today'],
+            'preferred_instructor_id' => ['required', 'exists:instructors,id'],
+            'note' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $student = $request->user()->student;
+
+        // The day must have no session scheduled yet.
+        $hasSession = Schedule::whereDate('date', $data['preferred_date'])->exists();
+        if ($hasSession) {
+            return response()->json(['message' => 'That day already has a session scheduled. Pick a free (green) day.'], 422);
+        }
+
+        // The instructor must have no session that day.
+        $busy = Schedule::where('instructor_id', $data['preferred_instructor_id'])
+            ->whereDate('date', $data['preferred_date'])
+            ->exists();
+        if ($busy) {
+            return response()->json(['message' => 'That instructor already has a session that day. Choose another instructor or day.'], 422);
+        }
+
+        // Student may only hold one pending booking request.
+        $open = $student->requests()
+            ->where('type', StudentRequest::TYPE_BOOKING)
+            ->where('status', StudentRequest::STATUS_PENDING)
+            ->exists();
+        if ($open) {
+            return response()->json(['message' => 'You already have a pending booking request. Wait for the admin to accept it.'], 422);
+        }
+
+        $req = StudentRequest::create([
+            'type' => StudentRequest::TYPE_BOOKING,
+            'student_id' => $student->id,
+            'preferred_date' => $data['preferred_date'],
+            'preferred_instructor_id' => $data['preferred_instructor_id'],
+            'note' => $data['note'] ?? null,
+            'status' => StudentRequest::STATUS_PENDING,
+        ]);
+
+        $this->notify($req, 'New PDC session requested for ' . $data['preferred_date']);
+
+        return response()->json(['request' => $this->shape($req)], 201);
+    }
+
     /* Request to move a booked session to a different open session. */
     public function reschedule(Request $request)
     {
@@ -118,6 +167,11 @@ class RequestController extends Controller
             'type' => $r->type,
             'status' => $r->status,
             'preferred_gender' => $r->preferred_gender,
+            'preferred_date' => $r->preferred_date,
+            'preferred_instructor' => $r->preferredInstructor ? [
+                'id' => $r->preferredInstructor->id,
+                'name' => $r->preferredInstructor->user->name ?? 'Instructor',
+            ] : null,
             'note' => $r->note,
             'admin_note' => $r->admin_note,
             'from_schedule' => $r->fromSchedule ? [

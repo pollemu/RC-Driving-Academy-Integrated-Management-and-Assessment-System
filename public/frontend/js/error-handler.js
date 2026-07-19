@@ -14,6 +14,40 @@ window.RCDA = window.RCDA || {};
 
 (function () {
 
+  /* Styles are injected here (not relying on base.css) so the alert always
+     renders correctly even if the stylesheet fails to load/cache. */
+  const ALERT_CSS = `
+  #rcdaToastRoot{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .rcda-toast-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(16,18,22,0.5);opacity:0;transition:opacity .24s ease;backdrop-filter:blur(2px);cursor:pointer;}
+  .rcda-toast-overlay.show{opacity:1;}
+  .rcda-toast{position:relative;width:min(420px,94vw);box-sizing:border-box;background:#fff;border-radius:20px;box-shadow:0 40px 80px rgba(16,24,40,.32);overflow:hidden;font-family:Inter,system-ui,sans-serif;line-height:1.45;transform:scale(.94) translateY(8px);opacity:0;transition:opacity .26s ease,transform .26s cubic-bezier(.2,.9,.3,1.2);}
+  .rcda-toast.show{opacity:1;transform:scale(1) translateY(0);}
+  .rcda-toast .toast-banner{height:6px;width:100%;}
+  .rcda-toast .toast-inner{padding:30px 28px 22px;display:flex;flex-direction:column;align-items:center;text-align:center;}
+  .rcda-toast .ic{flex:0 0 auto;width:64px;height:64px;border-radius:18px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:32px;margin-bottom:16px;box-shadow:0 10px 24px rgba(16,24,40,.18);}
+  .rcda-toast .body{flex:1 1 auto;min-width:0;}
+  .rcda-toast .title{font-family:'Poppins',sans-serif;font-weight:700;font-size:20px;margin-bottom:6px;color:#1F1F1F;}
+  .rcda-toast .msg{flex:1 1 auto;word-break:break-word;font-size:14px;opacity:.82;color:#2A2A2A;}
+  .rcda-toast .bar{position:absolute;left:0;bottom:0;height:4px;width:100%;transform-origin:left;animation:rcda-toast-bar 2.69s linear forwards;}
+  @keyframes rcda-toast-bar{from{transform:scaleX(1);}to{transform:scaleX(0);}}
+  .rcda-toast--success .toast-banner{background:linear-gradient(90deg,#12B76A,#0E9A5A);}
+  .rcda-toast--success .ic{background:linear-gradient(135deg,#12B76A,#0E9A5A);}
+  .rcda-toast--success .bar{background:#12B76A;}
+  .rcda-toast--error .toast-banner{background:linear-gradient(90deg,#F04438,#D92D20);}
+  .rcda-toast--error .ic{background:linear-gradient(135deg,#F04438,#D92D20);}
+  .rcda-toast--error .bar{background:#F04438;}
+  .rcda-toast--info .toast-banner{background:linear-gradient(90deg,#2E90FA,#1C78DD);}
+  .rcda-toast--info .ic{background:linear-gradient(135deg,#2E90FA,#1C78DD);}
+  .rcda-toast--info .bar{background:#2E90FA;}
+  `;
+  function ensureAlertStyles(){
+    if (document.getElementById('rcdaToastStyles')) return;
+    const s = document.createElement('style');
+    s.id = 'rcdaToastStyles';
+    s.textContent = ALERT_CSS;
+    document.head.appendChild(s);
+  }
+
   /* ---- Centered alert popup (SweetAlert-style) ----
      Signature kept as showToast(message, type) so every call site still works.
      Renders a dimmed full-screen overlay with a centered card that auto-dismisses
@@ -36,6 +70,7 @@ window.RCDA = window.RCDA || {};
 
   RCDA.showToast = function (message, type) {
     type = type || 'error'; // 'error' | 'success' | 'info'
+    ensureAlertStyles();
     const icons = { error: '!', success: '✓', info: 'i' };
     const titles = { error: 'Something went wrong', success: 'All set', info: 'Heads up' };
     const root = ensureToastRoot();

@@ -14,16 +14,21 @@ window.RCDA = window.RCDA || {};
 
 (function () {
 
-  /* ---- Toast UI (created lazily, one instance reused) ---- */
+  /* ---- Centered alert popup (SweetAlert-style) ----
+     Signature kept as showToast(message, type) so every call site still works.
+     Renders a dimmed full-screen overlay with a centered card that auto-dismisses
+     after 2.69s (and on click). type: 'success' | 'error' | 'info'. */
+  const ALERT_MS = 2690;
+
   function ensureToastRoot(){
     let root = document.getElementById('rcdaToastRoot');
     if (root) return root;
     root = document.createElement('div');
     root.id = 'rcdaToastRoot';
     root.style.cssText = [
-      'position:fixed', 'top:18px', 'right:18px', 'z-index:9999',
-      'display:flex', 'flex-direction:column', 'gap:10px',
-      'max-width:340px', 'pointer-events:none'
+      'position:fixed', 'inset:0', 'z-index:9999',
+      'display:flex', 'align-items:center', 'justify-content:center',
+      'pointer-events:none', 'padding:20px'
     ].join(';');
     document.body.appendChild(root);
     return root;
@@ -34,6 +39,13 @@ window.RCDA = window.RCDA || {};
     const icons = { error: '!', success: '✓', info: 'i' };
     const titles = { error: 'Something went wrong', success: 'All set', info: 'Heads up' };
     const root = ensureToastRoot();
+
+    // Replace any visible alert so only one shows at a time.
+    const prev = root.querySelector('.rcda-toast');
+    if (prev) prev.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'rcda-toast-overlay';
 
     const el = document.createElement('div');
     el.className = 'rcda-toast rcda-toast--' + type;
@@ -63,17 +75,20 @@ window.RCDA = window.RCDA || {};
     el.appendChild(ic);
     el.appendChild(body);
     el.appendChild(bar);
-    root.appendChild(el);
+    overlay.appendChild(el);
+    root.appendChild(overlay);
+    root.style.pointerEvents = 'auto';
 
-    requestAnimationFrame(() => el.classList.add('show'));
+    requestAnimationFrame(() => { overlay.classList.add('show'); el.classList.add('show'); });
 
     const hide = () => {
+      if (!el.isConnected) return;
+      overlay.classList.remove('show');
       el.classList.remove('show');
-      setTimeout(() => el.remove(), 240);
+      setTimeout(() => { overlay.remove(); if (!root.children.length) root.style.pointerEvents = 'none'; }, 260);
     };
-    el.addEventListener('click', hide);
-    const timer = setTimeout(hide, 5000);
-    el.addEventListener('mouseenter', () => clearTimeout(timer));
+    overlay.addEventListener('click', hide);
+    setTimeout(hide, ALERT_MS);
 
     return el;
   };

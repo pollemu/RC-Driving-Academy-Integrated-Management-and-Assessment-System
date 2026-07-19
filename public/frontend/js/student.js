@@ -845,17 +845,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   handlePayMongoReturn();
 
   try {
-    await Promise.all([
-      loadStudentProfile(),
-      loadStudentSessions(),
-      loadStudentResults(),
-      loadStudentPayments(),
-      loadStudentEnroll(),
-    ]);
+    await loadStudentProfile();
   } catch (e) {
     console.error('[RCDA student]', e);
     RCDA.showToast('Something went wrong while loading this page. Please refresh.');
   } finally {
     RCDA.hidePageLoading();
   }
+  loadStudentSessions().catch(e => console.error('[RCDA student] sessions', e));
+  loadStudentResults().catch(e => console.error('[RCDA student] results', e));
+  loadStudentPayments().catch(e => console.error('[RCDA student] payments', e));
+  loadStudentEnroll().catch(e => console.error('[RCDA student] enroll', e));
 });

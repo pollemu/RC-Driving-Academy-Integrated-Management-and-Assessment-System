@@ -117,9 +117,6 @@ function escapeHtml(str) {
 
 /* ---- PROFILE ---- */
 async function loadStudentProfile() {
-  const body = document.getElementById('studProfileBody');
-  if (body) body.innerHTML = '<div class="rcda-loading" style="padding:40px 0;"><div class="rcda-spinner"></div><div>Loading your profile…</div></div>';
-
   const API = STUD_API();
   const [me, dash, pay, prog] = await Promise.all([
     RCDA.safeFetch(API + '/me'),
@@ -831,7 +828,7 @@ async function sendChat(e) {
 
 /* ---- INIT ---- */
 document.addEventListener('DOMContentLoaded', async () => {
-  RCDA.showPageLoading();
+  RCDA.showPageLoading('Loading your profile…');
   if (!await requireAuth('student')) return;
   handlePayMongoReturn();
 

@@ -117,6 +117,9 @@ function escapeHtml(str) {
 
 /* ---- PROFILE ---- */
 async function loadStudentProfile() {
+  const body = document.getElementById('studProfileBody');
+  if (body) body.innerHTML = '<div class="rcda-loading" style="padding:40px 0;"><div class="rcda-spinner"></div><div>Loading your profile…</div></div>';
+
   const API = STUD_API();
   const [me, dash, pay, prog] = await Promise.all([
     RCDA.safeFetch(API + '/me'),
@@ -183,16 +186,8 @@ async function loadStudentProfile() {
             <option value="other">Other</option>
           </select>
         </div>
-        <div>
-          <label style="font-size:12.5px;color:var(--gray);">Preferred instructor gender</label>
-          <select id="prefInstr" class="sched-pick">
-            <option value="any">No preference</option>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-          </select>
-        </div>
         <button class="btn btn-primary" style="width:100%;" onclick="saveStudentPrefs()">Save Preferences</button>
-        <p style="font-size:12px;color:var(--gray);">Instructor gender is a preference we'll try to honour — it doesn't restrict which sessions you can book.</p>
+        <p style="font-size:12px;color:var(--gray);">Want a preferred instructor gender instead? Request it from the Requests tab.</p>
       </div>
     </div>
     <div class="card">
@@ -202,15 +197,12 @@ async function loadStudentProfile() {
 
   const g = document.getElementById('prefGender');
   if (g && meData.gender) g.value = meData.gender;
-  const pi = document.getElementById('prefInstr');
-  if (pi) pi.value = (meData.preferred_instructor_gender) || 'any';
 }
 
 async function saveStudentPrefs() {
   const gender = document.getElementById('prefGender') ? document.getElementById('prefGender').value : '';
-  const pref = document.getElementById('prefInstr') ? document.getElementById('prefInstr').value : 'any';
   const { ok, error } = await RCDA.safeFetch(STUD_API() + '/me/preferences', {
-    method: 'POST', body: { gender: gender || null, preferred_instructor_gender: pref === 'any' ? null : pref }
+    method: 'POST', body: { gender: gender || null }
   });
   if (!ok) { RCDA.showToast(error || 'Could not save preferences.'); return; }
   RCDA.showToast('Preferences saved.', 'success');

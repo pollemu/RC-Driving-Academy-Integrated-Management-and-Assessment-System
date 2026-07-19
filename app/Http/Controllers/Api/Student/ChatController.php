@@ -43,7 +43,11 @@ class ChatController extends Controller
         ],
         'instructor' => [
             'keywords' => ['instructor', 'teacher', 'male', 'female', 'prefer', 'gender'],
-            'reply' => "You can note a preferred instructor gender (male/female) from your profile or the request form. It's a preference we'll try to honour — it doesn't restrict which sessions you can book.",
+            'reply' => "You can request a preferred instructor gender (male/female or no preference) from the Requests tab — open 'Request a Preferred Instructor' and submit. It's a soft preference we'll try to honour; it doesn't restrict which sessions you can book. Instructor gender is no longer set from your profile.",
+        ],
+        'requests' => [
+            'keywords' => ['request', 'requests', 'my request', 'status', 'pending', 'accepted', 'rejected', 'preferred instructor', 'instructor preference'],
+            'reply' => "The Requests tab is where you ask admin for things: request a preferred instructor gender, request a reschedule, and track the status (pending/accepted/rejected) of each. Open the Requests tab from the sidebar to get started.",
         ],
         'certificate' => [
             'keywords' => ['certificate', 'cert', 'license', 'valid id'],
@@ -59,7 +63,7 @@ class ChatController extends Controller
         ],
         'help' => [
             'keywords' => ['help', 'support', 'talk to human', 'agent', 'admin', 'hi', 'hello', 'hey'],
-            'reply' => "Hi! I'm the RCDA support bot. I can help with enrolling, payments, bookings, rescheduling, instructor preferences, and certificates. Ask me anything — or type 'talk to human' and we'll route it to admin. How can I help?",
+            'reply' => "Hi! I'm the RCDA support bot. I can help with enrolling, payments, bookings, rescheduling, requesting a preferred instructor, tracking your requests, and certificates. Ask me anything — or type 'talk to human' and we'll route it to admin. How can I help?",
         ],
     ];
 

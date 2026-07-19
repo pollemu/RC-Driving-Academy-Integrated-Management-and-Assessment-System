@@ -733,7 +733,7 @@ async function processFakePay(){
 
   closeModal('payModal');
   RCDA.showToast('Demo payment applied — your enrollment is now active!', 'success');
-  await Promise.all([loadStudentEnroll(), loadStudentPayments(), loadStudentProfile()]);
+  await Promise.all([loadStudentEnroll(), loadStudentPayments(), loadStudentProfile(), loadStudentSessions()]);
 }
 
 /* After PayMongo redirects back (success_url), confirm the payment automatically. */
@@ -746,7 +746,7 @@ function handlePayMongoReturn(){
     const { ok, data } = await RCDA.safeFetch(STUD_API() + '/student/payments/return?session=' + encodeURIComponent(session));
     if (ok && data.verified) {
       RCDA.showToast(data.already ? 'Payment already confirmed.' : 'Payment confirmed — your enrollment is now active!', 'success');
-      await Promise.all([loadStudentEnroll(), loadStudentPayments(), loadStudentProfile()]);
+      await Promise.all([loadStudentEnroll(), loadStudentPayments(), loadStudentProfile(), loadStudentSessions()]);
     } else {
       RCDA.showToast((data && data.message) || 'Payment not confirmed yet — it will activate shortly.', 'info');
     }

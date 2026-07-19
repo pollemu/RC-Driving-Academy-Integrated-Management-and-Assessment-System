@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['user_id', 'instructor_id', 'phone', 'address', 'birthdate', 'license_type', 'document_path'])]
+#[Fillable(['user_id', 'instructor_id', 'phone', 'address', 'birthdate', 'license_type', 'gender', 'preferred_instructor_gender', 'document_path'])]
 class Student extends Model
 {
     protected function casts(): array
@@ -25,6 +25,16 @@ class Student extends Model
     public function instructor(): BelongsTo
     {
         return $this->belongsTo(Instructor::class);
+    }
+
+    public function requests(): HasMany
+    {
+        return $this->hasMany(\App\Models\Request::class);
+    }
+
+    public function messages(): HasMany
+    {
+        return $this->hasMany(\App\Models\Message::class);
     }
 
     public function enrollments(): HasMany

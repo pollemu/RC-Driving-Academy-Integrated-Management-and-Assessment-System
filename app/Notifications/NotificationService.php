@@ -115,4 +115,19 @@ class NotificationService
     {
         return $this->maps;
     }
+
+    /* Admin-side request received (reschedule / instructor preference). */
+    public function requestReceived(Student $student, string $summary): void
+    {
+        $name = $student->user->name;
+        $smsText = "Hi $name, we received your request: $summary. We'll confirm shortly. -RCDA";
+        $emailSubject = 'We received your request';
+        $emailBody = "Hi $name,\n\nWe have received your request: $summary.\n\nOur admin team will review it and confirm shortly. You can track its status in your dashboard.\n\nThank you,\nRC Driving Academy";
+
+        $to = $this->phone($student);
+        if ($to) {
+            $this->sms->send($to, $smsText, 'request_received', $student->user_id);
+        }
+        $this->mail->send($student->user->email, $emailSubject, $emailBody, 'request_received', $student->user_id);
+    }
 }

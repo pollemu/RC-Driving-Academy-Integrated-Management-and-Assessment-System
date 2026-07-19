@@ -106,14 +106,18 @@ function renderStudentRows(tbodyId, students) {
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--gray);padding:18px;">No students assigned yet.</td></tr>';
     return;
   }
-  tbody.innerHTML = students.map(st => `
-    <tr data-name="${escapeHtml((st.name || '').toLowerCase())}" data-classification="unknown">
+  tbody.innerHTML = students.map(st => {
+    const pref = st.preferred_instructor_gender === 'male' ? 'Prefers male'
+      : (st.preferred_instructor_gender === 'female' ? 'Prefers female' : '');
+    const prefBadge = pref ? `<span class="badge pending" style="font-size:11px;">${escapeHtml(pref)}</span>` : '';
+    return `<tr data-name="${escapeHtml((st.name || '').toLowerCase())}" data-classification="unknown">
       <td><b>${escapeHtml(st.name || 'Student')}</b></td>
       <td>${escapeHtml(Array.from(st.courses).join(', ') || '—')}</td>
-      <td><span class="badge">—</span></td>
+      <td>${prefBadge || '<span class="badge">—</span>'}</td>
       <td>${escapeHtml(st.lastDate || '—')}</td>
       <td><button class="btn btn-sm btn-primary" onclick="showPanel('myassessment',this)">Assess</button></td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 
 /* ---- DASHBOARD ---- */
@@ -142,6 +146,7 @@ async function loadInstructorStudents() {
   const rows = students.map(s => ({
     id: s.id,
     name: s.name,
+    preferred_instructor_gender: s.preferred_instructor_gender,
     courses: new Set([s.source === 'assigned' ? 'Assigned' : 'Session']),
     lastDate: '—',
   }));

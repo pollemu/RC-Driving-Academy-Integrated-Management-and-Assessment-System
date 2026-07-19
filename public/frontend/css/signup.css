@@ -25,7 +25,7 @@
   border:1.5px solid var(--gray-light);font-size:14.5px;background:white;
   color:var(--charcoal);appearance:none;cursor:pointer;transition:.2s;
 }
-.input-wrap select:focus{border-color:var(--orange);outline:none;box-shadow:0 0 0 4px rgba(242,106,33,0.1);}
+.input-wrap select:focus{border-color:var(--orange);outline:none;box-shadow:0 0 0 4px rgba(192,57,43,0.1);}
 
 /* success state */
 .su-success{text-align:center;}
@@ -44,7 +44,7 @@
   padding:16px;border-radius:14px;border:1.5px solid var(--gray-light);
   background:white;text-align:left;transition:.2s;
 }
-.pay-method:hover{border-color:rgba(242,106,33,0.4);}
+.pay-method:hover{border-color:rgba(192,57,43,0.4);}
 .pay-method.selected{border-color:var(--orange);background:var(--orange-light);}
 .pay-method-ico{
   width:38px;height:38px;border-radius:10px;background:transparent;
@@ -61,7 +61,7 @@
 .pay-panel{margin-top:6px;padding-top:6px;}
 .pay-note{
   display:flex;gap:10px;align-items:flex-start;
-  background:#fff8f3;border:1px solid rgba(242,106,33,0.2);
+  background:#fbf0ee;border:1px solid rgba(192,57,43,0.2);
   border-radius:10px;padding:12px 14px;margin-bottom:6px;
 }
 .pay-note svg{flex-shrink:0;margin-top:1px;}

@@ -51,6 +51,8 @@ class AuthController extends Controller
             'address' => ['nullable', 'string'],
             'birthdate' => ['nullable', 'date'],
             'license_type' => ['nullable', 'in:non-pro,pro,student-permit'],
+            'gender' => ['nullable', 'in:male,female,other'],
+            'preferred_instructor_gender' => ['nullable', 'in:male,female,any'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
@@ -67,6 +69,10 @@ class AuthController extends Controller
             'address' => $data['address'] ?? null,
             'birthdate' => $data['birthdate'] ?? null,
             'license_type' => $data['license_type'] ?? null,
+            'gender' => $data['gender'] ?? null,
+            'preferred_instructor_gender' => isset($data['preferred_instructor_gender']) && $data['preferred_instructor_gender'] !== 'any'
+                ? $data['preferred_instructor_gender']
+                : null,
         ]));
 
         $token = $user->createToken('rcda', ['*'], now()->addHours(8))->plainTextToken;
@@ -92,6 +98,8 @@ class AuthController extends Controller
     {
         $user = $request->user();
 
+        $student = $user->student;
+
         return response()->json([
             'user' => [
                 'id' => $user->id,
@@ -99,8 +107,31 @@ class AuthController extends Controller
                 'email' => $user->email,
                 'role' => $user->role,
                 'is_active' => $user->is_active,
+                'gender' => $student?->gender,
+                'preferred_instructor_gender' => $student?->preferred_instructor_gender,
             ],
         ]);
+    }
+
+    /* Update the authenticated student's own gender / instructor-gender preference. */
+    public function updatePreferences(Request $request)
+    {
+        $data = $request->validate([
+            'gender' => ['nullable', 'in:male,female,other'],
+            'preferred_instructor_gender' => ['nullable', 'in:male,female'],
+        ]);
+
+        $student = $request->user()->student;
+        if (! $student) {
+            return response()->json(['message' => 'No student profile found.'], 422);
+        }
+
+        $student->update([
+            'gender' => $data['gender'] ?? $student->gender,
+            'preferred_instructor_gender' => $data['preferred_instructor_gender'] ?? $student->preferred_instructor_gender,
+        ]);
+
+        return response()->json(['ok' => true]);
     }
 
     public function logout(Request $request)

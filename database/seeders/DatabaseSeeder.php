@@ -54,8 +54,8 @@ class DatabaseSeeder extends Seeder
 
         // Real instructor accounts (one TDC instructor, one PDC instructor).
         $instructorSeeds = [
-            ['name' => 'Mario Santos', 'email' => 'mario.santos@rcdriving.ph', 'phone' => '09171234567', 'specialization' => 'TDC', 'license_no' => 'LIC-100001'],
-            ['name' => 'Elena Reyes', 'email' => 'elena.reyes@rcdriving.ph', 'phone' => '09179876543', 'specialization' => 'PDC', 'license_no' => 'LIC-100002'],
+            ['name' => 'Mario Santos', 'email' => 'mario.santos@rcdriving.ph', 'phone' => '09171234567', 'specialization' => 'TDC', 'license_no' => 'LIC-100001', 'gender' => 'male'],
+            ['name' => 'Elena Reyes', 'email' => 'elena.reyes@rcdriving.ph', 'phone' => '09179876543', 'specialization' => 'PDC', 'license_no' => 'LIC-100002', 'gender' => 'female'],
         ];
 
         $instructors = collect();
@@ -72,6 +72,7 @@ class DatabaseSeeder extends Seeder
                 'phone' => $seed['phone'],
                 'specialization' => $seed['specialization'],
                 'license_no' => $seed['license_no'],
+                'gender' => $seed['gender'],
             ]));
         }
 
@@ -80,10 +81,10 @@ class DatabaseSeeder extends Seeder
 
         // Real student accounts (role = student).
         $studentSeeds = [
-            ['name' => 'John Cruz', 'email' => 'john.cruz@rcdriving.ph', 'phone' => '09171230001', 'address' => 'Quezon City', 'birthdate' => '2002-05-12', 'license_type' => 'student-permit', 'course' => 'TDC', 'instructor' => 'TDC'],
-            ['name' => 'Anna Lim', 'email' => 'anna.lim@rcdriving.ph', 'phone' => '09171230002', 'address' => 'Makati City', 'birthdate' => '2001-09-30', 'license_type' => 'non-pro', 'course' => 'TDC', 'instructor' => 'TDC'],
-            ['name' => 'Paolo Garcia', 'email' => 'paolo.garcia@rcdriving.ph', 'phone' => '09171230003', 'address' => 'Pasig City', 'birthdate' => '2003-01-18', 'license_type' => 'student-permit', 'course' => 'PDC', 'instructor' => 'PDC'],
-            ['name' => 'Maria Torres', 'email' => 'maria.torres@rcdriving.ph', 'phone' => '09171230004', 'address' => 'Taguig City', 'birthdate' => '2000-11-05', 'license_type' => 'pro', 'course' => 'PDC', 'instructor' => 'PDC'],
+            ['name' => 'John Cruz', 'email' => 'john.cruz@rcdriving.ph', 'phone' => '09171230001', 'address' => 'Quezon City', 'birthdate' => '2002-05-12', 'license_type' => 'student-permit', 'course' => 'TDC', 'instructor' => 'TDC', 'gender' => 'male', 'pref' => 'female'],
+            ['name' => 'Anna Lim', 'email' => 'anna.lim@rcdriving.ph', 'phone' => '09171230002', 'address' => 'Makati City', 'birthdate' => '2001-09-30', 'license_type' => 'non-pro', 'course' => 'TDC', 'instructor' => 'TDC', 'gender' => 'female', 'pref' => 'male'],
+            ['name' => 'Paolo Garcia', 'email' => 'paolo.garcia@rcdriving.ph', 'phone' => '09171230003', 'address' => 'Pasig City', 'birthdate' => '2003-01-18', 'license_type' => 'student-permit', 'course' => 'PDC', 'instructor' => 'PDC', 'gender' => 'male', 'pref' => null],
+            ['name' => 'Maria Torres', 'email' => 'maria.torres@rcdriving.ph', 'phone' => '09171230004', 'address' => 'Taguig City', 'birthdate' => '2000-11-05', 'license_type' => 'pro', 'course' => 'PDC', 'instructor' => 'PDC', 'gender' => 'female', 'pref' => 'female'],
         ];
 
         $tdcCourse = Course::where('type', 'TDC')->where('format', 'Face to Face')->first();
@@ -106,6 +107,8 @@ class DatabaseSeeder extends Seeder
                 'address' => $seed['address'],
                 'birthdate' => $seed['birthdate'],
                 'license_type' => $seed['license_type'],
+                'gender' => $seed['gender'],
+                'preferred_instructor_gender' => $seed['pref'],
                 'document_path' => null,
             ]);
 

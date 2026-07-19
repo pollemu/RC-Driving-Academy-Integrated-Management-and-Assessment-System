@@ -69,6 +69,10 @@
           <div class="input-wrap">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 118 0v4"/></svg>
             <input type="password" placeholder="••••••••" id="loginPass">
+            <button type="button" class="pw-toggle" onclick="togglePw('loginPass',this)" aria-label="Show password">
+              <svg class="eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="eye-off" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0112 20C5 20 1 12 1 12a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            </button>
           </div>
         </div>
 
@@ -122,7 +126,7 @@
     .m-close svg { pointer-events: none; }
     .m-role-badge {
       display: inline-flex; align-items: center; gap: 6px;
-      background: rgba(242,106,33,0.1); border-radius: 999px;
+      background: rgba(192,57,43,0.1); border-radius: 999px;
       padding: 5px 12px; margin-bottom: 14px;
     }
     .m-role-badge span { font-size: 11.5px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--orange); }
@@ -132,7 +136,7 @@
     .m-divider { height: 1px; background: var(--gray-light); margin: 20px 0; }
     .m-note {
       display: flex; gap: 10px; align-items: flex-start;
-      background: #fff8f3; border: 1px solid rgba(242,106,33,0.2);
+      background: #fbf0ee; border: 1px solid rgba(192,57,43,0.2);
       border-radius: 10px; padding: 12px 14px; margin-bottom: 20px;
     }
     .m-note svg { flex-shrink: 0; margin-top: 1px; }
@@ -153,7 +157,7 @@
     .m-inp-wrap textarea { padding-left: 42px; resize: none; }
     .m-inp-wrap input:focus, .m-inp-wrap select:focus, .m-inp-wrap textarea:focus {
       border-color: var(--orange); outline: none;
-      box-shadow: 0 0 0 4px rgba(242,106,33,0.1); background: #fff;
+      box-shadow: 0 0 0 4px rgba(192,57,43,0.1); background: #fff;
     }
     .m-inp-wrap select { appearance: none; cursor: pointer; }
     .m-err { display: none; color: #dc2626; font-size: 12.5px; margin: -6px 0 12px; background: #fef2f2; border-radius: 8px; padding: 9px 12px; }
@@ -164,7 +168,7 @@
       border: none; color: white; cursor: pointer; transition: transform .15s, box-shadow .15s;
       margin-top: 4px;
     }
-    .m-submit:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(242,106,33,.3); }
+    .m-submit:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(192,57,43,.3); }
     .m-foot { text-align: center; margin-top: 16px; font-size: 13.5px; color: var(--gray); }
     .m-foot a { color: var(--orange); font-weight: 700; }
 

@@ -53,6 +53,7 @@ class DashboardController extends Controller
                 'name' => $s->user->name,
                 'email' => $s->user->email,
                 'phone' => $s->phone,
+                'preferred_instructor_gender' => $s->preferred_instructor_gender,
                 'source' => 'assigned',
             ];
         });
@@ -70,6 +71,7 @@ class DashboardController extends Controller
                     'name' => $s->user->name,
                     'email' => $s->user->email,
                     'phone' => $s->phone,
+                    'preferred_instructor_gender' => $s->preferred_instructor_gender,
                     'source' => 'session',
                 ];
             });

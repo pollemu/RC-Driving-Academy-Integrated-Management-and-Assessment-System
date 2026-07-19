@@ -1,8 +1,8 @@
 /* ========== SHOWROOM BACKDROP (keeps the glossy theme going past the hero) ========== */
 body{
   background:
-    radial-gradient(1000px 520px at 88% 4%, rgba(242,106,33,0.07), transparent 62%),
-    radial-gradient(900px 500px at -5% 60%, rgba(242,106,33,0.04), transparent 55%),
+    radial-gradient(1000px 520px at 88% 4%, rgba(192,57,43,0.07), transparent 62%),
+    radial-gradient(900px 500px at -5% 60%, rgba(192,57,43,0.04), transparent 55%),
     linear-gradient(180deg,#fbfaf9 0%,#f5f3f0 45%,#f7f5f2 100%);
 }
 
@@ -22,7 +22,7 @@ body{
   .nav:not(.scrolled) .btn-ghost{border-color:var(--line);color:white;}
 
   /* ========== HERO ========== */
-  .hero{position:relative;min-height:100vh;display:flex;align-items:center;background:radial-gradient(ellipse 900px 500px at 80% 10%,rgba(242,106,33,0.18),transparent 60%),linear-gradient(180deg,#1c1c1f 0%,#131316 55%,#0e0e10 100%);overflow:hidden;}
+  .hero{position:relative;min-height:100vh;display:flex;align-items:center;background:radial-gradient(ellipse 900px 500px at 80% 10%,rgba(192,57,43,0.18),transparent 60%),linear-gradient(180deg,#1c1c1f 0%,#131316 55%,#0e0e10 100%);overflow:hidden;}
   .hero-road{position:absolute;inset:0;opacity:.5;}
   .hero-inner{position:relative;z-index:2;max-width:1280px;margin:0 auto;padding:160px 56px 120px;display:grid;grid-template-columns:1.1fr 0.9fr;gap:60px;align-items:center;width:100%;}
   .eyebrow{display:inline-flex;align-items:center;gap:8px;color:var(--orange);font-weight:700;font-size:13px;letter-spacing:1.6px;text-transform:uppercase;margin-bottom:22px;}
@@ -42,7 +42,7 @@ body{
   .route-line{padding-left:28px;}
   .route-line .pt{position:relative;padding:14px 0 26px;border-left:2px dashed rgba(255,255,255,0.22);padding-left:22px;margin-left:-22px;}
   .route-line .pt:last-child{border-left:2px dashed transparent;}
-  .route-line .pt::before{content:'';position:absolute;left:-7px;top:14px;width:13px;height:13px;border-radius:50%;background:var(--orange);box-shadow:0 0 0 4px rgba(242,106,33,0.18);}
+  .route-line .pt::before{content:'';position:absolute;left:-7px;top:14px;width:13px;height:13px;border-radius:50%;background:var(--orange);box-shadow:0 0 0 4px rgba(192,57,43,0.18);}
   .route-line .pt.done::before{background:#4ade80;box-shadow:0 0 0 4px rgba(74,222,128,0.18);}
   .route-line .pt b{color:white;font-size:14px;display:block;}
   .route-line .pt span{color:rgba(255,255,255,0.45);font-size:12.5px;}
@@ -71,7 +71,7 @@ body{
   .badge-float span{font-size:12.5px;}
   .about-points{display:flex;flex-direction:column;gap:22px;margin-top:28px;}
   .about-point{display:flex;gap:16px;}
-  .about-point .ico{width:46px;height:46px;border-radius:13px;background:rgba(242,106,33,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .about-point .ico{width:46px;height:46px;border-radius:13px;background:rgba(192,57,43,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
   .about-point h4{font-size:15.5px;margin-bottom:4px;}
   .about-point p{font-size:14.5px;}
 
@@ -84,7 +84,7 @@ body{
   .course-card:hover::after{left:130%;}
   .course-card .tag{display:inline-block;font-size:11.5px;font-weight:700;letter-spacing:.6px;padding:5px 12px;border-radius:999px;margin-bottom:18px;}
   .course-card.tdc .tag{background:rgba(112,112,112,0.12);color:var(--gray);}
-  .course-card.pdc .tag{background:rgba(242,106,33,0.12);color:var(--orange);}
+  .course-card.pdc .tag{background:rgba(192,57,43,0.12);color:var(--orange);}
   .course-card h3{font-size:23px;margin-bottom:10px;}
   .course-card p.desc{font-size:14.5px;margin-bottom:22px;}
   .course-meta{display:flex;gap:22px;margin-bottom:24px;}
@@ -98,8 +98,8 @@ body{
 
   .testi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;}
   .testi-card{background:linear-gradient(160deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02));border:1px solid rgba(255,255,255,0.1);border-radius:var(--radius);padding:28px;position:relative;overflow:hidden;transition:.3s;}
-  .testi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,rgba(242,106,33,0.7),transparent);}
-  .testi-card:hover{transform:translateY(-4px);border-color:rgba(242,106,33,0.35);}
+  .testi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,rgba(192,57,43,0.7),transparent);}
+  .testi-card:hover{transform:translateY(-4px);border-color:rgba(192,57,43,0.35);}
   .testi-stars{color:var(--orange);font-size:14px;margin-bottom:16px;letter-spacing:2px;}
   .testi-card p{color:rgba(255,255,255,0.75);font-size:14.5px;margin-bottom:22px;}
   .testi-person{display:flex;align-items:center;gap:12px;}
@@ -119,7 +119,7 @@ body{
   .field label{display:block;font-size:12.5px;font-weight:600;margin-bottom:7px;color:rgba(255,255,255,0.55);}
   .field input,.field textarea,.field select{width:100%;padding:13px 15px;border-radius:11px;border:1.5px solid rgba(255,255,255,0.12);font-size:14px;color:white;background:rgba(255,255,255,0.06);transition:.2s;}
   .field input::placeholder,.field textarea::placeholder{color:rgba(255,255,255,0.35);}
-  .field input:focus,.field textarea:focus,.field select:focus{border-color:var(--orange);background:rgba(255,255,255,0.1);outline:none;box-shadow:0 0 0 4px rgba(242,106,33,0.18);}
+  .field input:focus,.field textarea:focus,.field select:focus{border-color:var(--orange);background:rgba(255,255,255,0.1);outline:none;box-shadow:0 0 0 4px rgba(192,57,43,0.18);}
   .field{margin-bottom:16px;}
 
   footer{background:var(--asphalt);color:rgba(255,255,255,0.5);padding:60px 56px 30px;margin-top:40px;}

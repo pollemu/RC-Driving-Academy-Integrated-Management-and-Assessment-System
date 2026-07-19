@@ -9,6 +9,9 @@ use App\Http\Controllers\Api\Admin\ScheduleController as AdminScheduleController
 use App\Http\Controllers\Api\Admin\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Api\Admin\CertificationController as AdminCertificationController;
 use App\Http\Controllers\Api\Admin\ReportController as AdminReportController;
+use App\Http\Controllers\Api\Admin\RequestController as AdminRequestController;
+use App\Http\Controllers\Api\Student\RequestController as StudentRequestController;
+use App\Http\Controllers\Api\Student\ChatController as StudentChatController;
 use App\Http\Controllers\Api\Instructor\DashboardController as InstructorDashboardController;
 use App\Http\Controllers\Api\Instructor\AttendanceController as InstructorAttendanceController;
 use App\Http\Controllers\Api\Instructor\FeedbackController as InstructorFeedbackController;
@@ -24,8 +27,9 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
 
 Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/me', [AuthController::class, 'me']);
-    Route::post('/logout', [AuthController::class, 'logout']);
+        Route::get('/me', [AuthController::class, 'me']);
+        Route::post('/me/preferences', [AuthController::class, 'updatePreferences']);
+        Route::post('/logout', [AuthController::class, 'logout']);
 
     Route::middleware('api.role:admin')->prefix('admin')->group(function () {
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('api.admin.dashboard');
@@ -49,6 +53,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/payments/{payment}/verify', [AdminPaymentController::class, 'verify'])->name('api.admin.payments.verify');
         Route::post('/payments/{payment}/reject', [AdminPaymentController::class, 'reject'])->name('api.admin.payments.reject');
         Route::get('/certifications/ready', [AdminCertificationController::class, 'ready'])->name('api.admin.certifications.ready');
+        Route::get('/requests', [AdminRequestController::class, 'index'])->name('api.admin.requests.index');
+        Route::post('/requests/{studentRequest}/accept', [AdminRequestController::class, 'accept'])->name('api.admin.requests.accept');
+        Route::post('/requests/{studentRequest}/reject', [AdminRequestController::class, 'reject'])->name('api.admin.requests.reject');
         Route::get('/certifications', [AdminCertificationController::class, 'index'])->name('api.admin.certifications.index');
         Route::post('/certifications', [AdminCertificationController::class, 'store'])->name('api.admin.certifications.store');
         Route::get('/certifications/courses-for/{student}', [AdminCertificationController::class, 'coursesFor'])->name('api.admin.certifications.courses-for');
@@ -82,6 +89,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/schedules/{schedule}/book', [StudentScheduleController::class, 'book'])->name('api.student.schedules.book');
         Route::delete('/schedules/{schedule}/book', [StudentScheduleController::class, 'cancel'])->name('api.student.schedules.cancel');
         Route::get('/progress', [StudentProgressController::class, 'index'])->name('api.student.progress');
+        Route::get('/requests', [StudentRequestController::class, 'index'])->name('api.student.requests.index');
+        Route::post('/requests/instructor-preference', [StudentRequestController::class, 'instructorPreference'])->name('api.student.requests.preference');
+        Route::post('/requests/reschedule', [StudentRequestController::class, 'reschedule'])->name('api.student.requests.reschedule');
+        Route::delete('/requests/{studentRequest}', [StudentRequestController::class, 'destroy'])->name('api.student.requests.destroy');
+        Route::get('/chat', [StudentChatController::class, 'index'])->name('api.student.chat.index');
+        Route::post('/chat', [StudentChatController::class, 'send'])->name('api.student.chat.send');
     });
 });
 

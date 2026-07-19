@@ -389,5 +389,68 @@ Purpose (per original spec): show PDC routes / venues on a map.
   Reporting            -> live 6-card report endpoint (/admin/reports)
   SMS / Email / Maps    -> IMPLEMENTED (graceful no-key; wire via .env later)
 
-===========================================================
+==========================================================
+12. STUDENT-FACING SELF-SERVICE: PREFERENCES, RESCHEDULE REQUESTS & AI SUPPORT CHAT [IMPLEMENTED]
+
+These three features were added in the current batch to reduce admin
+coordination load and give students self-service touchpoints. They are all
+backed by the existing API + notification subsystem and require no external keys.
+
+--- A. INSTRUCTOR-GENDER PREFERENCE (SOFT) ---
+Purpose: let a student express a preferred instructor gender without it ever
+restricting their bookings. It is a preference, honoured best-effort by admin.
+- Storage: `students.gender` (their own) and
+  `students.preferred_instructor_gender` (male | female | null).
+- Captured at registration (`POST /api/register`, `gender` +
+  `preferred_instructor_gender`) and editable by the student via
+  `POST /api/me/preferences` (rendered in the student Profile → "My Preferences").
+- Admin can also set an instructor's `gender` when assigning a role
+  (`POST /api/admin/users/{id}/set-role`).
+- Surfaced to instructors in **My Students** (`GET /api/instructor/students`
+  returns `preferred_instructor_gender`) as a "Prefers male/female" badge, and to
+  admin in the Student Requests list (instructor-preference requests).
+- A student submits a formal preference *request* via
+  `POST /api/student/requests/instructor-preference`; this both stores the value
+  on the student and opens a pending `StudentRequest` for admin visibility, and
+  fires a `requestReceived` notification to admin.
+
+--- B. RESCHEDULE REQUESTS (STUDENT → ADMIN APPROVAL) ---
+Purpose: student requests to move a confirmed booking to another open session;
+admin approves/rejects. The original booking stays intact until approval.
+- Student endpoints:
+  - `GET  /api/student/requests`            -> their requests + statuses
+  - `POST /api/student/requests/reschedule` -> {from_schedule_id, schedule_id, note}
+    validates the source booking exists, courses match, and the target schedule is
+    open with capacity (reuses the booking validation rules).
+  - `DELETE /api/student/requests/{id}`     -> cancel a *pending* request only.
+- Admin endpoints:
+  - `GET  /api/admin/requests?status=pending` -> paginated list (filter by status).
+  - `POST /api/admin/requests/{id}/accept`    -> for reschedules, moves the booking
+    (StudentSchedule) from the old schedule to the new one, then notifies the student.
+  - `POST /api/admin/requests/{id}/reject`    -> records an optional admin note,
+    rejects the request, and notifies the student.
+- Model `StudentRequest` (type: reschedule | instructor_preference;
+  status: pending | accepted | rejected). Only one open reschedule per booking at a
+  time is enforced.
+
+--- C. AI SUPPORT CHATBOT (RULE-BASED) ---
+Purpose: an always-available support assistant for students, answering common
+questions about enrolling, TDC/PDC, payments, bookings, rescheduling, instructor
+preferences, and certificates — and escalating to a human on request.
+- No LLM key required: a data-driven keyword rule engine lives in
+  `app/Http/Controllers/Api/Student/ChatController.php` (`BOT_RULES`).
+- Student endpoints:
+  - `GET  /api/student/chat`  -> message history (most recent first, capped).
+  - `POST /api/student/chat`  -> saves the student's message, runs the rule engine,
+    saves and returns the bot reply. The phrase "talk to human" flags the
+    conversation for staff follow-up.
+- History persists in the `messages` table (sender: student | bot | instructor),
+  scoped per student. Frontend = a floating widget in the student dashboard.
+
+--- Summary Table of Actual API Touchpoints (added) ---
+  Instructor-gender pref -> stored on student + optional request + admin notified
+  Reschedule request      -> student request → admin accept moves booking → notifies
+  Support chat            -> rule-based bot, history in messages, human escalation
+
+==========================================================
 END OF DOCUMENT

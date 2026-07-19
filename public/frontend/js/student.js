@@ -11,7 +11,7 @@ window.addEventListener('scroll', () => {
 const STUD_TITLES = {
   profile: 'My Profile', handbook: 'Handbook',
   sessions: 'My Sessions', myassess: 'My Results',
-  enroll: 'Enroll', payment: 'Payment'
+  enroll: 'Enroll', payment: 'Payment', requests: 'Requests'
 };
 
 function showPanel(panel, el) {
@@ -28,6 +28,7 @@ function showPanel(panel, el) {
     if (el.classList) el.classList.add('active');
   }
   closeAllSidebars();
+  if (panel === 'requests') loadStudentRequests();
 }
 
 /* ---- HANDBOOK (book-like chapters) ---- */
@@ -159,7 +160,7 @@ async function loadStudentProfile() {
   if (body) body.innerHTML = `
     <div class="card">
       <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">
-        <div style="width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,var(--orange),#ff9a52);display:flex;align-items:center;justify-content:center;color:white;font-weight:800;font-size:20px;font-family:'Poppins';box-shadow:0 6px 16px rgba(242,106,33,0.3);">${initials}</div>
+        <div style="width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,var(--orange),#E35D4B);display:flex;align-items:center;justify-content:center;color:white;font-weight:800;font-size:20px;font-family:'Poppins';box-shadow:0 6px 16px rgba(192,57,43,0.3);">${initials}</div>
         <div><h3 style="font-size:18px;">${escapeHtml(name)}</h3><span style="font-size:13px;color:var(--gray);">${escapeHtml(meData.email || '')}</span></div>
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;">
@@ -171,9 +172,48 @@ async function loadStudentProfile() {
       </div>
     </div>
     <div class="card">
+      <div class="card-head"><h3>My Preferences</h3></div>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-top:6px;">
+        <div>
+          <label style="font-size:12.5px;color:var(--gray);">My gender</label>
+          <select id="prefGender" class="sched-pick">
+            <option value="">— prefer not to say —</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12.5px;color:var(--gray);">Preferred instructor gender</label>
+          <select id="prefInstr" class="sched-pick">
+            <option value="any">No preference</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" style="width:100%;" onclick="saveStudentPrefs()">Save Preferences</button>
+        <p style="font-size:12px;color:var(--gray);">Instructor gender is a preference we'll try to honour — it doesn't restrict which sessions you can book.</p>
+      </div>
+    </div>
+    <div class="card">
       <div class="card-head"><h3>Enrollments</h3></div>
       ${progressHtml}
     </div>`;
+
+  const g = document.getElementById('prefGender');
+  if (g && meData.gender) g.value = meData.gender;
+  const pi = document.getElementById('prefInstr');
+  if (pi) pi.value = (meData.preferred_instructor_gender) || 'any';
+}
+
+async function saveStudentPrefs() {
+  const gender = document.getElementById('prefGender') ? document.getElementById('prefGender').value : '';
+  const pref = document.getElementById('prefInstr') ? document.getElementById('prefInstr').value : 'any';
+  const { ok, error } = await RCDA.safeFetch(STUD_API() + '/me/preferences', {
+    method: 'POST', body: { gender: gender || null, preferred_instructor_gender: pref === 'any' ? null : pref }
+  });
+  if (!ok) { RCDA.showToast(error || 'Could not save preferences.'); return; }
+  RCDA.showToast('Preferences saved.', 'success');
 }
 
 /* ---- SESSIONS ---- */
@@ -475,9 +515,17 @@ function enrollRender(){
     </label>`;
   }).join('');
 
+  const alreadyActive = c => c && c.enrolled && (c.enrollment_status === 'active' || c.enrollment_status === 'completed');
   const selected = [];
-  if (ENROLL_SELECTED.tdc) selected.push(ENROLL_SELECTED.tdc);
-  Object.keys(ENROLL_SELECTED.pdc).forEach(id => { if (ENROLL_SELECTED.pdc[id]) selected.push(parseInt(id, 10)); });
+  if (ENROLL_SELECTED.tdc) {
+    const c = courses.find(x => x.id === ENROLL_SELECTED.tdc);
+    if (!alreadyActive(c)) selected.push(ENROLL_SELECTED.tdc);
+  }
+  Object.keys(ENROLL_SELECTED.pdc).forEach(id => {
+    const cid = parseInt(id, 10);
+    const c = courses.find(x => x.id === cid);
+    if (ENROLL_SELECTED.pdc[id] && !alreadyActive(c)) selected.push(cid);
+  });
 
   const lines = selected.map(id => {
     const c = courses.find(x => x.id === id);
@@ -562,10 +610,18 @@ async function loadStudentEnroll(){
 async function submitEnroll(){
   const data = ENROLL_STATE;
   if (!data) return;
+  const alreadyActive = c => c && c.enrolled && (c.enrollment_status === 'active' || c.enrollment_status === 'completed');
   const selected = [];
-  if (ENROLL_SELECTED.tdc) selected.push(ENROLL_SELECTED.tdc);
-  Object.keys(ENROLL_SELECTED.pdc).forEach(id => { if (ENROLL_SELECTED.pdc[id]) selected.push(parseInt(id, 10)); });
-  if (!selected.length) { RCDA.showToast('Select at least one course.'); return; }
+  if (ENROLL_SELECTED.tdc) {
+    const c = (data.courses || []).find(x => x.id === ENROLL_SELECTED.tdc);
+    if (!alreadyActive(c)) selected.push(ENROLL_SELECTED.tdc);
+  }
+  Object.keys(ENROLL_SELECTED.pdc).forEach(id => {
+    const cid = parseInt(id, 10);
+    const c = (data.courses || []).find(x => x.id === cid);
+    if (ENROLL_SELECTED.pdc[id] && !alreadyActive(c)) selected.push(cid);
+  });
+  if (!selected.length) { RCDA.showToast('Your selected courses are already active — nothing to pay for.'); return; }
 
   const { ok, data: res, error } = await RCDA.safeFetch(STUD_API() + '/student/enroll/cart', {
     method: 'POST', body: { course_ids: selected }
@@ -637,6 +693,149 @@ function handlePayMongoReturn(){
     }
     history.replaceState({}, document.title, window.location.pathname);
   })();
+}
+
+/* ---- REQUESTS (instructor preference + reschedule) ---- */
+async function loadStudentRequests() {
+  const [reqs, sched] = await Promise.all([
+    RCDA.safeFetch(STUD_API() + '/student/requests'),
+    RCDA.safeFetch(STUD_API() + '/student/schedules'),
+  ]);
+  const list = (reqs.ok && reqs.data.requests) || [];
+  const schedules = (sched.ok && sched.data.schedules) || [];
+  const bookedIds = (sched.ok && sched.data.bookedIds) || [];
+
+  const reqRows = list.length ? list.map(r => {
+    const typeLabel = r.type === 'reschedule' ? 'Reschedule' : 'Instructor preference';
+    const detail = r.type === 'reschedule'
+      ? `${r.from_schedule ? formatDate(r.from_schedule.date) : '?'} → ${r.to_schedule ? formatDate(r.to_schedule.date) : '?'}`
+      : `Preferred: ${r.preferred_gender || '—'}`;
+    const badge = r.status === 'pending' ? 'pending' : (r.status === 'accepted' ? 'verified' : 'needs');
+    return `<div class="req-card">
+      <h4>${escapeHtml(typeLabel)}</h4>
+      <div class="req-meta">${escapeHtml(detail)} · ${r.note ? escapeHtml(r.note) : ''}</div>
+      <div class="req-row"><span class="badge ${badge}">${escapeHtml(r.status.charAt(0).toUpperCase() + r.status.slice(1))}</span>
+      ${r.admin_note ? `<span class="req-note">Admin: ${escapeHtml(r.admin_note)}</span>` : ''}</div>
+      ${r.status === 'pending' ? `<button class="btn btn-sm btn-ghost" onclick="cancelRequest(${r.id})">Cancel request</button>` : ''}
+    </div>`;
+  }).join('')
+    : '<div class="req-card" style="color:var(--gray);font-size:13px;">No requests yet.</div>';
+
+  const availOpts = schedules.filter(s => !bookedIds.includes(s.id)).map(s =>
+    `<option value="${s.id}">${escapeHtml(s.course ? s.course.name : '')} · ${escapeHtml(s.date)} ${escapeHtml(s.time_start)} – ${escapeHtml(s.venue || '')}</option>`).join('');
+
+  const body = document.getElementById('studRequestsBody');
+  if (body) body.innerHTML = `
+    <div class="card">
+      <div class="card-head"><h3>Request a Preferred Instructor</h3><span style="font-size:13px;color:var(--gray);">Soft preference — we'll try to match it</span></div>
+      <div class="pref-opts" id="prefOpts">
+        <div class="pref-opt" data-v="male" onclick="pickPref(this)">Male</div>
+        <div class="pref-opt" data-v="female" onclick="pickPref(this)">Female</div>
+        <div class="pref-opt" data-v="any" onclick="pickPref(this)">No preference</div>
+      </div>
+      <textarea id="prefNote" class="sched-pick" style="height:60px;" placeholder="Optional note (e.g. reason for preference)"></textarea>
+      <button class="btn btn-primary" style="margin-top:8px;width:100%;" onclick="submitInstructorPref()">Submit Preference</button>
+    </div>
+    <div class="card" style="margin-top:18px;">
+      <div class="card-head"><h3>Request a Reschedule</h3><span style="font-size:13px;color:var(--gray);">Pick a new open session</span></div>
+      <label style="font-size:12.5px;color:var(--gray);">Your booked session</label>
+      <select id="fromSched" class="sched-pick">
+        <option value="">— select a booked session —</option>
+        ${bookedIds.map(id => { const s = schedules.find(x => x.id === id); return s ? `<option value="${s.id}">${escapeHtml(s.course ? s.course.name : '')} · ${escapeHtml(s.date)} ${escapeHtml(s.time_start)}</option>` : ''; }).join('')}
+      </select>
+      <label style="font-size:12.5px;color:var(--gray);">Move to</label>
+      <select id="toSched" class="sched-pick"><option value="">— select a new session —</option>${availOpts}</select>
+      <textarea id="reschedNote" class="sched-pick" style="height:60px;" placeholder="Optional reason"></textarea>
+      <button class="btn btn-primary" style="margin-top:8px;width:100%;" onclick="submitReschedule()">Submit Reschedule Request</button>
+      <p style="font-size:12px;color:var(--gray);margin-top:8px;">Your current booking stays until admin accepts the request.</p>
+    </div>
+    <div class="card" style="margin-top:18px;">
+      <div class="card-head"><h3>My Requests</h3></div>
+      ${reqRows}
+    </div>`;
+}
+
+function pickPref(el) {
+  document.querySelectorAll('#prefOpts .pref-opt').forEach(o => o.classList.remove('sel'));
+  el.classList.add('sel');
+}
+
+async function submitInstructorPref() {
+  const sel = document.querySelector('#prefOpts .pref-opt.sel');
+  const pref = sel ? sel.dataset.v : 'any';
+  const note = document.getElementById('prefNote') ? document.getElementById('prefNote').value : '';
+  const { ok, error } = await RCDA.safeFetch(STUD_API() + '/student/requests/instructor-preference', {
+    method: 'POST', body: { preferred_gender: pref, note }
+  });
+  if (!ok) { RCDA.showToast(error || 'Could not submit preference.'); return; }
+  RCDA.showToast('Preference submitted. Admin will review it.', 'success');
+  loadStudentRequests();
+}
+
+async function submitReschedule() {
+  const from = document.getElementById('fromSched') ? document.getElementById('fromSched').value : '';
+  const to = document.getElementById('toSched') ? document.getElementById('toSched').value : '';
+  const note = document.getElementById('reschedNote') ? document.getElementById('reschedNote').value : '';
+  if (!from || !to) { RCDA.showToast('Select both your current and new session.'); return; }
+  const { ok, error } = await RCDA.safeFetch(STUD_API() + '/student/requests/reschedule', {
+    method: 'POST', body: { from_schedule_id: Number(from), schedule_id: Number(to), note }
+  });
+  if (!ok) { RCDA.showToast(error || 'Could not submit reschedule request.'); return; }
+  RCDA.showToast('Reschedule requested. Admin will confirm.', 'success');
+  loadStudentRequests();
+}
+
+async function cancelRequest(id) {
+  const { ok, error } = await RCDA.safeFetch(STUD_API() + `/student/requests/${id}`, { method: 'DELETE' });
+  if (!ok) { RCDA.showToast(error || 'Could not cancel request.'); return; }
+  RCDA.showToast('Request cancelled.', 'success');
+  loadStudentRequests();
+}
+
+/* ---- AI SUPPORT CHATBOT ---- */
+let CHAT_LOADED = false;
+
+function toggleChat() {
+  const panel = document.getElementById('chatPanel');
+  if (!panel) return;
+  const open = panel.style.display === 'none' || !panel.style.display;
+  panel.style.display = open ? 'flex' : 'none';
+  if (open && !CHAT_LOADED) { loadChat(); CHAT_LOADED = true; }
+  const log = document.getElementById('chatLog');
+  if (log) log.scrollTop = log.scrollHeight;
+}
+
+function chatBubble(sender, text) {
+  const log = document.getElementById('chatLog');
+  if (!log) return;
+  const div = document.createElement('div');
+  div.className = 'chat-msg ' + (sender === 'user' ? 'user' : 'bot');
+  div.textContent = text;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+async function loadChat() {
+  const { ok, data } = await RCDA.safeFetch(STUD_API() + '/student/chat');
+  const log = document.getElementById('chatLog');
+  if (!log) return;
+  if (ok && data.messages && data.messages.length) {
+    data.messages.forEach(m => chatBubble(m.sender === 'student' ? 'user' : 'bot', m.body));
+  } else {
+    chatBubble('bot', "Hi! I'm the RCDA support bot. Ask me about enrolling, TDC/PDC, payments, bookings, rescheduling, instructor preferences, or certificates — or type 'talk to human' to reach our admin team.");
+  }
+}
+
+async function sendChat(e) {
+  e.preventDefault();
+  const input = document.getElementById('chatText');
+  if (!input || !input.value.trim()) return;
+  const text = input.value.trim();
+  input.value = '';
+  chatBubble('user', text);
+  const { ok, data, error } = await RCDA.safeFetch(STUD_API() + '/student/chat', { method: 'POST', body: { body: text } });
+  if (!ok) { chatBubble('bot', 'Sorry, I could not respond right now. Please try again.'); return; }
+  (data.messages || []).forEach(m => { if (m.sender !== 'student') chatBubble('bot', m.body); });
 }
 
 /* ---- INIT ---- */

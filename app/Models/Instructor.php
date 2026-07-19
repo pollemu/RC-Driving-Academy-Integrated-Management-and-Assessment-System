@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
-#[Fillable(['user_id', 'phone', 'specialization', 'license_no'])]
+#[Fillable(['user_id', 'phone', 'specialization', 'license_no', 'gender'])]
 class Instructor extends Model
 {
     public function user(): BelongsTo

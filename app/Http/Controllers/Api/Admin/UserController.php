@@ -21,6 +21,7 @@ class UserController extends Controller
         $data = $request->validate([
             'role' => ['required', 'in:student,instructor,admin'],
             'specialization' => ['nullable', 'in:TDC,PDC,Both'],
+            'gender' => ['nullable', 'in:male,female,other'],
             'reason' => ['nullable', 'string', 'max:500'],
         ]);
 
@@ -48,9 +49,19 @@ class UserController extends Controller
             $user->instructor()->save(new Instructor([
                 'phone' => $user->student?->phone,
                 'specialization' => $data['specialization'] ?? 'TDC',
+                'gender' => $data['gender'] ?? null,
             ]));
-        } elseif ($data['role'] === 'instructor' && isset($data['specialization'])) {
-            $user->instructor->update(['specialization' => $data['specialization']]);
+        } elseif ($data['role'] === 'instructor') {
+            $updates = [];
+            if (isset($data['specialization'])) {
+                $updates['specialization'] = $data['specialization'];
+            }
+            if (isset($data['gender'])) {
+                $updates['gender'] = $data['gender'];
+            }
+            if ($updates) {
+                $user->instructor->update($updates);
+            }
         }
 
         if ($data['role'] === 'student' && ! $user->student) {

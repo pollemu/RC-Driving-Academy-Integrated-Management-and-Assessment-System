@@ -6,7 +6,7 @@ const ADMIN_TITLES = {
   dashboard:'Dashboard', students:'Students', schedule:'Schedule',
   attendance:'Instructor Attendance', instructors:'Instructors',
   payments:'Payments', certifications:'Certifications', reports:'Reports',
-  notifications:'Notifications', bookings:'Pending Bookings'
+  notifications:'Notifications', bookings:'Pending Bookings', requests:'Student Requests'
 };
 
 function showPanel(panel, el){
@@ -27,6 +27,7 @@ function showPanel(panel, el){
   if (panel === 'schedule') highlightToday();
   if (panel === 'reports') loadReports();
   if (panel === 'notifications') loadNotifications();
+  if (panel === 'requests') loadAdminRequests();
 }
 
 function markAttend(btn, type){
@@ -666,6 +667,8 @@ async function viewStudent(btn){
   const metaEl = document.getElementById('modalStudentMeta');
   const courseEl = document.getElementById('modalStudentCourse');
   const instructorEl = document.getElementById('modalStudentInstructor');
+  const genderEl = document.getElementById('modalStudentGender');
+  const prefEl = document.getElementById('modalStudentPref');
   const tdcEl = document.getElementById('modalStudentTDC');
   const pdcEl = document.getElementById('modalStudentPDC');
   const statusEl = document.getElementById('modalStudentStatus');
@@ -677,6 +680,8 @@ async function viewStudent(btn){
   if (metaEl) metaEl.textContent = '#' + s.id + ' · ' + (user.email || '');
   if (courseEl) courseEl.textContent = courseLabel;
   if (instructorEl) instructorEl.textContent = '—';
+  if (genderEl) genderEl.textContent = s.gender ? (s.gender.charAt(0).toUpperCase() + s.gender.slice(1)) : '—';
+  if (prefEl) prefEl.textContent = s.preferred_instructor_gender ? (s.preferred_instructor_gender === 'male' ? 'Male' : 'Female') : 'No preference';
   if (tdcEl) tdcEl.textContent = '—';
   if (pdcEl) pdcEl.textContent = '—';
   if (statusEl) { statusEl.textContent = status; statusEl.className = 'badge ' + statusClass; }
@@ -1189,4 +1194,58 @@ async function loadNotifications(){
       <span style="font-size:12px;color:var(--gray);">${escapeHtml(l.recipient || '')} · ${escapeHtml(when)}</span></div>
       ${sent}</div>`;
   }).join('') : '<div style="color:var(--gray);padding:14px 0;">No notifications sent yet. They fire on registration, payment, and certificate issuance.</div>';
+}
+
+/* ---- STUDENT REQUESTS (instructor preference + reschedule) ---- */
+async function loadAdminRequests() {
+  const filter = document.getElementById('reqStatusFilter') ? document.getElementById('reqStatusFilter').value : 'pending';
+  const qs = filter ? ('?status=' + encodeURIComponent(filter)) : '';
+  const { ok, data, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/requests` + qs);
+  const body = document.getElementById('adminRequestsBody');
+  if (!body) return;
+  if (!ok) { body.innerHTML = '<div style="color:var(--gray);">Could not load requests.</div>'; return; }
+
+  const list = data.requests || [];
+  if (!list.length) { body.innerHTML = '<div style="color:var(--gray);padding:14px 0;">No requests found.</div>'; return; }
+
+  body.innerHTML = list.map(r => {
+    const typeLabel = r.type === 'reschedule' ? 'Reschedule' : 'Instructor preference';
+    const badge = r.status === 'pending' ? 'pending' : (r.status === 'accepted' ? 'verified' : 'needs');
+    let detail = '';
+    if (r.type === 'reschedule') {
+      detail = `From: ${r.from_schedule ? escapeHtml((r.from_schedule.course || '') + ' · ' + r.from_schedule.date + ' ' + r.from_schedule.time_start) : '—'}
+      <br>To: ${r.to_schedule ? escapeHtml((r.to_schedule.course || '') + ' · ' + r.to_schedule.date + ' ' + r.to_schedule.time_start) : '—'}`;
+    } else {
+      const pref = r.preferred_gender === 'male' ? 'Male' : (r.preferred_gender === 'female' ? 'Female' : 'No preference');
+      detail = `Requested instructor gender: <b>${escapeHtml(pref)}</b>`;
+    }
+    const actions = r.status === 'pending'
+      ? `<div style="display:flex;gap:8px;margin-top:10px;">
+           <button class="btn btn-sm btn-primary" onclick="acceptRequest(${r.id})">Accept</button>
+           <button class="btn btn-sm btn-ghost" onclick="rejectRequest(${r.id})">Reject</button>
+         </div>`
+      : `<div class="req-note" style="margin-top:8px;">${escapeHtml((r.admin_note || (r.status === 'accepted' ? 'Accepted' : 'Rejected')).toString())}</div>`;
+    const studentName = r.student_name ? escapeHtml(r.student_name) : ('#' + r.student_id);
+    return `<div class="req-card">
+      <h4>${escapeHtml(typeLabel)} <span class="badge ${badge}" style="margin-left:6px;">${escapeHtml(r.status)}</span></h4>
+      <div class="req-meta">Student: ${studentName} · ${r.note ? escapeHtml(r.note) : ''}</div>
+      <div style="font-size:13px;line-height:1.5;">${detail}</div>
+      ${actions}
+    </div>`;
+  }).join('');
+}
+
+async function acceptRequest(id) {
+  const { ok, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/requests/${id}/accept`, { method: 'POST' });
+  if (!ok) { RCDA.showToast(error || 'Could not accept request.'); return; }
+  RCDA.showToast('Request accepted. Student notified.', 'success');
+  loadAdminRequests();
+}
+
+async function rejectRequest(id) {
+  const note = prompt('Optional note for the student (reason for rejection):') || '';
+  const { ok, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/requests/${id}/reject`, { method: 'POST', body: { admin_note: note } });
+  if (!ok) { RCDA.showToast(error || 'Could not reject request.'); return; }
+  RCDA.showToast('Request rejected. Student notified.', 'success');
+  loadAdminRequests();
 }

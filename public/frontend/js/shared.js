@@ -6,6 +6,15 @@
 function openModal(id){ const m = document.getElementById(id); if(m) m.classList.add('open'); }
 function closeModal(id){ const m = document.getElementById(id); if(m) m.classList.remove('open'); }
 
+/* ---- PASSWORD VISIBILITY TOGGLE ---- */
+function togglePw(inputId, btn){
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const showing = input.type === 'text';
+  input.type = showing ? 'password' : 'text';
+  if (btn) btn.classList.toggle('showing', !showing);
+}
+
 /* Reusable spinner/loading placeholder (CSS in base.css).
    Labels are app-controlled literals, so no escaping needed. */
 function rcdaLoading(label){

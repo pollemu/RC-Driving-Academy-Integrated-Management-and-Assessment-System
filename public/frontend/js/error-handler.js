@@ -28,7 +28,7 @@ window.RCDA = window.RCDA || {};
   .rcda-toast .body{flex:1 1 auto;min-width:0;}
   .rcda-toast .title{font-family:'Poppins',sans-serif;font-weight:700;font-size:20px;margin-bottom:6px;color:#1F1F1F;}
   .rcda-toast .msg{flex:1 1 auto;word-break:break-word;font-size:14px;opacity:.82;color:#2A2A2A;}
-  .rcda-toast .bar{position:absolute;left:0;bottom:0;height:4px;width:100%;transform-origin:left;animation:rcda-toast-bar 2.69s linear forwards;}
+  .rcda-toast .bar{position:absolute;left:0;bottom:0;height:4px;width:100%;transform-origin:left;animation:rcda-toast-bar 1.69s linear forwards;}
   @keyframes rcda-toast-bar{from{transform:scaleX(1);}to{transform:scaleX(0);}}
   .rcda-toast--success .toast-banner{background:linear-gradient(90deg,#12B76A,#0E9A5A);}
   .rcda-toast--success .ic{background:linear-gradient(135deg,#12B76A,#0E9A5A);}
@@ -52,7 +52,7 @@ window.RCDA = window.RCDA || {};
      Signature kept as showToast(message, type) so every call site still works.
      Renders a dimmed full-screen overlay with a centered card that auto-dismisses
      after 2.69s (and on click). type: 'success' | 'error' | 'info'. */
-  const ALERT_MS = 2690;
+  const ALERT_MS = 1690;
 
   function ensureToastRoot(){
     let root = document.getElementById('rcdaToastRoot');

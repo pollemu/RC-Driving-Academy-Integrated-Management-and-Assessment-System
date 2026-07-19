@@ -6,8 +6,8 @@
 <title>Instructor Dashboard - RC Driving Academy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/base.css?v=26">
-<link rel="stylesheet" href="../css/instructor.css?v=26">
+<link rel="stylesheet" href="../css/base.css?v=27">
+<link rel="stylesheet" href="../css/instructor.css?v=27">
 </head>
 <body>
 
@@ -165,7 +165,7 @@
                 </div>
               </div>
 
-              <p style="font-size:12.5px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 12px;">Skills Rating</p>
+              <p style="font-size:12.5px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 12px;" id="ratingLabel">Skills Rating</p>
               <div class="skills-rating-grid" id="skillsGrid">
                 <div class="skill-rate-row" data-cat="steering"><label>Steering Control</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span></div><div class="preset-btns"><button type="button" class="pbtn" onclick="pickNote(this,'steering')">Average</button></div></div>
                 <div class="skill-rate-row" data-cat="speed"><label>Speed Management</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span></div><div class="preset-btns"><button type="button" class="pbtn" onclick="pickNote(this,'speed')">Average</button></div></div>
@@ -173,6 +173,11 @@
                 <div class="skill-rate-row" data-cat="parking"><label>Parking</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span></div><div class="preset-btns"><button type="button" class="pbtn" onclick="pickNote(this,'parking')">Average</button></div></div>
                 <div class="skill-rate-row" data-cat="safety"><label>Safety Awareness</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span></div><div class="preset-btns"><button type="button" class="pbtn" onclick="pickNote(this,'safety')">Average</button></div></div>
                 <div class="skill-rate-row" data-cat="mirror"><label>Mirror &amp; Observation</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span></div><div class="preset-btns"><button type="button" class="pbtn" onclick="pickNote(this,'mirror')">Average</button></div></div>
+              </div>
+
+              <div class="field" id="examField" style="display:none;margin-top:18px;">
+                <label>Exam Score (%)</label>
+                <input id="assessExam" type="number" min="0" max="100" placeholder="0–100" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);">
               </div>
 
               <div class="field" style="margin-top:18px;"><label>Qualitative Feedback</label><textarea id="nlpInput2" rows="4" placeholder="Describe the student's performance in detail..." style="width:100%;padding:13px 15px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);resize:vertical;"></textarea></div>
@@ -261,9 +266,9 @@
   </div>
 </div>
 
-<script src="../js/config.js?v=26"></script>
-<script src="../js/error-handler.js?v=26"></script>
-<script src="../js/shared.js?v=26"></script>
-<script src="../js/instructor.js?v=26"></script>
+<script src="../js/config.js?v=27"></script>
+<script src="../js/error-handler.js?v=27"></script>
+<script src="../js/shared.js?v=27"></script>
+<script src="../js/instructor.js?v=27"></script>
 </body>
 </html>

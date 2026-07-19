@@ -58,7 +58,9 @@ class FeedbackController extends Controller
             'Student is not booked in this session.'
         );
 
-        $data = $request->validate([
+        $isTdc = $schedule->course->type === 'TDC';
+
+        $rules = [
             'raw_text' => ['required', 'string', 'min:10'],
             'star_steering' => ['nullable', 'integer', 'between:1,5'],
             'star_speed' => ['nullable', 'integer', 'between:1,5'],
@@ -72,8 +74,9 @@ class FeedbackController extends Controller
             'note_parking' => ['nullable', 'string', 'max:120'],
             'note_safety' => ['nullable', 'string', 'max:120'],
             'note_mirror' => ['nullable', 'string', 'max:120'],
-            'exam_score' => ['nullable', 'numeric', 'between:0,100'],
-        ]);
+            'exam_score' => $isTdc ? ['required', 'numeric', 'between:0,100'] : ['nullable', 'numeric', 'between:0,100'],
+        ];
+        $data = $request->validate($rules);
 
         $feedback = Feedback::updateOrCreate(
             ['schedule_id' => $schedule->id, 'student_id' => $student->id],
@@ -86,15 +89,25 @@ class FeedbackController extends Controller
             $queued = true;
         }
 
-        // Rule-based training suggestion (works without the NLP service).
-        $stars = [
-            'steering' => $feedback->star_steering,
-            'speed'    => $feedback->star_speed,
-            'lane'     => $feedback->star_lane,
-            'parking'  => $feedback->star_parking,
-            'safety'   => $feedback->star_safety,
-            'mirror'   => $feedback->star_mirror,
-        ];
+        // TDC is classroom theory — graded by EXAM score only (no driving stars).
+        // PDC is behind-the-wheel — graded by the driving star ratings (+optional exam).
+        if ($isTdc) {
+            $exam = $data['exam_score'] ?? null;
+            $score = $exam;
+            $passed = $exam !== null ? $exam >= 75 : null;
+            $classification = $exam === null ? 'avg'
+                : ($exam >= 85 ? 'fast' : ($exam >= 75 ? 'avg' : 'needs'));
+            $stars = [];
+        } else {
+            $stars = [
+                'steering' => $feedback->star_steering,
+                'speed'    => $feedback->star_speed,
+                'lane'     => $feedback->star_lane,
+                'parking'  => $feedback->star_parking,
+                'safety'   => $feedback->star_safety,
+                'mirror'   => $feedback->star_mirror,
+            ];
+        }
         $notes = [
             'steering' => $feedback->note_steering,
             'speed'    => $feedback->note_speed,
@@ -105,21 +118,35 @@ class FeedbackController extends Controller
         ];
 
         $built = AssessmentSuggestion::build($stars, $notes);
-        $classification = AssessmentSuggestion::classify($stars);
 
-        // Composite score + pass/fail. The practical star average (0-5) is
-        // normalised to 0-100; if an exam score was recorded it is blended 50/50.
-        // TDC is passed when the composite >= 75 (and no safety override).
-        $avg = collect($stars)->filter()->avg();
-        $practical = $avg ? round($avg / 5 * 100, 2) : null;
-        $exam = $data['exam_score'] ?? null;
-        $score = null;
-        if ($practical !== null && $exam !== null) {
-            $score = round(($practical + $exam) / 2, 2);
-        } elseif ($practical !== null) {
-            $score = $practical;
-        } elseif ($exam !== null) {
+        // For PDC, classify from the driving stars; for TDC we already set
+        // $classification from the exam score above.
+        if (! $isTdc) {
+            $classification = AssessmentSuggestion::classify($stars);
+        }
+
+        // Composite score + pass/fail.
+        //  - TDC: exam score only (classroom theory, no driving stars).
+        //  - PDC: practical star average (0-5 -> 0-100), blended 50/50 with
+        //    exam if one was recorded. Passed when score >= 75.
+        if ($isTdc) {
+            $exam = $data['exam_score'] ?? null;
+            $avg = null;
+            $practical = null;
             $score = $exam;
+        } else {
+            $avg = collect($stars)->filter()->avg();
+            $practical = $avg ? round($avg / 5 * 100, 2) : null;
+            $exam = $data['exam_score'] ?? null;
+            if ($practical !== null && $exam !== null) {
+                $score = round(($practical + $exam) / 2, 2);
+            } elseif ($practical !== null) {
+                $score = $practical;
+            } elseif ($exam !== null) {
+                $score = $exam;
+            } else {
+                $score = null;
+            }
         }
         $passed = $score !== null ? $score >= 75 : null;
 
@@ -141,6 +168,19 @@ class FeedbackController extends Controller
                 'suggestions' => $built['suggestions'],
             ]
         );
+
+        // Mark the student's booking for this session as finished, and finish
+        // the schedule itself once every booked student has been assessed.
+        StudentSchedule::where('schedule_id', $schedule->id)
+            ->where('student_id', $student->id)
+            ->update(['status' => 'done']);
+
+        $remaining = StudentSchedule::where('schedule_id', $schedule->id)
+            ->where('status', '!=', 'done')
+            ->count();
+        if ($remaining === 0) {
+            $schedule->update(['status' => 'done']);
+        }
 
         return response()->json([
             'feedback' => ['id' => $feedback->id],

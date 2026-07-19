@@ -178,9 +178,11 @@ async function loadInstructorSchedule() {
 }
 
 /* ---- ASSESS FORM ---- */
+let ASSESS_SCHEDULES = [];
 async function setupAssessForm() {
   const { ok, data } = await RCDA.safeFetch(INSTR_API() + '/instructor/feedback');
   const schedules = (ok && data.schedules) || [];
+  ASSESS_SCHEDULES = schedules;
   const sel = document.getElementById('assessSchedule');
   if (!sel) return;
   if (!schedules.length) { sel.innerHTML = '<option value="">No sessions available</option>'; return; }
@@ -197,6 +199,19 @@ function populateAssessStudents(schedules, scheduleId) {
   sel.innerHTML = students.length
     ? students.map(st => `<option value="${st.student_id}">${escapeHtml(st.student_name)}</option>`).join('')
     : '<option value="">No students booked</option>';
+
+  toggleAssessMode(sch);
+}
+
+/* TDC is graded by exam score only; PDC by driving star ratings. */
+function toggleAssessMode(sch) {
+  const isTdc = sch && sch.course && sch.course.type === 'TDC';
+  const grid = document.getElementById('skillsGrid');
+  const exam = document.getElementById('examField');
+  const label = document.getElementById('ratingLabel');
+  if (grid) grid.style.display = isTdc ? 'none' : 'grid';
+  if (exam) exam.style.display = isTdc ? 'block' : 'none';
+  if (label) label.textContent = isTdc ? 'Exam Score' : 'Skills Rating';
 }
 
 /* ============================================================
@@ -347,13 +362,19 @@ function saveAssessment() {
   const txt = (document.getElementById('nlpInput2') || {}).value || '';
   if (txt.trim().length < 10) { RCDA.showToast('Please enter at least 10 characters of feedback.'); return; }
 
-  const stars = readStars();
-  const notes = readNotes();
+  const sch = (ASSESS_SCHEDULES || []).find(s => String(s.id) === String(scheduleId));
+  const isTdc = sch && sch.course && sch.course.type === 'TDC';
 
-  RCDA.safeFetch(INSTR_API() + `/instructor/feedback/${scheduleId}/${studentId}`, {
-    method: 'POST',
-    body: {
-      raw_text: txt,
+  const body = { raw_text: txt };
+
+  if (isTdc) {
+    const exam = (document.getElementById('assessExam') || {}).value;
+    if (exam === '' || exam == null) { RCDA.showToast('Enter the exam score (0–100).', 'error'); return; }
+    body.exam_score = Number(exam);
+  } else {
+    const stars = readStars();
+    const notes = readNotes();
+    Object.assign(body, {
       star_steering: stars.steering || null,
       star_speed: stars.speed || null,
       star_lane: stars.lane || null,
@@ -366,7 +387,12 @@ function saveAssessment() {
       note_parking: notes.parking || null,
       note_safety: notes.safety || null,
       note_mirror: notes.mirror || null,
-    }
+    });
+  }
+
+  RCDA.safeFetch(INSTR_API() + `/instructor/feedback/${scheduleId}/${studentId}`, {
+    method: 'POST',
+    body
   }).then(({ ok, data, error }) => {
     if (!ok) { RCDA.showToast(error || 'Could not save assessment.'); return; }
     RCDA.showToast('Assessment saved — training suggestion generated.', 'success');

@@ -88,6 +88,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/schedules', [StudentScheduleController::class, 'index'])->name('api.student.schedules.index');
         Route::post('/schedules/{schedule}/book', [StudentScheduleController::class, 'book'])->name('api.student.schedules.book');
         Route::delete('/schedules/{schedule}/book', [StudentScheduleController::class, 'cancel'])->name('api.student.schedules.cancel');
+        Route::get('/schedules/pdc-calendar', [StudentScheduleController::class, 'pdcCalendar'])->name('api.student.schedules.pdcCalendar');
+        Route::get('/schedules/pdc-day', [StudentScheduleController::class, 'pdcDay'])->name('api.student.schedules.pdcDay');
         Route::get('/progress', [StudentProgressController::class, 'index'])->name('api.student.progress');
         Route::get('/requests', [StudentRequestController::class, 'index'])->name('api.student.requests.index');
         Route::post('/requests/instructor-preference', [StudentRequestController::class, 'instructorPreference'])->name('api.student.requests.preference');

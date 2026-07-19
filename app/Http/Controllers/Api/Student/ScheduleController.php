@@ -142,4 +142,90 @@ class ScheduleController extends Controller
 
         return response()->json(['ok' => true]);
     }
+
+    /* PDC calendar: green days = days that have an open PDC session for the
+       student's active PDC course. PDC only unlocks after TDC is passed. */
+    public function pdcCalendar(Request $request)
+    {
+        $student = $request->user()->student;
+
+        $pdcCourseIds = $student->enrollments()
+            ->where('status', 'active')
+            ->whereHas('course', fn ($q) => $q->where('type', 'PDC'))
+            ->pluck('course_id')
+            ->toArray();
+
+        if (empty($pdcCourseIds)) {
+            return response()->json(['green_days' => [], 'unlocked' => false]);
+        }
+
+        $month = $request->query('month'); // YYYY-MM
+        $query = Schedule::with('instructor.user')
+            ->whereIn('course_id', $pdcCourseIds)
+            ->where('status', 'open');
+        if ($month) {
+            $query->where('date', 'like', $month . '%');
+        }
+        $days = $query->pluck('date')
+            ->map(fn ($d) => Carbon::parse($d)->toDateString())
+            ->unique()
+            ->values();
+
+        return response()->json(['green_days' => $days, 'unlocked' => true]);
+    }
+
+    /* Instructors available on a given day: they have an open PDC session that
+       day AND are not already booked (by anyone) on that day. */
+    public function pdcDay(Request $request)
+    {
+        $student = $request->user()->student;
+        $date = $request->query('date');
+
+        $pdcCourseIds = $student->enrollments()
+            ->where('status', 'active')
+            ->whereHas('course', fn ($q) => $q->where('type', 'PDC'))
+            ->pluck('course_id')
+            ->toArray();
+
+        if (empty($pdcCourseIds) || ! $date) {
+            return response()->json(['instructors' => []]);
+        }
+
+        $sessions = Schedule::with('instructor.user')
+            ->whereIn('course_id', $pdcCourseIds)
+            ->where('status', 'open')
+            ->whereDate('date', $date)
+            ->get();
+
+        // Instructors already booked (by anyone) on this date are unavailable.
+        $busyInstructorIds = StudentSchedule::where('status', '!=', 'cancelled')
+            ->whereHas('schedule', fn ($q) => $q->whereDate('date', $date))
+            ->with('schedule:id,instructor_id')
+            ->get()
+            ->map(fn ($b) => $b->schedule?->instructor_id)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $bookedSessionIds = $student->studentSchedules()->pluck('schedule_id')->toArray();
+
+        $instructors = [];
+        foreach ($sessions as $s) {
+            if (in_array($s->instructor_id, $busyInstructorIds, true)) continue;
+            if (in_array($s->id, $bookedSessionIds, true)) continue;
+            $instructors[] = [
+                'schedule_id' => $s->id,
+                'instructor_id' => $s->instructor_id,
+                'instructor_name' => $s->instructor->user->name ?? 'Instructor',
+                'time_start' => $s->time_start,
+                'time_end' => $s->time_end,
+                'venue' => $s->venue,
+                'booked' => $s->studentSchedules()->count(),
+                'max_students' => $s->max_students,
+            ];
+        }
+
+        return response()->json(['instructors' => $instructors]);
+    }
 }

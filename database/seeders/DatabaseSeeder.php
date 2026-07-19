@@ -175,6 +175,20 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
+        // A second PDC session on the first PDC day with a different instructor
+        // who has no bookings that day, so students see an available instructor
+        // in the booking calendar (green day -> available instructor).
+        Schedule::create([
+            'course_id' => $pdcCourse->id,
+            'instructor_id' => $tdcInstructor->id,
+            'date' => $pdcSessions[0]['date']->format('Y-m-d'),
+            'time_start' => '11:00',
+            'time_end' => '13:00',
+            'venue' => 'RC Driving Academy — Driving Range',
+            'max_students' => 1,
+            'status' => 'open',
+        ]);
+
         // Confirmed bookings: each TDC student booked into the first TDC session,
         // each PDC student into their own PDC session.
         $firstTdc = Schedule::where('course_id', $tdcCourse->id)->orderBy('date')->first();

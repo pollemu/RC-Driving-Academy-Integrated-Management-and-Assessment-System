@@ -260,7 +260,11 @@ function renderBookWizard() {
   if (SESSIONS_CACHE._type === 'TDC') {
     inner = renderTdcWeek();
   } else {
-    inner = renderPdcDatePicker();
+    if (SESSIONS_CACHE._pdcMonth && (SESSIONS_CACHE._pdcLoadedMonth !== SESSIONS_CACHE._pdcMonth)) {
+      SESSIONS_CACHE._pdcLoadedMonth = SESSIONS_CACHE._pdcMonth;
+      loadPdcCalendar();
+    }
+    inner = renderPdcCalendar();
   }
 
   host.innerHTML = `
@@ -309,42 +313,116 @@ function renderTdcWeek() {
     <p style="font-size:12px;color:var(--gray);margin-top:10px;">TDC sessions from all instructors this week. Pick any open slot to book.</p>`;
 }
 
-function renderPdcDatePicker() {
-  const { schedules, bookedIds } = SESSIONS_CACHE;
+function renderPdcCalendar() {
+  const { schedules } = SESSIONS_CACHE;
   const pdc = schedules.filter(s => s.course.type === 'PDC');
-  if (!pdc.length) return '<div style="font-size:13px;color:var(--gray);">No open PDC sessions scheduled right now.</div>';
+  if (!pdc.length) return '<div style="font-size:13px;color:var(--gray);">No open PDC sessions scheduled right now. Check back soon — a green day means an instructor has an open slot.</div>';
 
-  const dates = [...new Set(pdc.map(s => String(s.date).slice(0, 10)))].sort();
-  if (SESSIONS_CACHE._pdcDate == null || !dates.includes(SESSIONS_CACHE._pdcDate)) SESSIONS_CACHE._pdcDate = dates[0];
+  if (!SESSIONS_CACHE._pdcMonth) {
+    const now = new Date();
+    SESSIONS_CACHE._pdcMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  }
 
-  const dateTabs = dates.map(d => `<button class="btn btn-sm ${SESSIONS_CACHE._pdcDate === d ? 'btn-primary' : 'btn-ghost'}" onclick="setPdcDate('${d}')">${formatDate(d)}</button>`).join(' ');
+  const greenDays = new Set((SESSIONS_CACHE._pdcGreen || []).map(d => String(d).slice(0, 10)));
+  const [y, m] = SESSIONS_CACHE._pdcMonth.split('-').map(Number);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const monthStart = new Date(y, m - 1, 1);
+  const firstDow = monthStart.getDay();
+  const daysInMonth = new Date(y, m, 0).getDate();
 
-  const daySched = pdc.filter(s => String(s.date).slice(0, 10) === SESSIONS_CACHE._pdcDate);
-  const rows = daySched.map(s => {
-    const full = s.booked >= s.max_students;
-    const isBooked = bookedIds.includes(s.id);
-    let btn;
-    if (isBooked) btn = '<span class="badge enrolled">Booked</span>';
-    else if (full) btn = '<span class="badge">Full</span>';
-    else btn = `<button class="btn btn-sm btn-primary" onclick="bookSession(${s.id})">Book</button>`;
-    return `<tr>
-      <td>${escapeHtml(s.instructor ? s.instructor.name : 'Instructor')}</td>
+  const cellHtml = [];
+  for (let i = 0; i < firstDow; i++) cellHtml.push('<div class="cal-cell cal-empty"></div>');
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(y, m - 1, d); date.setHours(0, 0, 0, 0);
+    const key = y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    const isPast = date < today;
+    const isGreen = greenDays.has(key) && !isPast;
+    const isSel = SESSIONS_CACHE._pdcDay === key;
+    const cls = ['cal-cell'];
+    if (isPast) cls.push('cal-past');
+    else if (isGreen) cls.push('cal-green');
+    if (isSel) cls.push('cal-sel');
+    const label = isGreen ? `<button class="cal-day-btn" onclick="setPdcDay('${key}')">${d}</button>` : `<span class="cal-day">${d}</span>`;
+    cellHtml.push(`<div class="${cls.join(' ')}">${label}</div>`);
+  }
+
+  const dow = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(x => `<div class="cal-dow">${x}</div>`).join('');
+  const prevDisabled = (y === today.getFullYear() && m === today.getMonth() + 1);
+  const prevBtn = prevDisabled ? '<button class="btn btn-sm btn-ghost" disabled>‹ Prev</button>'
+    : `<button class="btn btn-sm btn-ghost" onclick="shiftPdcMonth(-1)">‹ Prev</button>`;
+
+  const dayPanel = SESSIONS_CACHE._pdcLoading
+    ? '<div style="font-size:13px;color:var(--gray);">Loading instructors…</div>'
+    : renderPdcDayInstructors();
+
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <strong>${monthStart.toLocaleString('default', { month: 'long' })} ${y}</strong>
+      <div style="display:flex;gap:6px;">${prevBtn}<button class="btn btn-sm btn-ghost" onclick="shiftPdcMonth(1)">Next ›</button></div>
+    </div>
+    <div class="cal-grid">${dow}${cellHtml.join('')}</div>
+    <div style="display:flex;gap:14px;font-size:12px;color:var(--gray);margin:8px 0 4px;">
+      <span><span class="cal-dot cal-dot-green"></span>Open day (pick a slot)</span>
+      <span><span class="cal-dot cal-dot-muted"></span>Unavailable</span>
+    </div>
+    <div id="pdcDayPanel" style="margin-top:10px;">${dayPanel}</div>`;
+}
+
+function renderPdcDayInstructors() {
+  const list = SESSIONS_CACHE._pdcInstructors || [];
+  if (SESSIONS_CACHE._pdcDay == null) {
+    return '<div style="font-size:13px;color:var(--gray);">Pick a green day to see instructors available that day.</div>';
+  }
+  if (!list.length) {
+    return `<div style="font-size:13px;color:var(--gray);">No instructors available on ${formatDate(SESSIONS_CACHE._pdcDay)} — every instructor is already booked that day. Try another green day.</div>`;
+  }
+  const rows = list.map(s => `<tr>
+      <td>${escapeHtml(s.instructor_name)}</td>
       <td>${escapeHtml((s.time_start || '') + (s.time_end ? ' – ' + s.time_end : ''))}</td>
       <td>${escapeHtml(s.venue || '—')}</td>
       <td>${s.booked}/${s.max_students}</td>
-      <td>${btn}</td>
-    </tr>`;
-  }).join('');
-
-  return `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">${dateTabs}</div>
-    <div style="overflow-x:auto;">
+      <td><button class="btn btn-sm btn-primary" onclick="bookSession(${s.schedule_id})">Book</button></td>
+    </tr>`).join('');
+  return `<div style="overflow-x:auto;">
       <table><thead><tr><th>Instructor</th><th>Time</th><th>Venue</th><th>Slots</th><th></th></tr></thead>
       <tbody>${rows}</tbody></table>
     </div>
-    <p style="font-size:12px;color:var(--gray);margin-top:10px;">Instructors available on this date for PDC. Pick one to book.</p>`;
+    <p style="font-size:12px;color:var(--gray);margin-top:8px;">An instructor is available only if they have no bookings yet on the day you pick. Choose one to book your PDC session.</p>`;
 }
 
-function setPdcDate(d) { SESSIONS_CACHE._pdcDate = d; renderBookWizard(); }
+function shiftPdcMonth(dir) {
+  const [y, m] = SESSIONS_CACHE._pdcMonth.split('-').map(Number);
+  let ny = y, nm = m + dir;
+  if (nm < 1) { nm = 12; ny--; } else if (nm > 12) { nm = 1; ny++; }
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  if (ny < now.getFullYear() || (ny === now.getFullYear() && nm < now.getMonth() + 1)) return;
+  SESSIONS_CACHE._pdcMonth = ny + '-' + String(nm).padStart(2, '0');
+  SESSIONS_CACHE._pdcDay = null;
+  SESSIONS_CACHE._pdcInstructors = [];
+  renderBookWizard();
+  loadPdcCalendar();
+}
+
+async function setPdcDay(date) {
+  SESSIONS_CACHE._pdcDay = date;
+  SESSIONS_CACHE._pdcInstructors = [];
+  SESSIONS_CACHE._pdcLoading = true;
+  renderBookWizard();
+  const r = await RCDA.safeFetch(STUD_API() + `/student/schedules/pdc-day?date=${date}`);
+  SESSIONS_CACHE._pdcLoading = false;
+  const data = r && r.data ? r.data : null;
+  if (data && data.instructors) SESSIONS_CACHE._pdcInstructors = data.instructors;
+  else SESSIONS_CACHE._pdcInstructors = [];
+  renderBookWizard();
+}
+
+async function loadPdcCalendar() {
+  const r = await RCDA.safeFetch(STUD_API() + `/student/schedules/pdc-calendar?month=${SESSIONS_CACHE._pdcMonth}`);
+  const data = r && r.data ? r.data : null;
+  if (data && data.green_days) SESSIONS_CACHE._pdcGreen = data.green_days;
+  else SESSIONS_CACHE._pdcGreen = [];
+  renderBookWizard();
+}
 
 async function bookSession(id) {
   const { ok, error } = await RCDA.safeFetch(STUD_API() + `/student/schedules/${id}/book`, { method: 'POST' });

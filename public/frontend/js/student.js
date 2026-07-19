@@ -117,6 +117,7 @@ function escapeHtml(str) {
 
 /* ---- PROFILE ---- */
 async function loadStudentProfile() {
+  const body = document.getElementById('studProfileBody');
   const API = STUD_API();
   const [me, dash, pay, prog] = await Promise.all([
     RCDA.safeFetch(API + '/me'),
@@ -836,7 +837,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadStudentProfile();
   } catch (e) {
     console.error('[RCDA student]', e);
-    RCDA.showToast('Something went wrong: ' + (e && e.message ? e.message : e) + '. Please refresh.');
+    RCDA.showToast('Something went wrong while loading this page. Please refresh.');
   } finally {
     RCDA.hidePageLoading();
   }

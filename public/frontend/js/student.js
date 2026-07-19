@@ -840,10 +840,10 @@ async function sendChat(e) {
 
 /* ---- INIT ---- */
 document.addEventListener('DOMContentLoaded', async () => {
+  RCDA.showPageLoading();
   if (!await requireAuth('student')) return;
   handlePayMongoReturn();
 
-  RCDA.showPageLoading('Loading your profile…');
   try {
     await Promise.all([
       loadStudentProfile(),

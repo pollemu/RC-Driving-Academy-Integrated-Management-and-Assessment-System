@@ -18,7 +18,9 @@ class DashboardController extends Controller
         $enrollments = $student->enrollments->map(function ($e) {
             return [
                 'id' => $e->id,
+                'course_id' => $e->course_id,
                 'course' => [
+                    'id' => $e->course_id,
                     'name' => $e->course->name,
                     'type' => $e->course->type,
                     'fee' => $e->course->fee,

@@ -11,8 +11,8 @@ use Illuminate\Http\Request;
 
 class EnrollController extends Controller
 {
-    /* Has the student completed a TDC (an assessment exists for a TDC session)?
-       PDC enrollment is locked until this is true. */
+    /* Has the student completed a TDC with a passing assessment?
+        PDC enrollment is locked until this is true. */
     protected function tdcCompleted(Request $request): bool
     {
         $studentId = $request->user()->student->id;
@@ -20,7 +20,9 @@ class EnrollController extends Controller
         return Assessment::whereHas('feedback', function ($q) use ($studentId) {
             $q->where('student_id', $studentId)
                ->whereHas('schedule.course', fn ($q) => $q->where('type', 'TDC'));
-        })->exists();
+        })
+            ->where('passed', true)
+            ->exists();
     }
 
     public function index(Request $request)

@@ -7,6 +7,8 @@ use App\Models\Certification;
 use App\Models\Course;
 use App\Models\Enrollment;
 use App\Models\Student;
+use App\Notifications\NotificationService;
+use App\Services\CertGateService;
 use Illuminate\Http\Request;
 
 class CertificationController extends Controller
@@ -32,6 +34,7 @@ class CertificationController extends Controller
 
     public function coursesFor(Student $student)
     {
+        $gate = new CertGateService();
         $active = $student->enrollments()
             ->whereIn('status', ['active', 'completed'])
             ->with('course')
@@ -39,11 +42,16 @@ class CertificationController extends Controller
 
         $already = $student->certifications()->pluck('course_id')->toArray();
 
-        $courses = $active->map(function ($e) use ($already) {
+        $courses = $active->map(function ($e) use ($already, $gate, $student) {
+            $noCertYet = ! in_array($e->course_id, $already);
+            $requirements = $gate->requirements($student, $e->course);
+            $met = $noCertYet && $gate->isEligible($student, $e->course);
+
             return [
                 'course_id' => $e->course_id,
                 'name' => $e->course->name,
-                'eligible' => ! in_array($e->course_id, $already),
+                'eligible' => $met,
+                'requirements' => $noCertYet ? $requirements : [],
             ];
         });
 
@@ -54,6 +62,7 @@ class CertificationController extends Controller
        for that course — i.e. certificates the admin can issue now. */
     public function ready()
     {
+        $gate = new CertGateService();
         $eligible = Student::query()
             ->whereHas('enrollments', function ($q) {
                 $q->whereIn('status', ['active', 'completed']);
@@ -62,20 +71,25 @@ class CertificationController extends Controller
                 $q->whereIn('status', ['active', 'completed'])->with('course');
             }, 'certifications'])
             ->get()
-            ->flatMap(function (Student $student) {
+            ->flatMap(function (Student $student) use ($gate) {
                 $issued = $student->certifications->pluck('course_id')->toArray();
 
                 return $student->enrollments
                     ->filter(function ($e) use ($issued) {
                         return ! in_array($e->course_id, $issued);
                     })
-                    ->map(function ($e) use ($student) {
+                    ->map(function ($e) use ($student, $gate) {
+                        $requirements = $gate->requirements($student, $e->course);
+                        $met = $gate->isEligible($student, $e->course);
+
                         return [
                             'student_id' => $student->id,
                             'student_name' => $student->user->name,
                             'course_id' => $e->course_id,
                             'course_name' => $e->course->name,
                             'course_type' => $e->course->type,
+                            'eligible' => $met,
+                            'requirements' => $requirements,
                         ];
                     });
             })
@@ -89,6 +103,7 @@ class CertificationController extends Controller
         $data = $request->validate([
             'student_id' => ['required', 'exists:students,id'],
             'course_id' => ['required', 'exists:courses,id'],
+            'force' => ['nullable', 'boolean'],
         ]);
 
         $enrollment = Enrollment::where('student_id', $data['student_id'])
@@ -108,6 +123,21 @@ class CertificationController extends Controller
             return response()->json(['message' => 'Certificate already issued for this course.'], 422);
         }
 
+        // Enforce the certification gates (TDC pass / PDC sessions / safety /
+        // full payment). An admin may bypass by sending force=true so a human
+        // can override an edge case, but the missing requirements are surfaced.
+        $student = Student::findOrFail($data['student_id']);
+        $course = Course::findOrFail($data['course_id']);
+        $gate = new CertGateService();
+        $requirements = $gate->requirements($student, $course);
+
+        if (! $gate->isEligible($student, $course) && empty($data['force'])) {
+            return response()->json([
+                'message' => 'Student does not yet meet all certification requirements.',
+                'requirements' => $requirements,
+            ], 422);
+        }
+
         $certification = Certification::create([
             'student_id' => $data['student_id'],
             'course_id' => $data['course_id'],
@@ -118,6 +148,16 @@ class CertificationController extends Controller
         ]);
 
         $certification->load(['student.user', 'course']);
+
+        try {
+            (new NotificationService())->certificateIssued(
+                $certification->student,
+                $certification->course->name,
+                $certification->certificate_no
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return response()->json(['certification' => $certification], 201);
     }

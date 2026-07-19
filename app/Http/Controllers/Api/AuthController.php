@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Student;
 use App\Models\User;
+use App\Notifications\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -69,6 +70,12 @@ class AuthController extends Controller
         ]));
 
         $token = $user->createToken('rcda', ['*'], now()->addHours(8))->plainTextToken;
+
+        try {
+            (new NotificationService())->registration($user);
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return response()->json([
             'token' => $token,

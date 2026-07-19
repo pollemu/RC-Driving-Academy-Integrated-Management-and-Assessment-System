@@ -36,6 +36,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/bookings/{studentSchedule}/accept', [AdminStudentController::class, 'acceptBooking'])->name('api.admin.bookings.accept');
         Route::post('/bookings/{studentSchedule}/reject', [AdminStudentController::class, 'rejectBooking'])->name('api.admin.bookings.reject');
         Route::post('/users/{user}/set-role', [AdminUserController::class, 'setRole'])->name('api.admin.users.set-role');
+        Route::get('/users/role-changes', [AdminUserController::class, 'roleChanges'])->name('api.admin.users.role-changes');
+        Route::get('/notifications', [AdminReportController::class, 'notifications'])->name('api.admin.notifications');
         Route::apiResource('instructors', AdminInstructorController::class)->except(['create', 'edit', 'show', 'update']);
         Route::post('/instructors/{instructor}/toggle-active', [AdminInstructorController::class, 'toggleActive'])->name('api.admin.instructors.toggle');
         Route::get('/schedules', [AdminScheduleController::class, 'index'])->name('api.admin.schedules.index');
@@ -52,6 +54,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/certifications/courses-for/{student}', [AdminCertificationController::class, 'coursesFor'])->name('api.admin.certifications.courses-for');
         Route::post('/certifications/{certification}/revoke', [AdminCertificationController::class, 'revoke'])->name('api.admin.certifications.revoke');
         Route::get('/reports', [AdminReportController::class, 'index'])->name('api.admin.reports');
+        Route::post('/reports/cert-settings', [AdminReportController::class, 'updateCertSettings'])->name('api.admin.reports.cert-settings');
         Route::get('/attendance', [AdminScheduleController::class, 'attendanceIndex'])->name('api.admin.attendance.index');
         Route::get('/attendance/{schedule}', [AdminScheduleController::class, 'attendanceShow'])->name('api.admin.attendance.show');
     });

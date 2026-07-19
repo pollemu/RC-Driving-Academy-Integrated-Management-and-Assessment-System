@@ -96,6 +96,12 @@
   .report-card p{font-size:12.5px;margin:0;}
   .report-card .btn{margin-top:auto;padding-top:12px;}
 
+  .report-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  .report-block{background:white;border-radius:14px;padding:18px;box-shadow:var(--shadow-soft);border:1px solid var(--gray-light);}
+  .report-block h4{font-size:13.5px;font-weight:700;margin-bottom:10px;color:var(--charcoal);}
+  @media(max-width:900px){.report-grid{grid-template-columns:1fr 1fr;}}
+  @media(max-width:600px){.report-grid{grid-template-columns:1fr;}}
+
 
   /* ========== CERTIFICATION ========== */
   .cert-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px 18px;border-radius:14px;margin-bottom:8px;background:var(--cream);border:1px solid transparent;transition:.2s;}

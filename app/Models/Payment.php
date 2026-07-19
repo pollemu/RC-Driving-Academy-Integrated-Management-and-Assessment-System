@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Notifications\NotificationService;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -35,7 +36,7 @@ class Payment extends Model
 
     /* Mark this payment verified and activate the linked enrollment once the
        verified amount covers the course's required downpayment. */
-    public function markVerified(?int $by = null): void
+    public function markVerified(?int $by = null, bool $notify = true): void
     {
         $this->update([
             'status' => 'verified',
@@ -54,5 +55,20 @@ class Payment extends Model
         }
         $enrollment->enrolled_at = $enrollment->enrolled_at ?? now();
         $enrollment->save();
+
+        // Notify the student. The admin manual "record payment" path creates the
+        // row already verified, so it relies on notify=true to fire once.
+        if ($notify) {
+            try {
+                (new NotificationService())->paymentVerified(
+                    $this->student,
+                    $this->course?->name ?? 'course',
+                    (float) $this->amount
+                );
+            } catch (\Throwable $e) {
+                // Notifications must never break payment verification.
+                report($e);
+            }
+        }
     }
 }

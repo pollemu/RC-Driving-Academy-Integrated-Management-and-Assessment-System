@@ -68,16 +68,8 @@ class PaymentController extends Controller
             'verified_at' => now(),
         ]);
 
-        $enrollment = Enrollment::firstOrNew([
-            'student_id' => $payment->student_id,
-            'course_id' => $payment->course_id,
-        ]);
-        $course = $payment->course;
-        if ($course && $payment->amount >= $course->downpayment && $enrollment->status !== 'completed') {
-            $enrollment->status = 'active';
-        }
-        $enrollment->enrolled_at = $enrollment->enrolled_at ?? now();
-        $enrollment->save();
+        // markVerified() activates the enrollment and notifies the student.
+        $payment->markVerified(auth()->id());
 
         $payment->load(['student.user', 'course']);
 
@@ -90,25 +82,8 @@ class PaymentController extends Controller
             return response()->json(['payment' => $payment]);
         }
 
-        $payment->update([
-            'status' => 'verified',
-            'verified_by' => auth()->id(),
-            'verified_at' => now(),
-        ]);
-
-        $enrollment = Enrollment::firstOrNew([
-            'student_id' => $payment->student_id,
-            'course_id' => $payment->course_id,
-        ]);
-        $course = $payment->course;
-        // Activate (make schedulable) only once the verified amount covers the
-        // required downpayment. TDC / PDC 2W require the full fee; PDC 4W
-        // activates on its 50% downpayment (balance payable later).
-        if ($course && $payment->amount >= $course->downpayment && $enrollment->status !== 'completed') {
-            $enrollment->status = 'active';
-        }
-        $enrollment->enrolled_at = $enrollment->enrolled_at ?? now();
-        $enrollment->save();
+        // markVerified() activates the enrollment and notifies the student.
+        $payment->markVerified(auth()->id(), true);
 
         $payment->load(['student.user', 'course']);
 

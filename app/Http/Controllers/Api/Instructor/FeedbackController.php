@@ -72,6 +72,7 @@ class FeedbackController extends Controller
             'note_parking' => ['nullable', 'string', 'max:120'],
             'note_safety' => ['nullable', 'string', 'max:120'],
             'note_mirror' => ['nullable', 'string', 'max:120'],
+            'exam_score' => ['nullable', 'numeric', 'between:0,100'],
         ]);
 
         $feedback = Feedback::updateOrCreate(
@@ -106,12 +107,31 @@ class FeedbackController extends Controller
         $built = AssessmentSuggestion::build($stars, $notes);
         $classification = AssessmentSuggestion::classify($stars);
 
+        // Composite score + pass/fail. The practical star average (0-5) is
+        // normalised to 0-100; if an exam score was recorded it is blended 50/50.
+        // TDC is passed when the composite >= 75 (and no safety override).
+        $avg = collect($stars)->filter()->avg();
+        $practical = $avg ? round($avg / 5 * 100, 2) : null;
+        $exam = $data['exam_score'] ?? null;
+        $score = null;
+        if ($practical !== null && $exam !== null) {
+            $score = round(($practical + $exam) / 2, 2);
+        } elseif ($practical !== null) {
+            $score = $practical;
+        } elseif ($exam !== null) {
+            $score = $exam;
+        }
+        $passed = $score !== null ? $score >= 75 : null;
+
         Assessment::updateOrCreate(
             ['feedback_id' => $feedback->id],
             [
                 'classification'  => $classification,
                 'confidence_score' => $classification === 'fast' ? 0.9
                                         : ($classification === 'needs' ? 0.7 : 0.8),
+                'exam_score' => $exam,
+                'score' => $score,
+                'passed' => $passed,
                 'recommendation' => $classification === 'fast'
                                         ? 'Ready for certification — keep up the good work.'
                                         : ($classification === 'needs'

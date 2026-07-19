@@ -65,6 +65,10 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
         Reports
       </div>
+      <div class="nav-item" onclick="showPanel('notifications',this)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+        Notifications
+      </div>
     </nav>
       <div class="sidebar-footer">
         <div class="nav-item" onclick="logout()" style="color:rgba(255,255,255,0.4);">
@@ -336,15 +340,44 @@
       <!-- REPORTS PANEL -->
       <div class="panel" id="admin-reports">
         <div class="card" style="margin-bottom:20px;">
-          <div class="card-head"><h3>Generate Reports</h3></div>
-          <div class="report-cards">
-            <div class="report-card"><div class="ricon"><img src="../images/enrollment.png" alt="Enrollment Summary" class="ricon-img"></div><h4>Enrollment Summary</h4><p>Monthly enrollment counts by course and status.</p><button class="btn btn-sm btn-primary">Generate</button></div>
-            <div class="report-card"><div class="ricon"><img src="../images/financial-report.png" alt="Revenue Report" class="ricon-img"></div><h4>Revenue Report</h4><p>Payments collected, pending, and monthly breakdown.</p><button class="btn btn-sm btn-primary">Generate</button></div>
-            <div class="report-card"><div class="ricon"><img src="../images/performance.png" alt="Learner Performance" class="ricon-img"></div><h4>Learner Performance</h4><p>AI classification breakdown across all students.</p><button class="btn btn-sm btn-primary">Generate</button></div>
-            <div class="report-card"><div class="ricon"><img src="../images/attendance.png" alt="Attendance Report" class="ricon-img"></div><h4>Attendance Report</h4><p>Session attendance rates per student and instructor.</p><button class="btn btn-sm btn-primary">Generate</button></div>
-            <div class="report-card"><div class="ricon"><img src="../images/instructor.png" alt="Instructor Report" class="ricon-img"></div><h4>Instructor Report</h4><p>Session load, student count, and performance by instructor.</p><button class="btn btn-sm btn-primary">Generate</button></div>
-            <div class="report-card"><div class="ricon"><img src="../images/certification.png" alt="Certification Report" class="ricon-img"></div><h4>Certification Report</h4><p>Certificates issued, pending, and pass rates.</p><button class="btn btn-sm btn-primary">Generate</button></div>
+          <div class="card-head"><h3>Reports &amp; Analytics</h3><span style="font-size:12px;color:var(--gray);">Live data</span></div>
+          <div id="reportTotals" style="display:flex;flex-wrap:wrap;gap:14px;margin:6px 0 18px;"></div>
+
+          <div class="report-grid">
+            <div class="report-block">
+              <h4>Enrollments by Course</h4>
+              <div id="repEnrollments"></div>
+            </div>
+            <div class="report-block">
+              <h4>Revenue (Verified) by Month</h4>
+              <div id="repRevenue"></div>
+            </div>
+            <div class="report-block">
+              <h4>Payment Status</h4>
+              <div id="repPayments"></div>
+            </div>
+            <div class="report-block">
+              <h4>Certifications Issued</h4>
+              <div id="repCerts"></div>
+            </div>
+            <div class="report-block">
+              <h4>Attendance Summary</h4>
+              <div id="repAttendance"></div>
+            </div>
+            <div class="report-block">
+              <h4>Assessment Outcomes</h4>
+              <div id="repAssess"></div>
+            </div>
           </div>
+        </div>
+      </div>
+
+      <!-- NOTIFICATIONS PANEL -->
+      <div class="panel" id="admin-notifications">
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-head"><h3>Notification Log</h3><span style="font-size:12px;color:var(--gray);">SMS / Email / Maps</span></div>
+          <div id="notifChannels" style="display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 16px;"></div>
+          <div id="notifLog" style="font-size:13.5px;"></div>
         </div>
       </div>
 
@@ -384,9 +417,24 @@
               <option value="instructor">Instructor</option>
               <option value="admin">Admin</option>
             </select>
-            <button class="btn btn-sm btn-primary" onclick="saveStudentRole()">Save</button>
           </div>
         </div>
+        <div id="specializationWrap" style="display:none;padding:8px 0;border-top:1px solid var(--gray-light);">
+          <span style="color:var(--gray);">Instructor specialization</span>
+          <select id="modalStudentSpec" style="width:100%;margin-top:6px;padding:8px 12px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;background:#fff;">
+            <option value="TDC">TDC (Theoretical)</option>
+            <option value="PDC">PDC (Practical)</option>
+            <option value="Both">Both</option>
+          </select>
+        </div>
+        <div style="padding:8px 0;border-top:1px solid var(--gray-light);">
+          <span style="color:var(--gray);">Reason (optional, audited)</span>
+          <input id="modalStudentRoleReason" type="text" placeholder="e.g. completed instructor training" style="width:100%;margin-top:6px;padding:8px 12px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;" />
+        </div>
+        <div style="padding-top:10px;border-top:1px solid var(--gray-light);margin-top:4px;text-align:right;">
+          <button class="btn btn-sm btn-primary" onclick="saveStudentRole()">Save Role Change</button>
+        </div>
+        <div id="roleChangeLog" style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--gray-light);font-size:12.5px;color:var(--gray);"></div>
       </div>
     </div>
     <div id="ptab-attend-content" style="display:none;">

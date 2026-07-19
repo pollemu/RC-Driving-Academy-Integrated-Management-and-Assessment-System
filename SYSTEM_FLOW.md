@@ -42,8 +42,11 @@ Step 4: Account Creation
 
 Step 5: Confirmation
 - System displays a success message and redirects to the Login page.
-- **[CORRECTION]** No confirmation email or SMS is sent (no email/SMS
-  integration exists — see Section 10).
+- **[UPDATED]** A registration notification is now dispatched through the
+  NotificationService (see Section 10): an email (logged via MAIL_MAILER=log
+  when no SMTP is configured) and an SMS (logged, not sent, until Semaphore
+  keys are added). Every attempt is recorded in `notification_logs` so the
+  send is verifiable even before provider keys exist.
 
 Step 6: Student Login
 - Student logs in with Email + Password.
@@ -80,11 +83,11 @@ Step 3: Select a User to Modify
 
 Step 4: Assign/Change Role
 - Admin picks the new role and saves.
-- **[CORRECTION]** There is **no confirmation prompt** before saving.
-- **[CORRECTION]** Promoting to Instructor does **not** require or capture a
-  specialization (TDC/PDC/both). The system creates an Instructor row but
-  leaves `specialization` empty; it must be set elsewhere (or via seeder) if
-  needed. The role-change endpoint only accepts `{ role }`.
+- **[UPDATED]** The role-change endpoint now accepts `{ role, specialization,
+  reason }`. When promoting to **Instructor**, the admin may set a
+  `specialization` of TDC / PDC / Both (defaults to TDC); changing an existing
+  instructor's specialization also works via this endpoint. There is still no
+  confirmation prompt before saving (by design).
 
 Step 5: Instructor Assignment (student → instructor)
 - **[NEW in current build]** Admin can assign a Student to an Instructor from
@@ -93,11 +96,14 @@ Step 5: Instructor Assignment (student → instructor)
 - This is a separate action from role promotion.
 
 Step 6: Audit Log
-- **[CORRECTION]** There is **no role-change audit log** (no who/old/new/
-  timestamp recorded).
+- **[NEW in current build]** Every role change is recorded in the
+  `role_changes` table (user_id, changed_by, from_role, to_role, reason,
+  timestamps). Admins can view the audit trail per user in the Student Profile
+  modal ("Role change history"); the API is `GET /admin/users/role-changes`.
 
 Step 7: Notification
-- **[CORRECTION]** No notification is sent on role change (no email/SMS).
+- **[CORRECTION]** No notification is sent on role change (the notification
+  subsystem covers registration, payment, and certificate events only).
 
 Step 8: Access Update
 - The affected user's access is determined by their role on next login.
@@ -126,11 +132,15 @@ Step 4: Conduct Session & Mark Attendance
   (student_id, schedule_id, status, recorded_at).
 
 Step 5: TDC vs PDC Assessment
-- **[CORRECTION]** There is **no separate TDC completion/exam-score recording**.
-  Attendance is the only TDC-specific record. "TDC completed" is inferred
-  indirectly (presence of an assessment linked to a TDC feedback), but the
-  instructor assessment UI is oriented to PDC. PDC assessment is detailed in
-  Section 4.
+- **[UPDATED]** TDC assessments now carry real scores. The instructor feedback
+  form accepts an optional `exam_score` (0–100). The system computes a composite
+  `score` (0–100): practical star average (0–5 normalised) blended 50/50 with the
+  exam score when both exist, otherwise whichever is present. A TDC assessment is
+  marked `passed = true` when `score >= 75`. "TDC completed" for PDC gating now
+  requires a **passing** TDC assessment (`passed = true`), not merely its
+  existence. PDC assessments behave as before (attendance + star ratings + NLP);
+  their `passed`/`score`/`exam_score` columns are populated the same way and feed
+  the safety/certification gates in Section 8.
 
 ===========================================================
 4. INSTRUCTOR FLOW — PDC ASSESSMENT (STAR RATINGS + NLP ENRICHMENT)
@@ -174,7 +184,8 @@ Step 6: Safety Override Check
 
 Step 7: Store Assessment Result
 - Final assessment is saved linked to the student's PDC session, including
-  raw text, stars, notes, classification, and suggestions.
+  raw text, stars, notes, classification, suggestions, and now `exam_score`,
+  `score`, and `passed` (see Section 3 Step 5 for the scoring rule).
 
 Step 8: Return Result
 - Instructor and student see the classification + suggestions on their
@@ -266,18 +277,31 @@ Step 6: Verification
 ===========================================================
 
 Step 1: Admin opens Certifications → "Ready to Issue".
-- **[CORRECTION]** Eligibility is simply: the student has an enrollment with
-  status `active` or `completed` for the course, and no certificate has already
-  been issued for that course.
-- The originally specified gates — "required number of PDC sessions completed",
-  "no unresolved safety flags", and an explicit "full payment" check — are
-  **NOT implemented**. (A PDC 4W student who paid only the 50% downpayment is
-  still certifiable because their enrollment is `active`.)
+- **[UPDATED]** Eligibility is now evaluated by `CertGateService` and surfaced
+  per-candidate with a checklist of requirements (shown in the UI):
+  * Base rule: an enrollment with status `active`/`completed` for the course,
+    and no certificate already issued.
+  * TDC: additionally requires a **passing TDC assessment** (`passed = true`).
+  * PDC: additionally requires:
+    - **Completed PDC sessions** — configurable count (default **8**), measured
+      as `confirmed` bookings whose schedule is `done`.
+    - **No unresolved safety flag** — no PDC assessment with `override_applied`
+      or classification `needs` (can be disabled via setting).
+    - **Full payment settled** — verified payments for the course >= course fee
+      (can be disabled via setting; PDC 4W still certifies only after the full
+      fee is paid, not just the 50% downpayment).
+- The thresholds (`pdc.required_sessions`, `cert.require_full_payment`,
+  `cert.require_safety_clear`) are stored in `settings` and editable via
+  `POST /admin/reports/cert-settings`.
+- The originally specified gates are now **IMPLEMENTED**. If a candidate fails
+  any gate, the admin may still **Force issue** (sends `force:1`); the missing
+  requirements are returned in the 422 response for transparency.
 
 Step 2: Issue Certificate
-- Admin selects the student + course and issues. System generates a
-  certificate number, stores the record (issued_by, issued_at, status=
-  "active"), and can print a PDF.
+- Admin selects the student + course and issues (or Force-issues). System
+  generates a certificate number, stores the record (issued_by, issued_at,
+  status = "active"), can print a PDF, and dispatches a certificate-issued
+  notification (email + SMS, see Section 10).
 
 Step 3: Student Access
 - Student views/downloads the certificate from their dashboard.
@@ -290,17 +314,16 @@ Step 4: Revoke
 ===========================================================
 
 Step 1: Admin accesses the Reports module.
-Step 2: **[CORRECTION]** The backend provides a single stats endpoint
-  returning aggregate counts only:
-  * total students
-  * total enrollments
-  * verified payments
-  * total revenue
-  * completed sessions
-- The UI shows six report cards (Enrollment Summary, Revenue, Learner
-  Performance, Attendance, Instructor, Certification), but their "Generate"
-  buttons are **non-functional placeholders** — no detailed report endpoints
-  exist yet.
+Step 2: **[UPDATED]** The Reports panel now renders **live data** from
+  `GET /admin/reports` (no more placeholder "Generate" buttons). It shows:
+  * Totals: students, instructors, enrollments, revenue, certifications.
+  * **Enrollments by Course** (total / active / completed per course).
+  * **Revenue by Month** (sum of verified payments, grouped by month).
+  * **Payment Status** (verified / pending / rejected counts).
+  * **Certifications Issued** (per course, issued vs revoked).
+  * **Attendance Summary** (present / late / absent counts, sessions done).
+  * **Assessment Outcomes** (passed/failed, fast/average/needs, safety-flagged).
+- The headline dashboard counts still come from `GET /admin/dashboard`.
 
 ===========================================================
 10. EXTERNAL API / THIRD-PARTY INTEGRATIONS
@@ -324,28 +347,47 @@ Purpose: Store payment receipts (upload) and generated certificate PDFs.
 - Uses local Laravel storage (receipts disk). Cloud storage (S3/Drive) is not
   wired up.
 
---- D. SMS GATEWAY API --- [NOT IMPLEMENTED]
+--- D. SMS GATEWAY API (Semaphore PH) --- [IMPLEMENTED, KEY-OPTIONAL]
 Purpose (per original spec): OTP, reminders, payment/cert notifications.
-- **No SMS code exists in the codebase.** Documented but absent.
+- A pluggable `SemaphoreSmsChannel` sends via `https://api.semaphore.co/api/v4/messages`.
+- **Graceful no-key behaviour:** if `SMS_ENABLED=false` or no `SEMAPHORE_API_KEY`
+  is set, the message is **logged** (channel = "sms", sent = false) instead of
+  sent, so the system runs fully without keys. Flip `SMS_ENABLED=true` and add
+  the key in `.env` to go live. Phone numbers are normalised to PH international
+  format (63…). Used for: registration welcome, payment received, certificate
+  issued, and session reminders.
 
---- E. EMAIL / SMTP SERVICE --- [NOT IMPLEMENTED]
-Purpose (per original spec): registration, payment receipts, schedule, cert.
-- **No email-sending code exists.** Documented but absent.
+--- E. EMAIL / SMTP SERVICE (Laravel Mailer) --- [IMPLEMENTED]
+Purpose (per original spec): registration, payment receipts, cert, reminders.
+- An `EmailChannel` sends via Laravel's mailer (config/mail.php). With
+  `MAIL_MAILER=log` (the dev default) mail is written to
+  `storage/logs/laravel.log` rather than delivered — this is the intended
+  no-key behaviour. Set a real mailer (SMTP/Resend/SES) + `MAIL_ENABLED=true` to
+  deliver. Used for the same four events as SMS.
 
---- F. GOOGLE MAPS / GEOLOCATION --- [NOT IMPLEMENTED]
+--- F. GOOGLE MAPS / GEOLOCATION --- [IMPLEMENTED, KEY-OPTIONAL]
 Purpose (per original spec): show PDC routes / venues on a map.
-- **No maps integration.** Venue is a free-text field only.
+- A `MapsChannel` builds Google Maps directions/embed URLs for a session venue.
+  With `MAPS_ENABLED=false` or no `GOOGLE_MAPS_API_KEY`, the directions URL is
+  still generated and **logged**, but no embedded map is resolved. Used by the
+  session-reminder notification to include a route link to the venue.
+
+--- Notification Log & Channel Status ---
+- Every send (or logged attempt) is recorded in `notification_logs`
+  (channel, event, recipient, message, sent, error, user). Admins view them in
+  the new **Notifications** panel (`GET /admin/notifications`), which also shows
+  whether each channel is currently Live or Disabled.
 
 --- Summary Table of Actual API Touchpoints ---
-  Registration        -> none (no SMS/email)
-  Role/Account Mgmt    -> none (no notification)
+  Registration        -> Email + SMS (logged until keys added)
+  Role/Account Mgmt    -> none (audit log only)
   Enrollment           -> PayMongo (student), Admin cash path (offline)
-  Scheduling           -> none (no reminders)
+  Scheduling           -> none on book; Maps link in reminders
   PDC Assessment        -> NLP Microservice (internal, async)
-  Payment              -> PayMongo (GCash/BDO) + Admin manual verify
-  Certification        -> Local file storage (PDF) only
-  Reporting            -> none (stats only)
-  SMS / Email / Maps    -> NOT IMPLEMENTED
+  Payment              -> PayMongo (GCash/BDO) + Admin manual verify + notification
+  Certification        -> Local file storage (PDF) + notification + gated eligibility
+  Reporting            -> live 6-card report endpoint (/admin/reports)
+  SMS / Email / Maps    -> IMPLEMENTED (graceful no-key; wire via .env later)
 
 ===========================================================
 END OF DOCUMENT

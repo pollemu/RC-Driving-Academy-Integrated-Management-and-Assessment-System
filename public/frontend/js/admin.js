@@ -6,7 +6,7 @@ const ADMIN_TITLES = {
   dashboard:'Dashboard', students:'Students', schedule:'Schedule',
   attendance:'Instructor Attendance', instructors:'Instructors',
   payments:'Payments', certifications:'Certifications', reports:'Reports',
-  bookings:'Pending Bookings'
+  notifications:'Notifications', bookings:'Pending Bookings'
 };
 
 function showPanel(panel, el){
@@ -25,6 +25,8 @@ function showPanel(panel, el){
   closeAllSidebars();
 
   if (panel === 'schedule') highlightToday();
+  if (panel === 'reports') loadReports();
+  if (panel === 'notifications') loadNotifications();
 }
 
 function markAttend(btn, type){
@@ -648,6 +650,7 @@ async function viewStudent(btn){
   const s = data.student;
   const user = s.user || {};
   window._viewUserId = user.id;
+  window._viewUserName = user.name || '';
   const name = user.name || 'Student';
   const initials = name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
   const isActive = !!(user.is_active);
@@ -681,9 +684,13 @@ async function viewStudent(btn){
 
   const roleSel = document.getElementById('modalStudentRole');
   if (roleSel) roleSel.value = user.role || 'student';
+  const specSel = document.getElementById('modalStudentSpec');
+  if (specSel) specSel.value = s.instructor?.specialization || 'TDC';
+  syncRoleSpecialization();
 
   profileTab('info');
   openModal('studentModal');
+  loadRoleChangeLog(user.id);
 }
 
 /* Instructors are created by promoting a student, not by direct sign-up. */
@@ -696,16 +703,48 @@ function promoteInstructorHint(){
 async function saveStudentRole(){
   const sel = document.getElementById('modalStudentRole');
   const role = sel ? sel.value : 'student';
+  const specSel = document.getElementById('modalStudentSpec');
+  const reasonEl = document.getElementById('modalStudentRoleReason');
   const id = window._viewUserId;
   if (!id) return;
+  const body = { role };
+  if (role === 'instructor' && specSel) body.specialization = specSel.value;
+  if (reasonEl && reasonEl.value.trim()) body.reason = reasonEl.value.trim();
   const { ok, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/users/${id}/set-role`, {
     method: 'POST',
-    body: { role }
+    body
   });
   if (!ok) { RCDA.showToast(error || 'Could not update role.', 'error'); return; }
   RCDA.showToast('Role updated to ' + role + '.', 'success');
   loadStudents();
   loadInstructors();
+  loadRoleChangeLog(id);
+}
+
+/* Toggle the specialization field depending on the chosen role. */
+function syncRoleSpecialization(){
+  const sel = document.getElementById('modalStudentRole');
+  const wrap = document.getElementById('specializationWrap');
+  if (sel && wrap) wrap.style.display = sel.value === 'instructor' ? 'block' : 'none';
+}
+if (document.getElementById('modalStudentRole')) {
+  document.getElementById('modalStudentRole').addEventListener('change', syncRoleSpecialization);
+}
+
+/* Load the audit trail of role changes for the viewed user. */
+async function loadRoleChangeLog(userId){
+  const el = document.getElementById('roleChangeLog');
+  if (!el || !userId) return;
+  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/users/role-changes`, { method: 'GET' });
+  if (!ok || !data) { el.innerHTML = ''; return; }
+  const mine = (data.changes || []).filter(c => c.user_name && window._viewUserName === c.user_name);
+  if (!mine.length) { el.innerHTML = '<i>No prior role changes recorded.</i>'; return; }
+  el.innerHTML = '<b>Role change history</b>' + mine.map(c =>
+    `<div style="padding:5px 0;border-top:1px solid var(--gray-light);margin-top:6px;">
+      ${escapeHtml(c.from_role)} → <b>${escapeHtml(c.to_role)}</b> by ${escapeHtml(c.changed_by || '—')}
+      <span style="color:var(--gray);">· ${c.created_at ? new Date(c.created_at).toLocaleDateString('en-PH') : ''}</span>
+      ${c.reason ? `<br><span style="color:var(--gray);">"${escapeHtml(c.reason)}"</span>` : ''}
+    </div>`).join('');
 }
 
 /* ============================================================
@@ -866,11 +905,22 @@ async function loadCertifications(){
 function renderReadyCerts(list){
   const el = document.getElementById('certsReadyList');
   if (!el) return;
-  el.innerHTML = list.length ? list.map(c => `
-    <div class="cert-row" data-student-id="${c.student_id}" data-course-id="${c.course_id}">
-      <div class="cert-info"><h4>${escapeHtml(c.student_name)} — ${escapeHtml(c.course_name)}</h4><span>Eligible · ${escapeHtml(c.course_type)}</span></div>
-      <div style="display:flex;gap:10px;align-items:center;"><span class="badge completed">Ready</span><button class="btn btn-sm btn-primary" onclick="issueCertificate(this)">Issue</button></div>
-    </div>`).join('')
+  el.innerHTML = list.length ? list.map(c => {
+    const reqs = (c.requirements || []).map(r =>
+      `<div style="font-size:12px;${r.met ? 'color:#2e7d32;' : 'color:var(--gray);'}">${r.met ? '✓' : '✗'} ${escapeHtml(r.label)}</div>`
+    ).join('');
+    const ready = c.eligible
+      ? '<span class="badge completed">Ready</span>'
+      : '<span class="badge pending">Not eligible</span>';
+    const btn = c.eligible
+      ? `<button class="btn btn-sm btn-primary" onclick="issueCertificate(this)">Issue</button>`
+      : `<button class="btn btn-sm btn-ghost" onclick="issueCertificate(this,true)" title="Force issue despite unmet requirements">Force</button>`;
+    return `<div class="cert-row" data-student-id="${c.student_id}" data-course-id="${c.course_id}">
+      <div class="cert-info"><h4>${escapeHtml(c.student_name)} — ${escapeHtml(c.course_name)}</h4>
+        <span>${escapeHtml(c.course_type)}</span>${reqs ? `<div style="margin-top:4px;">${reqs}</div>` : ''}</div>
+      <div style="display:flex;gap:10px;align-items:center;">${ready}${btn}</div>
+    </div>`;
+  }).join('')
     : '<div style="font-size:12px;color:var(--gray);padding:14px 0;">No certificates ready to issue.</div>';
 }
 
@@ -885,7 +935,7 @@ function renderIssuedCerts(list){
     : '<div style="font-size:12px;color:var(--gray);padding:14px 0;">No certificates issued yet.</div>';
 }
 
-async function issueCertificate(btn){
+async function issueCertificate(btn, force = false){
   const row = btn.closest('.cert-row');
   if (!row) return;
 
@@ -901,7 +951,7 @@ async function issueCertificate(btn){
 
   const { ok, data, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/certifications`, {
     method: 'POST',
-    body: { student_id: Number(studentId), course_id: Number(courseId) },
+    body: { student_id: Number(studentId), course_id: Number(courseId), force: force ? 1 : 0 },
   });
 
   if (!ok) { RCDA.showToast(error || 'Could not issue certificate.', 'error'); return; }
@@ -1059,4 +1109,84 @@ async function printCertificate(studentName, courseCode, validId, issuedDateFull
 
   doc.autoPrint();
   window.open(doc.output('bloburl'), '_blank');
+}
+
+/* ============================================================
+   Reports — render the six live report cards from /admin/reports.
+   ============================================================ */
+async function loadReports(){
+  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/reports`, { method: 'GET' });
+  if (!ok || !data) return;
+
+  const totals = data.totals || {};
+  document.getElementById('reportTotals').innerHTML = [
+    ['Students', totals.students],
+    ['Instructors', totals.instructors],
+    ['Enrollments', totals.enrollments],
+    ['Revenue', '₱' + Number(totals.revenue || 0).toLocaleString('en-PH')],
+    ['Certifications', totals.certifications],
+  ].map(([k, v]) => `<div style="background:var(--cream);border:1px solid var(--gray-light);border-radius:12px;padding:12px 18px;min-width:120px;">
+      <div style="font-size:12px;color:var(--gray);">${k}</div>
+      <div style="font-size:20px;font-weight:700;color:var(--charcoal);">${v}</div></div>`).join('');
+
+  document.getElementById('repEnrollments').innerHTML = (data.enrollmentsByCourse || [])
+    .map(c => `<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--gray-light);">
+      <b>${escapeHtml(c.course)}</b><span>${c.enrollments} enrolled · ${c.active} active · ${c.completed} done</span></div>`).join('')
+    || '<div style="color:var(--gray);">No data.</div>';
+
+  document.getElementById('repRevenue').innerHTML = (data.revenueByMonth || [])
+    .map(r => `<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--gray-light);">
+      <b>${escapeHtml(r.month)}</b><span>₱${Number(r.revenue || 0).toLocaleString('en-PH')}</span></div>`).join('')
+    || '<div style="color:var(--gray);">No revenue yet.</div>';
+
+  const ps = data.paymentStatus || {};
+  document.getElementById('repPayments').innerHTML = `
+    <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--gray-light);"><b>Verified</b><span class="badge verified">${ps.verified || 0}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--gray-light);"><b>Pending</b><span class="badge pending">${ps.pending || 0}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:7px 0;"><b>Rejected</b><span class="badge needs">${ps.rejected || 0}</span></div>`;
+
+  document.getElementById('repCerts').innerHTML = (data.certificationsByCourse || [])
+    .map(c => `<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--gray-light);">
+      <b>${escapeHtml(c.course)}</b><span>${c.issued} issued · ${c.revoked} revoked</span></div>`).join('')
+    || '<div style="color:var(--gray);">No data.</div>';
+
+  const a = data.attendance || {};
+  document.getElementById('repAttendance').innerHTML = `
+    <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--gray-light);"><b>Present</b><span class="badge active">${a.present || 0}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--gray-light);"><b>Late</b><span class="badge pending">${a.late || 0}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:7px 0;"><b>Absent</b><span class="badge needs">${a.absent || 0}</span></div>
+    <div style="font-size:12px;color:var(--gray);margin-top:6px;">${a.sessions_done || 0} sessions completed</div>`;
+
+  const s = data.assessments || {};
+  document.getElementById('repAssess').innerHTML = `
+    <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--gray-light);"><b>Passed / Failed</b><span>${s.passed || 0} / ${s.failed || 0}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--gray-light);"><b>Fast / Average / Needs</b><span>${s.fast || 0} / ${s.average || 0} / ${s.needs || 0}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:7px 0;"><b>Safety flagged</b><span class="badge needs">${s.safety_flagged || 0}</span></div>`;
+}
+
+/* ============================================================
+   Notifications — show channel status + recent log from
+   /admin/notifications (works without provider keys; the log
+   records every attempt so delivery can be verified later).
+   ============================================================ */
+async function loadNotifications(){
+  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/notifications`, { method: 'GET' });
+  if (!ok || !data) return;
+
+  const ch = data.channels || {};
+  const badge = on => on ? '<span class="badge active">Live</span>' : '<span class="badge pending">Disabled</span>';
+  document.getElementById('notifChannels').innerHTML = `
+    <div style="background:var(--cream);border:1px solid var(--gray-light);border-radius:10px;padding:8px 14px;">SMS ${badge(ch.sms_enabled)}</div>
+    <div style="background:var(--cream);border:1px solid var(--gray-light);border-radius:10px;padding:8px 14px;">Email ${badge(ch.mail_enabled)}</div>
+    <div style="background:var(--cream);border:1px solid var(--gray-light);border-radius:10px;padding:8px 14px;">Maps ${badge(ch.maps_enabled)}</div>`;
+
+  const logs = data.logs || [];
+  document.getElementById('notifLog').innerHTML = logs.length ? logs.map(l => {
+    const sent = l.sent ? '<span class="badge verified">Sent</span>' : '<span class="badge pending">Logged</span>';
+    const when = l.created_at ? new Date(l.created_at).toLocaleString('en-PH') : '';
+    return `<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--gray-light);border-radius:10px;margin-bottom:8px;">
+      <div><b>${escapeHtml((l.channel || '').toUpperCase())} · ${escapeHtml(l.event || '')}</b><br>
+      <span style="font-size:12px;color:var(--gray);">${escapeHtml(l.recipient || '')} · ${escapeHtml(when)}</span></div>
+      ${sent}</div>`;
+  }).join('') : '<div style="color:var(--gray);padding:14px 0;">No notifications sent yet. They fire on registration, payment, and certificate issuance.</div>';
 }

@@ -51,6 +51,12 @@ window.RCDA = window.RCDA || {};
     el.className = 'rcda-toast rcda-toast--' + type;
     el.setAttribute('role', 'status');
 
+    const banner = document.createElement('div');
+    banner.className = 'toast-banner';
+
+    const inner = document.createElement('div');
+    inner.className = 'toast-inner';
+
     const ic = document.createElement('span');
     ic.className = 'ic';
     ic.textContent = icons[type] || icons.error;
@@ -68,12 +74,14 @@ window.RCDA = window.RCDA || {};
 
     body.appendChild(title);
     body.appendChild(msg);
+    inner.appendChild(ic);
+    inner.appendChild(body);
 
     const bar = document.createElement('span');
     bar.className = 'bar';
 
-    el.appendChild(ic);
-    el.appendChild(body);
+    el.appendChild(banner);
+    el.appendChild(inner);
     el.appendChild(bar);
     overlay.appendChild(el);
     root.appendChild(overlay);

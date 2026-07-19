@@ -854,6 +854,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const se = document.getElementById('studEnrollBody');
   if (se) se.innerHTML = rcdaLoading('Loading courses…');
 
+  RCDA.showPageLoading('Loading your profile…');
   try {
     await Promise.all([
       loadStudentProfile(),
@@ -865,5 +866,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch (e) {
     console.error('[RCDA student]', e);
     RCDA.showToast('Something went wrong while loading this page. Please refresh.');
+  } finally {
+    RCDA.hidePageLoading();
   }
 });

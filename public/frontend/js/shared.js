@@ -21,6 +21,43 @@ function rcdaLoading(label){
   return '<div class="rcda-loading"><div class="rcda-spinner"></div><div>' + (label || 'Loading…') + '</div></div>';
 }
 
+/* Centered full-screen loading overlay with a spinning circle.
+   Styles are injected so it renders even if base.css is cached/fails. */
+const PAGE_LOADING_CSS = `
+  #rcdaPageLoading{position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;background:rgba(250,248,246,0.72);backdrop-filter:blur(3px);opacity:0;transition:opacity .2s ease;cursor:default;}
+  #rcdaPageLoading.show{opacity:1;}
+  .rcda-pl-card{display:flex;flex-direction:column;align-items:center;gap:18px;padding:34px 40px;}
+  .rcda-pl-spin{width:54px;height:54px;border:4px solid rgba(192,57,43,0.18);border-top-color:#C0392B;border-radius:50%;animation:rcda-pl-spin .8s linear infinite;}
+  .rcda-pl-label{font-family:'Inter',system-ui,sans-serif;font-size:15px;font-weight:600;color:#2A2A2A;letter-spacing:.2px;}
+  @keyframes rcda-pl-spin{to{transform:rotate(360deg);}}
+`;
+function ensurePageLoadingStyles(){
+  if (document.getElementById('rcdaPageLoadingStyles')) return;
+  const s = document.createElement('style');
+  s.id = 'rcdaPageLoadingStyles';
+  s.textContent = PAGE_LOADING_CSS;
+  document.head.appendChild(s);
+}
+RCDA.showPageLoading = function(label){
+  ensurePageLoadingStyles();
+  let el = document.getElementById('rcdaPageLoading');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'rcdaPageLoading';
+    document.body.appendChild(el);
+  }
+  el.innerHTML = '<div class="rcda-pl-card"><div class="rcda-pl-spin"></div><div class="rcda-pl-label">' +
+    (label || 'Loading…') + '</div></div>';
+  requestAnimationFrame(() => el.classList.add('show'));
+  return el;
+};
+RCDA.hidePageLoading = function(){
+  const el = document.getElementById('rcdaPageLoading');
+  if (!el) return;
+  el.classList.remove('show');
+  setTimeout(() => el.remove(), 220);
+};
+
 /* ---- AUTH GUARD (dashboards) ----
    Verifies the stored token against /api/me, redirecting to login
    when missing/invalid, and to the correct role dashboard when the

@@ -4,7 +4,8 @@
 
 const INSTR_TITLES = {
   dashboard: 'My Dashboard', mystudents: 'My Students',
-  myschedule: 'My Schedule', myassessment: 'Assess Students'
+  myschedule: 'My Schedule', myassessment: 'Assess Students',
+  attendance: 'Session Attendance'
 };
 
 function showPanel(panel, el) {

@@ -178,6 +178,8 @@ async function loadStudentProfile() {
 }
 
 /* ---- SESSIONS ---- */
+let SESSIONS_CACHE = { schedules: [], bookedIds: [], bookings: [], hasUpcoming: false };
+
 async function loadStudentSessions() {
   const API = STUD_API();
   const [dash, sched] = await Promise.all([
@@ -192,6 +194,8 @@ async function loadStudentSessions() {
     ? new Date(b.date + 'T' + b.time_start).getTime() >= Date.now()
     : false;
   const hasUpcoming = bookings.some(isUpcoming);
+
+  SESSIONS_CACHE = { schedules, bookedIds, bookings, hasUpcoming };
 
   const bookedRows = bookings.length ? bookings.map(b => `
     <tr>
@@ -209,31 +213,6 @@ async function loadStudentSessions() {
     </tr>`).join('')
     : '<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:18px;">No sessions booked yet.</td></tr>';
 
-  const availRows = schedules.length ? schedules.map(s => {
-    const full = s.booked >= s.max_students;
-    const isBooked = bookedIds.includes(s.id);
-    let btn;
-    if (isBooked) {
-      btn = '<span class="badge enrolled">Booked</span>';
-    } else if (full) {
-      btn = '<span class="badge">Full</span>';
-    } else if (hasUpcoming) {
-      btn = '<span class="badge">1 session booked</span>';
-    } else {
-      btn = `<button class="btn btn-sm btn-primary" onclick="bookSession(${s.id})">Book</button>`;
-    }
-    return `<tr>
-      <td>${escapeHtml(s.course ? s.course.name : '—')}</td>
-      <td>${escapeHtml(s.date || '—')}</td>
-      <td>${escapeHtml((s.time_start || '') + ' – ' + (s.time_end || ''))}</td>
-      <td>${escapeHtml(s.venue || '—')}</td>
-      <td>${escapeHtml(s.instructor ? s.instructor.name : '—')}</td>
-      <td>${s.booked}/${s.max_students}</td>
-      <td>${btn}</td>
-    </tr>`;
-  }).join('')
-    : '<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:18px;">No open sessions available for your active courses.</td></tr>';
-
   const body = document.getElementById('studSessionsBody');
   if (body) body.innerHTML = `
     <div class="card">
@@ -244,14 +223,117 @@ async function loadStudentSessions() {
       </div>
     </div>
     <div class="card" style="margin-top:18px;">
-      <div class="card-head"><h3>Available Sessions</h3><span style="font-size:13px;color:var(--gray);">Book a slot in your active course</span></div>
-      ${hasUpcoming ? '<div class="enroll-note" style="margin:0 0 12px;">You’re already booked for an upcoming session. Cancel it from “My Booked Sessions” first if you want to pick a different one.</div>' : ''}
-      <div style="overflow-x:auto;">
-        <table><thead><tr><th>Course</th><th>Date</th><th>Time</th><th>Venue</th><th>Instructor</th><th>Slots</th><th></th></tr></thead>
-        <tbody>${availRows}</tbody></table>
-      </div>
+      <div class="card-head"><h3>Book a Session</h3><span style="font-size:13px;color:var(--gray);">Pick a course, then choose an open slot</span></div>
+      <div id="bookWizard"></div>
     </div>`;
+
+  renderBookWizard();
 }
+
+/* Booking wizard: course-first. TDC -> weekly grid across all instructors.
+   PDC -> pick an open date, then see instructors available that day. */
+function renderBookWizard() {
+  const host = document.getElementById('bookWizard');
+  if (!host) return;
+  const { schedules, hasUpcoming } = SESSIONS_CACHE;
+  const types = [...new Set(schedules.map(s => s.course.type))].filter(t => t === 'TDC' || t === 'PDC');
+  if (!types.length) {
+    host.innerHTML = '<div style="font-size:13px;color:var(--gray);padding:8px 0;">No open sessions available for your active courses yet.</div>';
+    return;
+  }
+
+  const courseTabs = types.map(t => `<button class="btn btn-sm ${SESSIONS_CACHE._type === t ? 'btn-primary' : 'btn-ghost'}" onclick="setBookType('${t}')">${t === 'TDC' ? 'TDC (Theory)' : 'PDC (Practical)'}</button>`).join(' ');
+  if (!SESSIONS_CACHE._type || !types.includes(SESSIONS_CACHE._type)) SESSIONS_CACHE._type = types[0];
+
+  let inner = '';
+  if (SESSIONS_CACHE._type === 'TDC') {
+    inner = renderTdcWeek();
+  } else {
+    inner = renderPdcDatePicker();
+  }
+
+  host.innerHTML = `
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">${courseTabs}</div>
+    ${hasUpcoming ? '<div class="enroll-note" style="margin:0 0 12px;">You’re already booked for an upcoming session. Cancel it from “My Booked Sessions” first if you want to pick a different one.</div>' : ''}
+    ${inner}`;
+}
+
+function setBookType(t) { SESSIONS_CACHE._type = t; renderBookWizard(); }
+
+function renderTdcWeek() {
+  const { schedules, bookedIds } = SESSIONS_CACHE;
+  const tdc = schedules.filter(s => s.course.type === 'TDC');
+  if (!tdc.length) return '<div style="font-size:13px;color:var(--gray);">No open TDC sessions scheduled right now.</div>';
+
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const monday = new Date(); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  const week = [];
+  for (let i = 0; i < 7; i++) { const d = new Date(monday); d.setDate(monday.getDate() + i); week.push(d); }
+
+  const cells = week.map(d => {
+    const key = d.toISOString().slice(0, 10);
+    const daySched = tdc.filter(s => s.date === key);
+    const slots = daySched.length ? daySched.map(s => {
+      const full = s.booked >= s.max_students;
+      const isBooked = bookedIds.includes(s.id);
+      let btn;
+      if (isBooked) btn = '<span class="badge enrolled">Booked</span>';
+      else if (full) btn = '<span class="badge">Full</span>';
+      else btn = `<button class="btn btn-sm btn-primary" style="margin-top:6px;" onclick="bookSession(${s.id})">Book</button>`;
+      return `<div style="border-top:1px solid var(--gray-light);padding-top:8px;margin-top:8px;">
+        <div style="font-size:12px;font-weight:600;">${escapeHtml(s.instructor ? s.instructor.name : 'Instructor')}</div>
+        <div style="font-size:11.5px;color:var(--gray);">${escapeHtml((s.time_start || '') + (s.time_end ? ' – ' + s.time_end : ''))}</div>
+        <div style="font-size:11.5px;color:var(--gray);">${escapeHtml(s.venue || '')} · ${s.booked}/${s.max_students}</div>
+        ${btn}
+      </div>`;
+    }).join('') : '<div style="font-size:12px;color:var(--gray);margin-top:8px;">—</div>';
+    return `<div class="week-col" data-day="${d.getDay()}" style="flex:1;min-width:120px;border:1px solid var(--gray-light);border-radius:12px;padding:10px;background:var(--cream);">
+      <div style="font-weight:700;font-size:13px;">${days[d.getDay()]}</div>
+      <div style="font-size:11.5px;color:var(--gray);">${d.getMonth() + 1}/${d.getDate()}</div>
+      ${slots}
+    </div>`;
+  }).join('');
+
+  return `<div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;">${cells}</div>
+    <p style="font-size:12px;color:var(--gray);margin-top:10px;">TDC sessions from all instructors this week. Pick any open slot to book.</p>`;
+}
+
+function renderPdcDatePicker() {
+  const { schedules, bookedIds } = SESSIONS_CACHE;
+  const pdc = schedules.filter(s => s.course.type === 'PDC');
+  if (!pdc.length) return '<div style="font-size:13px;color:var(--gray);">No open PDC sessions scheduled right now.</div>';
+
+  const dates = [...new Set(pdc.map(s => s.date))].sort();
+  if (SESSIONS_CACHE._pdcDate == null || !dates.includes(SESSIONS_CACHE._pdcDate)) SESSIONS_CACHE._pdcDate = dates[0];
+
+  const dateTabs = dates.map(d => `<button class="btn btn-sm ${SESSIONS_CACHE._pdcDate === d ? 'btn-primary' : 'btn-ghost'}" onclick="setPdcDate('${d}')">${formatDate(d)}</button>`).join(' ');
+
+  const daySched = pdc.filter(s => s.date === SESSIONS_CACHE._pdcDate);
+  const rows = daySched.map(s => {
+    const full = s.booked >= s.max_students;
+    const isBooked = bookedIds.includes(s.id);
+    let btn;
+    if (isBooked) btn = '<span class="badge enrolled">Booked</span>';
+    else if (full) btn = '<span class="badge">Full</span>';
+    else btn = `<button class="btn btn-sm btn-primary" onclick="bookSession(${s.id})">Book</button>`;
+    return `<tr>
+      <td>${escapeHtml(s.instructor ? s.instructor.name : 'Instructor')}</td>
+      <td>${escapeHtml((s.time_start || '') + (s.time_end ? ' – ' + s.time_end : ''))}</td>
+      <td>${escapeHtml(s.venue || '—')}</td>
+      <td>${s.booked}/${s.max_students}</td>
+      <td>${btn}</td>
+    </tr>`;
+  }).join('');
+
+  return `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">${dateTabs}</div>
+    <div style="overflow-x:auto;">
+      <table><thead><tr><th>Instructor</th><th>Time</th><th>Venue</th><th>Slots</th><th></th></tr></thead>
+      <tbody>${rows}</tbody></table>
+    </div>
+    <p style="font-size:12px;color:var(--gray);margin-top:10px;">Instructors available on this date for PDC. Pick one to book.</p>`;
+}
+
+function setPdcDate(d) { SESSIONS_CACHE._pdcDate = d; renderBookWizard(); }
 
 async function bookSession(id) {
   const { ok, error } = await RCDA.safeFetch(STUD_API() + `/student/schedules/${id}/book`, { method: 'POST' });

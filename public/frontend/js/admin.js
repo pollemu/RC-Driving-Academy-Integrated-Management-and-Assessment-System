@@ -24,7 +24,7 @@ function showPanel(panel, el){
   }
   closeAllSidebars();
 
-  if (panel === 'schedule') highlightToday();
+  if (panel === 'schedule') { highlightToday(); loadAdminSchedules(); }
   if (panel === 'reports') loadReports();
   if (panel === 'notifications') loadNotifications();
   if (panel === 'requests') loadAdminRequests();
@@ -110,11 +110,80 @@ document.addEventListener('DOMContentLoaded', async () => {
   loadInstructorList();
   loadBookings();
   loadInstructorAttendance();
+  loadAdminSchedules();
 });
 
 async function loadInstructorList(){
   const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/instructors?per_page=100`, { method: 'GET' });
   if (ok && data) ADMIN_INSTRUCTORS = data.instructors || [];
+}
+
+/* ---- SCHEDULES (admin creates sessions + assigns instructor) ---- */
+let ADMIN_COURSES = [];
+
+async function loadAdminCourses() {
+  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/courses`, { method: 'GET' });
+  ADMIN_COURSES = (ok && data && data.courses) || [];
+  const sel = document.getElementById('schedCourse');
+  if (sel) sel.innerHTML = ADMIN_COURSES.map(c => `<option value="${c.id}">${escapeHtml(c.name)} (${escapeHtml((c.type || '').toUpperCase())})</option>`).join('');
+}
+
+async function loadAdminSchedules() {
+  await loadAdminCourses();
+  const instSel = document.getElementById('schedInstructor');
+  if (instSel && (!instSel.options.length || instSel.dataset.loaded !== '1')) {
+    const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/instructors?per_page=100`, { method: 'GET' });
+    const insts = (ok && data && data.instructors) || [];
+    instSel.innerHTML = insts.map(i => `<option value="${i.id}">${escapeHtml(i.name)}</option>`).join('');
+    instSel.dataset.loaded = '1';
+  }
+
+  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/schedules`, { method: 'GET' });
+  const list = document.getElementById('adminScheduleList');
+  if (!list) return;
+  const sched = (ok && data && data.schedules) || [];
+  if (!sched.length) {
+    list.innerHTML = '<div style="color:var(--gray);padding:14px;">No sessions created yet.</div>';
+    return;
+  }
+  list.innerHTML = sched.map(s => `
+    <div class="cert-row" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border:1px solid var(--gray-light);border-radius:12px;background:var(--cream);">
+      <div>
+        <b>${escapeHtml(s.course ? s.course.name : 'Course')}</b> <span class="type-badge">${escapeHtml((s.course && s.course.type || '').toUpperCase())}</span><br>
+        <span style="font-size:12px;color:var(--gray);">${escapeHtml(String(s.date || ''))} · ${escapeHtml((s.time_start || '') + (s.time_end ? ' – ' + s.time_end : ''))} · ${escapeHtml(s.venue || '')}</span><br>
+        <span style="font-size:12px;color:var(--gray);">Instructor: ${escapeHtml(s.instructor ? s.instructor.name : 'Unassigned')} · ${statusBadge(s.status)}</span>
+      </div>
+      <button class="btn btn-sm btn-ghost" onclick="cancelAdminSchedule(${s.id})">Cancel</button>
+    </div>`).join('');
+}
+
+async function createAdminSchedule() {
+  const course_id = (document.getElementById('schedCourse') || {}).value;
+  const instructor_id = (document.getElementById('schedInstructor') || {}).value;
+  const date = (document.getElementById('schedDate') || {}).value;
+  const time_start = (document.getElementById('schedStart') || {}).value;
+  const time_end = (document.getElementById('schedEnd') || {}).value;
+  const venue = (document.getElementById('schedVenue') || {}).value || 'RC Driving Academy — Main Branch';
+  const max_students = (document.getElementById('schedCap') || {}).value || 10;
+
+  if (!course_id || !instructor_id || !date || !time_start || !time_end) {
+    RCDA.showToast('Fill course, instructor, date and time.', 'error');
+    return;
+  }
+  const { ok, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/schedules`, {
+    method: 'POST',
+    body: { course_id, instructor_id, date, time_start, time_end, venue, max_students }
+  });
+  if (!ok) { RCDA.showToast(error || 'Could not create session.', 'error'); return; }
+  RCDA.showToast('Session created and opened for booking.', 'success');
+  loadAdminSchedules();
+}
+
+async function cancelAdminSchedule(id) {
+  const { ok, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/schedules/${id}/cancel`, { method: 'POST' });
+  if (!ok) { RCDA.showToast(error || 'Could not cancel session.', 'error'); return; }
+  RCDA.showToast('Session cancelled.', 'success');
+  loadAdminSchedules();
 }
 
 async function loadDashboardStats(){
@@ -229,6 +298,16 @@ function renderPagination(tableEl, containerId, pagination, onPage){
 
 function escapeHtml(str){
   return String(str == null ? '' : str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function statusBadge(status) {
+  const map = {
+    open: ['confirmed', 'Open'], done: ['done', 'Done'], full: ['', 'Full'],
+    cancelled: ['', 'Cancelled'], pending: ['pending', 'Pending'],
+    active: ['enrolled', 'Active'], completed: ['done', 'Completed'],
+  };
+  const [cls, label] = map[status] || ['', (status || '').charAt(0).toUpperCase() + (status || '').slice(1)];
+  return `<span class="badge ${cls}">${label}</span>`;
 }
 
 /* ============================================================

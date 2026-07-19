@@ -6,8 +6,8 @@
 <title>Admin Dashboard - RC Driving Academy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/base.css?v=21">
-<link rel="stylesheet" href="../css/admin.css?v=21">
+<link rel="stylesheet" href="../css/base.css?v=22">
+<link rel="stylesheet" href="../css/admin.css?v=22">
 </head>
 <body>
 
@@ -180,36 +180,22 @@
       <!-- SCHEDULE PANEL -->
       <div class="panel" id="admin-schedule">
         <div class="card">
-          <div class="card-head"><h3>Weekly Schedule - All Instructors</h3><span style="font-size:13px;color:var(--gray);">Apr 28 – May 4, 2026</span></div>
-          <div class="week-grid">
-            <div class="week-col" data-day="1">
-              <div class="day-label">MON</div>
-              <div class="sched-slot tdc"><div class="sched-slot-top"><b>8–10AM</b><span class="type-badge">TDC</span></div><span class="course-name">Face to Face</span><div class="instr"><span class="instr-avatar">JS</span>Mr. Santos</div></div>
-              <div class="sched-slot pdc"><div class="sched-slot-top"><b>2–4PM</b><span class="type-badge">PDC</span></div><span class="course-name">4-Wheel</span><div class="instr"><span class="instr-avatar">RL</span>Ms. Lim</div></div>
-            </div>
-            <div class="week-col" data-day="2">
-              <div class="day-label">TUE</div>
-              <div class="sched-slot pdc"><div class="sched-slot-top"><b>3–5PM</b><span class="type-badge">PDC</span></div><span class="course-name">2-Wheel</span><div class="instr"><span class="instr-avatar">JS</span>Mr. Santos</div></div>
-              <div class="sched-slot tdc"><div class="sched-slot-top"><b>9–11AM</b><span class="type-badge">TDC</span></div><span class="course-name">Face to Face</span><div class="instr"><span class="instr-avatar">TD</span>Mr. Dela Cruz</div></div>
-            </div>
-            <div class="week-col" data-day="3">
-              <div class="day-label">WED</div>
-              <div class="sched-slot pdc"><div class="sched-slot-top"><b>1–3PM</b><span class="type-badge">PDC</span></div><span class="course-name">4-Wheel</span><div class="instr"><span class="instr-avatar">JS</span>Mr. Santos</div></div>
-            </div>
-            <div class="week-col" data-day="4">
-              <div class="day-label">THU</div>
-              <div class="sched-slot tdc"><div class="sched-slot-top"><b>8–10AM</b><span class="type-badge">TDC</span></div><span class="course-name">Online</span><div class="instr"><span class="instr-avatar">RL</span>Ms. Lim</div></div>
-            </div>
-            <div class="week-col" data-day="5">
-              <div class="day-label">FRI</div>
-              <div class="sched-slot tdc"><div class="sched-slot-top"><b>8–10AM</b><span class="type-badge">TDC</span></div><span class="course-name">Face to Face</span><div class="instr"><span class="instr-avatar">JS</span>Mr. Santos</div></div>
-              <div class="sched-slot pdc"><div class="sched-slot-top"><b>1–3PM</b><span class="type-badge">PDC</span></div><span class="course-name">4-Wheel</span><div class="instr"><span class="instr-avatar">TD</span>Mr. Dela Cruz</div></div>
-            </div>
-            <div class="week-col" data-day="6">
-              <div class="day-label">SAT</div>
-              <div class="sched-slot pdc"><div class="sched-slot-top"><b>9–11AM</b><span class="type-badge">PDC</span></div><span class="course-name">4-Wheel</span><div class="instr"><span class="instr-avatar">JS</span>Mr. Santos</div></div>
-              <div class="sched-slot pdc"><div class="sched-slot-top"><b>2–4PM</b><span class="type-badge">PDC</span></div><span class="course-name">2-Wheel</span><div class="instr"><span class="instr-avatar">RL</span>Ms. Lim</div></div>
-            </div>
+          <div class="card-head"><h3>Create a Session</h3><span style="font-size:13px;color:var(--gray);">Assign an instructor and open it for student booking</span></div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:8px;">
+            <div><label style="font-size:12px;color:var(--gray);">Course</label><select id="schedCourse" class="sched-pick"></select></div>
+            <div><label style="font-size:12px;color:var(--gray);">Instructor</label><select id="schedInstructor" class="sched-pick"></select></div>
+            <div><label style="font-size:12px;color:var(--gray);">Date</label><input id="schedDate" type="date" class="sched-pick"></div>
+            <div><label style="font-size:12px;color:var(--gray);">Start</label><input id="schedStart" type="time" class="sched-pick" value="08:00"></div>
+            <div><label style="font-size:12px;color:var(--gray);">End</label><input id="schedEnd" type="time" class="sched-pick" value="10:00"></div>
+            <div><label style="font-size:12px;color:var(--gray);">Capacity</label><input id="schedCap" type="number" min="1" value="10" class="sched-pick"></div>
+          </div>
+          <div style="margin-top:12px;"><label style="font-size:12px;color:var(--gray);">Venue</label><input id="schedVenue" class="sched-pick" placeholder="RC Driving Academy — Main Branch"></div>
+          <button class="btn btn-primary" style="margin-top:14px;width:100%;justify-content:center;" onclick="createAdminSchedule()">Create Session</button>
+        </div>
+        <div class="card" style="margin-top:18px;">
+          <div class="card-head"><h3>All Sessions</h3></div>
+          <div id="adminScheduleList" style="display:flex;flex-direction:column;gap:8px;">
+            <div style="color:var(--gray);padding:14px;">Loading sessions…</div>
           </div>
         </div>
       </div>
@@ -681,9 +667,9 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
-<script src="../js/config.js?v=21"></script>
-<script src="../js/error-handler.js?v=21"></script>
-<script src="../js/shared.js?v=21"></script>
-<script src="../js/admin.js?v=21"></script>
+<script src="../js/config.js?v=22"></script>
+<script src="../js/error-handler.js?v=22"></script>
+<script src="../js/shared.js?v=22"></script>
+<script src="../js/admin.js?v=22"></script>
 </body>
 </html>

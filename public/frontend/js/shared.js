@@ -24,7 +24,7 @@ function rcdaLoading(label){
 /* Centered full-screen loading overlay with a spinning circle.
    Styles are injected so it renders even if base.css is cached/fails. */
 const PAGE_LOADING_CSS = `
-  #rcdaPageLoading{position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;pointer-events:none;}
+  #rcdaPageLoading{position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .2s ease;}
   #rcdaPageLoading.show{opacity:1;}
   .rcda-pl-card{display:flex;flex-direction:column;align-items:center;gap:16px;}
   .rcda-pl-spin{width:54px;height:54px;border:4px solid rgba(192,57,43,0.18);border-top-color:#C0392B;border-radius:50%;animation:rcda-pl-spin .8s linear infinite;}

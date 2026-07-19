@@ -46,14 +46,15 @@ RCDA.showPageLoading = function(label){
     document.body.appendChild(el);
   }
   el.innerHTML = '<div class="rcda-pl-spin"></div>';
-  requestAnimationFrame(() => el.classList.add('show'));
+  el.classList.add('show');
   return el;
 };
 RCDA.hidePageLoading = function(){
   const el = document.getElementById('rcdaPageLoading');
   if (!el) return;
   el.classList.remove('show');
-  setTimeout(() => el.remove(), 220);
+  el.style.display = 'none';
+  if (el.parentNode) el.parentNode.removeChild(el);
 };
 
 /* ---- AUTH GUARD (dashboards) ----

@@ -10,6 +10,7 @@ use App\Models\Schedule;
 use App\Models\Student;
 use App\Models\StudentSchedule;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -134,10 +135,15 @@ class DatabaseSeeder extends Seeder
             $students->push($student);
         }
 
+        // Academy operates Monday–Saturday only; never seed a Sunday session.
+        $nextWeekday = function ($date) {
+            return $date->dayOfWeek === Carbon::SUNDAY ? $date->copy()->addDay() : $date;
+        };
+
         // Sessions: TDC sessions hold up to 10 students; PDC sessions hold 1 student.
         $tdcSessions = [
-            ['date' => now()->addDays(7), 'time_start' => '08:00', 'time_end' => '10:00', 'venue' => 'RC Driving Academy — Main Branch'],
-            ['date' => now()->addDays(14), 'time_start' => '13:00', 'time_end' => '15:00', 'venue' => 'RC Driving Academy — Main Branch'],
+            ['date' => $nextWeekday(now()->addDays(7)), 'time_start' => '08:00', 'time_end' => '10:00', 'venue' => 'RC Driving Academy — Main Branch'],
+            ['date' => $nextWeekday(now()->addDays(14)), 'time_start' => '13:00', 'time_end' => '15:00', 'venue' => 'RC Driving Academy — Main Branch'],
         ];
         foreach ($tdcSessions as $s) {
             Schedule::create([
@@ -153,8 +159,8 @@ class DatabaseSeeder extends Seeder
         }
 
         $pdcSessions = [
-            ['date' => now()->addDays(9), 'time_start' => '09:00', 'time_end' => '11:00', 'venue' => 'RC Driving Academy — Driving Range'],
-            ['date' => now()->addDays(16), 'time_start' => '14:00', 'time_end' => '16:00', 'venue' => 'RC Driving Academy — Driving Range'],
+            ['date' => $nextWeekday(now()->addDays(9)), 'time_start' => '09:00', 'time_end' => '11:00', 'venue' => 'RC Driving Academy — Driving Range'],
+            ['date' => $nextWeekday(now()->addDays(16)), 'time_start' => '14:00', 'time_end' => '16:00', 'venue' => 'RC Driving Academy — Driving Range'],
         ];
         foreach ($pdcSessions as $s) {
             Schedule::create([

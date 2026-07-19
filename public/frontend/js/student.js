@@ -187,6 +187,7 @@ async function loadStudentSessions() {
     RCDA.safeFetch(API + '/student/schedules'),
   ]);
   const bookings = (dash.ok && dash.data.bookings) || [];
+  const enrollments = (dash.ok && dash.data.enrollments) || [];
   const schedules = (sched.ok && sched.data.schedules) || [];
   const bookedIds = (sched.ok && sched.data.bookedIds) || [];
 
@@ -195,7 +196,17 @@ async function loadStudentSessions() {
     : false;
   const hasUpcoming = bookings.some(isUpcoming);
 
-  SESSIONS_CACHE = { schedules, bookedIds, bookings, hasUpcoming };
+  // Show a booking tab for every course type the student has an active
+  // (or completed) enrollment in — so PDC appears right after they pay it,
+  // even if no open session has been scheduled yet.
+  const activeTypes = [...new Set(
+    enrollments
+      .filter(e => e.status === 'active' || e.status === 'completed')
+      .map(e => e.course && e.course.type)
+      .filter(t => t === 'TDC' || t === 'PDC')
+  )];
+
+  SESSIONS_CACHE = { schedules, bookedIds, bookings, hasUpcoming, activeTypes };
 
   const bookedRows = bookings.length ? bookings.map(b => `
     <tr>
@@ -235,10 +246,10 @@ async function loadStudentSessions() {
 function renderBookWizard() {
   const host = document.getElementById('bookWizard');
   if (!host) return;
-  const { schedules, hasUpcoming } = SESSIONS_CACHE;
-  const types = [...new Set(schedules.map(s => s.course.type))].filter(t => t === 'TDC' || t === 'PDC');
+  const { hasUpcoming, activeTypes } = SESSIONS_CACHE;
+  const types = (activeTypes && activeTypes.length) ? activeTypes : [];
   if (!types.length) {
-    host.innerHTML = '<div style="font-size:13px;color:var(--gray);padding:8px 0;">No open sessions available for your active courses yet.</div>';
+    host.innerHTML = '<div style="font-size:13px;color:var(--gray);padding:8px 0;">Enroll and pay for a course to book a session.</div>';
     return;
   }
 

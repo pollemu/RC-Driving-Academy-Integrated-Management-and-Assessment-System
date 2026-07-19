@@ -95,8 +95,9 @@
   .input-wrap svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--gray);}
   .input-wrap input{width:100%;padding:13.5px 44px 13.5px 42px;border-radius:12px;border:1.5px solid var(--gray-light);font-size:14.5px;background:white;transition:.2s;}
   .input-wrap input:focus{border-color:var(--orange);outline:none;box-shadow:0 0 0 4px rgba(192,57,43,0.1);}
-  .pw-toggle{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;padding:4px;color:var(--gray);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:color .2s;}
-  .pw-toggle:hover{color:var(--orange);}
+  .pw-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:#f4f1ef;border:none;border-radius:9px;padding:6px;color:var(--gray);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:color .2s,background .2s;line-height:0;}
+  .pw-toggle:hover{color:var(--orange);background:#ece7e4;}
+  .pw-toggle:focus-visible{outline:2px solid var(--orange);outline-offset:1px;}
   .pw-toggle .eye-off{display:none;}
   .pw-toggle.showing .eye-open{display:none;}
   .pw-toggle.showing .eye-off{display:block;}

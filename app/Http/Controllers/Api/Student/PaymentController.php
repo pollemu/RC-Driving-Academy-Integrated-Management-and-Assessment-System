@@ -104,9 +104,45 @@ class PaymentController extends Controller
         $data = $request->validate([
             'course_ids' => ['required', 'array', 'min:1'],
             'course_ids.*' => ['integer', 'exists:courses,id'],
+            'fake' => ['nullable', 'boolean'],
         ]);
 
         $student = $request->user()->student;
+
+        /* DEMO ONLY: when 'fake' is true, skip PayMongo and mark the downpayments
+           verified immediately so enrollments activate without a real gateway. */
+        if (! empty($data['fake'])) {
+            $payments = [];
+            foreach ($data['course_ids'] as $courseId) {
+                $enrollment = $student->enrollments()->where('course_id', $courseId)->first();
+                if (! $enrollment || $enrollment->status === 'active') {
+                    continue;
+                }
+                $course = $enrollment->course;
+                $payment = Payment::create([
+                    'student_id' => $student->id,
+                    'course_id' => $courseId,
+                    'amount' => $course->downpayment,
+                    'method' => 'demo',
+                    'reference_no' => 'DEMO-' . $student->id . '-' . time(),
+                    'status' => 'pending',
+                ]);
+                $payment->markVerified($request->user()->id, false);
+                $payments[] = $payment;
+            }
+
+            if (empty($payments)) {
+                return response()->json(['message' => 'No enrolled courses to bill. Enroll first.'], 422);
+            }
+
+            return response()->json([
+                'demo' => true,
+                'verified' => true,
+                'payments' => collect($payments)->map(fn ($p) => [
+                    'id' => $p->id, 'amount' => $p->amount, 'status' => $p->status,
+                ]),
+            ]);
+        }
 
         $payments = [];
         foreach ($data['course_ids'] as $courseId) {

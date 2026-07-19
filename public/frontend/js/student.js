@@ -638,6 +638,22 @@ async function processPay(){
   RCDA.showToast('Payment started but no redirect was returned.', 'error');
 }
 
+async function processFakePay(){
+  if (!PAY_COURSE_IDS.length) { RCDA.showToast('No courses to pay for.'); return; }
+  const btn = document.getElementById('payModalPayBtn');
+  if (btn) btn.disabled = true;
+
+  const { ok, data, error } = await RCDA.safeFetch(STUD_API() + '/student/payments/cart', {
+    method: 'POST', body: { course_ids: PAY_COURSE_IDS, fake: true }
+  });
+  if (btn) btn.disabled = false;
+  if (!ok) { RCDA.showToast(error || 'Could not process demo payment.'); return; }
+
+  closeModal('payModal');
+  RCDA.showToast('Demo payment applied — your enrollment is now active!', 'success');
+  await Promise.all([loadStudentEnroll(), loadStudentPayments(), loadStudentProfile()]);
+}
+
 /* After PayMongo redirects back (success_url), confirm the payment automatically. */
 function handlePayMongoReturn(){
   const params = new URLSearchParams(window.location.search);

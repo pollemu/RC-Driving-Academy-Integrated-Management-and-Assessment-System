@@ -26,7 +26,9 @@ function rcdaLoading(label){
 const PAGE_LOADING_CSS = `
   #rcdaPageLoading{position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;pointer-events:none;}
   #rcdaPageLoading.show{opacity:1;}
+  .rcda-pl-card{display:flex;flex-direction:column;align-items:center;gap:16px;}
   .rcda-pl-spin{width:54px;height:54px;border:4px solid rgba(192,57,43,0.18);border-top-color:#C0392B;border-radius:50%;animation:rcda-pl-spin .8s linear infinite;}
+  .rcda-pl-label{font-family:'Inter',system-ui,sans-serif;font-size:15px;font-weight:600;color:#C0392B;letter-spacing:.2px;}
   @keyframes rcda-pl-spin{to{transform:rotate(360deg);}}
 `;
 function ensurePageLoadingStyles(){
@@ -44,7 +46,8 @@ RCDA.showPageLoading = function(label){
     el.id = 'rcdaPageLoading';
     document.body.appendChild(el);
   }
-  el.innerHTML = '<div class="rcda-pl-spin"></div>';
+  el.innerHTML = '<div class="rcda-pl-card"><div class="rcda-pl-spin"></div><div class="rcda-pl-label">' +
+    (label || 'Loading…') + '</div></div>';
   requestAnimationFrame(() => el.classList.add('show'));
   return el;
 };

@@ -843,17 +843,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!await requireAuth('student')) return;
   handlePayMongoReturn();
 
-  const sp = document.getElementById('studProfileBody');
-  if (sp) sp.innerHTML = rcdaLoading('Loading your profile…');
-  const ss = document.getElementById('studSessionsBody');
-  if (ss) ss.innerHTML = rcdaLoading('Loading your sessions…');
-  const sr = document.getElementById('studResultsBody');
-  if (sr) sr.innerHTML = rcdaLoading('Loading your results…');
-  const spay = document.getElementById('studPaymentBody');
-  if (spay) spay.innerHTML = rcdaLoading('Loading your payments…');
-  const se = document.getElementById('studEnrollBody');
-  if (se) se.innerHTML = rcdaLoading('Loading courses…');
-
   RCDA.showPageLoading('Loading your profile…');
   try {
     await Promise.all([

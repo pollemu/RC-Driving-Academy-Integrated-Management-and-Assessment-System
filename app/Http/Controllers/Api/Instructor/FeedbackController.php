@@ -176,7 +176,7 @@ class FeedbackController extends Controller
             ->update(['status' => 'done']);
 
         $remaining = StudentSchedule::where('schedule_id', $schedule->id)
-            ->where('status', '!=', 'done')
+            ->whereIn('status', ['pending', 'confirmed'])
             ->count();
         if ($remaining === 0) {
             $schedule->update(['status' => 'done']);

@@ -79,6 +79,16 @@ class RequestController extends Controller
             $fromId = $studentRequest->from_schedule_id;
             $toId = $studentRequest->schedule_id;
             if ($fromId && $toId) {
+                // Re-check target capacity at accept time (the session may have
+                // filled while the request was pending).
+                $targetSchedule = Schedule::find($toId);
+                $occupied = $targetSchedule
+                    ? $targetSchedule->studentSchedules()->whereIn('status', ['confirmed', 'pending'])->count()
+                    : 0;
+                if ($targetSchedule && $occupied >= $targetSchedule->max_students) {
+                    return response()->json(['message' => 'The requested session is already full.'], 422);
+                }
+
                 $existingTarget = StudentSchedule::where('student_id', $studentRequest->student_id)
                     ->where('schedule_id', $toId)
                     ->whereIn('status', ['pending', 'confirmed'])

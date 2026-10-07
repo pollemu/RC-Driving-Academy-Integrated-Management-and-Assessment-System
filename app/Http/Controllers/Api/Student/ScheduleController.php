@@ -8,6 +8,7 @@ use App\Models\Schedule;
 use App\Models\StudentSchedule;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ScheduleController extends Controller
 {
@@ -51,14 +52,16 @@ class ScheduleController extends Controller
 
     /* A student may hold only ONE upcoming booking at a time.
        Portable across SQLite / MySQL: a session is "upcoming" when its
-       date is after today, or it is today and has not started yet. */
+       date is after today, or it is today and has not started yet.
+       Pending (awaiting admin acceptance) counts as upcoming too, so a
+       student can't stack multiple pending requests across sessions. */
     protected function hasUpcomingBooking(Request $request): bool
     {
         $student = $request->user()->student;
         $now = now();
 
         return $student->studentSchedules()
-            ->where('status', 'confirmed')
+            ->whereIn('status', ['pending', 'confirmed'])
             ->whereHas('schedule', function ($q) use ($now) {
                 $q->where(function ($inner) use ($now) {
                     $inner->whereDate('date', '>', $now->toDateString())
@@ -75,44 +78,66 @@ class ScheduleController extends Controller
     {
         $student = $request->user()->student;
 
-        $enrollment = Enrollment::where('student_id', $student->id)
-            ->where('course_id', $schedule->course_id)
-            ->where('status', 'active')
-            ->exists();
+        // Serialize concurrent booking attempts on the same session. The row
+        // lock + transaction make the capacity check + insert atomic, so two
+        // students clicking "Book" at the same time cannot both grab the last
+        // slot.
+        return DB::transaction(function () use ($request, $schedule, $student) {
+            $schedule = Schedule::whereKey($schedule->id)->lockForUpdate()->first();
+            if (! $schedule) {
+                return response()->json(['message' => 'Session not found.'], 404);
+            }
 
-        if (! $enrollment) {
-            return response()->json(['message' => 'Payment must be verified before booking.'], 422);
-        }
+            if ($schedule->status !== 'open') {
+                return response()->json(
+                    ['message' => 'This session is no longer open for booking.'],
+                    422
+                );
+            }
 
-        if ($this->hasUpcomingBooking($request)) {
-            return response()->json(
-                ['message' => 'You already have an upcoming session booked. Cancel it first to book another.'],
-                422
-            );
-        }
+            $enrollment = Enrollment::where('student_id', $student->id)
+                ->where('course_id', $schedule->course_id)
+                ->where('status', 'active')
+                ->exists();
 
-        $bookedIds = $student->studentSchedules()->pluck('schedule_id')->toArray();
+            if (! $enrollment) {
+                return response()->json(['message' => 'Payment must be verified before booking.'], 422);
+            }
 
-        if (in_array($schedule->id, $bookedIds)) {
-            return response()->json(['message' => 'You have already booked this session.'], 422);
-        }
+            if ($this->hasUpcomingBooking($request)) {
+                return response()->json(
+                    ['message' => 'You already have an upcoming session booked. Cancel it first to book another.'],
+                    422
+                );
+            }
 
-        $confirmedCount = $schedule->studentSchedules()->where('status', 'confirmed')->count();
-        if ($confirmedCount >= $schedule->max_students) {
-            return response()->json(['message' => 'This session is already full.'], 422);
-        }
+            $bookedIds = $student->studentSchedules()->pluck('schedule_id')->toArray();
 
-        StudentSchedule::create([
-            'student_id' => $student->id,
-            'schedule_id' => $schedule->id,
-            'booked_at' => now(),
-            'status' => 'pending',
-        ]);
+            if (in_array($schedule->id, $bookedIds)) {
+                return response()->json(['message' => 'You have already booked this session.'], 422);
+            }
 
-        return response()->json([
-            'ok' => true,
-            'message' => 'Booking submitted. The admin must accept the assigned instructor before your slot is confirmed.',
-        ]);
+            // Count pending + confirmed together so a single slot can't be
+            // stacked with multiple pending requests from different students.
+            $occupied = $schedule->studentSchedules()
+                ->whereIn('status', ['pending', 'confirmed'])
+                ->count();
+            if ($occupied >= $schedule->max_students) {
+                return response()->json(['message' => 'This session is already full.'], 422);
+            }
+
+            StudentSchedule::create([
+                'student_id' => $student->id,
+                'schedule_id' => $schedule->id,
+                'booked_at' => now(),
+                'status' => 'pending',
+            ]);
+
+            return response()->json([
+                'ok' => true,
+                'message' => 'Booking submitted. The admin must accept the assigned instructor before your slot is confirmed.',
+            ], 201);
+        });
     }
 
     /* Cancel a booking — allowed only at least 1 hour before the session starts. */

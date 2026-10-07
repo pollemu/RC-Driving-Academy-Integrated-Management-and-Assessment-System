@@ -7,6 +7,7 @@ use App\Models\Enrollment;
 use App\Models\Request as StudentRequest;
 use App\Models\Schedule;
 use App\Notifications\NotificationService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class RequestController extends Controller
@@ -61,6 +62,11 @@ class RequestController extends Controller
         ]);
 
         $student = $request->user()->student;
+
+        // The academy is closed on Sundays — no bookings on a rest day.
+        if (Carbon::parse($data['preferred_date'])->dayOfWeek === Carbon::SUNDAY) {
+            return response()->json(['message' => 'The academy is closed on Sundays. Pick a day from Monday to Saturday.'], 422);
+        }
 
         // The day must have no session scheduled yet.
         $hasSession = Schedule::whereDate('date', $data['preferred_date'])->exists();

@@ -110,8 +110,12 @@ class PaymentController extends Controller
         $student = $request->user()->student;
 
         /* DEMO ONLY: when 'fake' is true, skip PayMongo and mark the downpayments
-           verified immediately so enrollments activate without a real gateway. */
+           verified immediately so enrollments activate without a real gateway.
+           Never allowed in production — anyone could mark payments paid for free. */
         if (! empty($data['fake'])) {
+            if (app()->environment('production')) {
+                return response()->json(['message' => 'Demo payments are not available.'], 403);
+            }
             $payments = [];
             foreach ($data['course_ids'] as $courseId) {
                 $enrollment = $student->enrollments()->where('course_id', $courseId)->first();

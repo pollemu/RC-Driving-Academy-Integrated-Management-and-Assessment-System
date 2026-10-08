@@ -22,7 +22,7 @@ class AttendanceController extends Controller
             ->map(function (Schedule $schedule) {
                 return [
                     'id' => $schedule->id,
-                    'date' => $schedule->date,
+                    'date' => $schedule->date?->format('Y-m-d'),
                     'course' => ['name' => $schedule->course->name],
                     'status' => $schedule->status,
                 ];
@@ -52,7 +52,7 @@ class AttendanceController extends Controller
         return response()->json([
             'schedule' => [
                 'id' => $schedule->id,
-                'date' => $schedule->date,
+                'date' => $schedule->date?->format('Y-m-d'),
                 'time_start' => $schedule->time_start,
                 'time_end' => $schedule->time_end,
                 'venue' => $schedule->venue,

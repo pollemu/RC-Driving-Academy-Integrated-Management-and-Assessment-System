@@ -30,7 +30,7 @@ class RequestController extends Controller
                 'student_name' => $r->student?->user?->name,
                 'student_id' => $r->student_id,
                 'preferred_gender' => $r->preferred_gender,
-                'preferred_date' => $r->preferred_date,
+                'preferred_date' => $r->preferred_date?->format('Y-m-d'),
                 'preferred_instructor' => $r->preferredInstructor ? [
                     'id' => $r->preferredInstructor->id,
                     'name' => $r->preferredInstructor->user?->name,
@@ -39,13 +39,13 @@ class RequestController extends Controller
                 'admin_note' => $r->admin_note,
                 'from_schedule' => $r->fromSchedule ? [
                     'id' => $r->fromSchedule->id,
-                    'date' => $r->fromSchedule->date,
+                    'date' => $r->fromSchedule->date?->format('Y-m-d'),
                     'time_start' => $r->fromSchedule->time_start,
                     'course' => $r->fromSchedule->course?->name,
                 ] : null,
                 'to_schedule' => $r->schedule ? [
                     'id' => $r->schedule->id,
-                    'date' => $r->schedule->date,
+                    'date' => $r->schedule->date?->format('Y-m-d'),
                     'time_start' => $r->schedule->time_start,
                     'course' => $r->schedule->course?->name,
                 ] : null,

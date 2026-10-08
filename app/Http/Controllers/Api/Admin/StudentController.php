@@ -112,7 +112,7 @@ class StudentController extends Controller
         $student->update([
             'phone' => $data['phone'] ?? $student->phone,
             'address' => $data['address'] ?? $student->address,
-            'birthdate' => $data['birthdate'] ?? $student->birthdate,
+            'birthdate' => $data['birthdate'] ?? ($student->birthdate?->format('Y-m-d')),
             'license_type' => $data['license_type'] ?? $student->license_type,
         ]);
 
@@ -167,7 +167,7 @@ class StudentController extends Controller
             ->map(function (StudentSchedule $booking) {
                 return [
                     'id' => $booking->id,
-                    'booked_at' => $booking->booked_at,
+                    'booked_at' => $booking->booked_at?->format('Y-m-d H:i'),
                     'status' => $booking->status,
                     'student' => [
                         'id' => $booking->student->id,
@@ -176,7 +176,7 @@ class StudentController extends Controller
                     ],
                     'schedule' => [
                         'id' => $booking->schedule->id,
-                        'date' => $booking->schedule->date,
+                        'date' => $booking->schedule->date?->format('Y-m-d'),
                         'time_start' => $booking->schedule->time_start,
                         'time_end' => $booking->schedule->time_end,
                         'venue' => $booking->schedule->venue,

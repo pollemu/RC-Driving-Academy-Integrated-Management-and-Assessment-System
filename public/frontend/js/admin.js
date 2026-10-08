@@ -139,22 +139,27 @@ async function loadAdminSchedules() {
   }
 
   const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/schedules`, { method: 'GET' });
-  const list = document.getElementById('adminScheduleList');
-  if (!list) return;
+  const tb = document.getElementById('adminSessionsTbody');
+  if (!tb) return;
   const sched = (ok && data && data.schedules) || [];
   if (!sched.length) {
-    list.innerHTML = '<div style="color:var(--gray);padding:14px;">No sessions created yet.</div>';
+    tb.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--gray);padding:20px;">No sessions created yet.</td></tr>';
     return;
   }
-  list.innerHTML = sched.map(s => `
-    <div class="cert-row" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border:1px solid var(--gray-light);border-radius:12px;background:var(--cream);">
-      <div>
-        <b>${escapeHtml(s.course ? s.course.name : 'Course')}</b> <span class="type-badge">${escapeHtml((s.course && s.course.type || '').toUpperCase())}</span><br>
-        <span style="font-size:12px;color:var(--gray);">${escapeHtml(String(s.date || ''))} · ${escapeHtml((s.time_start || '') + (s.time_end ? ' – ' + s.time_end : ''))} · ${escapeHtml(s.venue || '')}</span><br>
-        <span style="font-size:12px;color:var(--gray);">Instructor: ${escapeHtml(s.instructor ? s.instructor.name : 'Unassigned')} · ${statusBadge(s.status)}</span>
-      </div>
-      <button class="btn btn-sm btn-ghost" onclick="cancelAdminSchedule(${s.id})">Cancel</button>
-    </div>`).join('');
+  tb.innerHTML = sched.map(s => {
+    const type = (s.course && s.course.type || '').toUpperCase();
+    const slots = `${s.booked || 0}/${s.max_students || 0}`;
+    return `<tr data-id="${s.id}">
+      <td><b>${escapeHtml(s.course ? s.course.name : '—')}</b> <span class="type-badge" style="font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px;color:#fff;background:${type === 'PDC' ? 'var(--orange)' : '#6366f1'};">${type}</span></td>
+      <td>${escapeHtml(String(s.date || '—'))}</td>
+      <td>${escapeHtml(String(s.time_start || ''))}–${escapeHtml(String(s.time_end || ''))}</td>
+      <td>${escapeHtml(s.venue || '—')}</td>
+      <td>${escapeHtml(s.instructor ? s.instructor.name : 'Unassigned')}</td>
+      <td>${slots}</td>
+      <td>${statusBadge(s.status)}</td>
+      <td>${s.status !== 'cancelled' ? `<button class="btn btn-sm btn-danger" onclick="cancelAdminSchedule(${s.id})">Cancel</button>` : ''}</td>
+    </tr>`;
+  }).join('');
 }
 
 async function createAdminSchedule() {
@@ -224,7 +229,7 @@ function renderStudents(students, pagination){
       <td><span class="badge ${payBadge}">${escapeHtml(st.payment_status)}</span></td>
       <td><span class="badge ${statusBadge}">${status}</span></td>
       <td>${instructor}</td>
-      <td><div style="display:flex;gap:6px;"><button class="btn btn-sm btn-ghost" onclick="viewStudent(this)">View</button><button class="btn btn-sm btn-primary" onclick="openAssignInstructorModal(${st.id})">Assign</button><button class="btn btn-sm btn-danger" onclick="deleteStudent(this)">Delete</button></div></td>
+      <td><div style="display:flex;gap:6px;"><button class="btn btn-sm btn-ghost" onclick="viewStudent(this)">View</button><button class="btn btn-sm btn-primary" onclick="openAssignInstructorModal(${st.id})">Assign</button><button class="btn btn-sm btn-ghost" onclick="toggleStudentActive(${st.id})">${st.is_active ? 'Deactivate' : 'Activate'}</button><button class="btn btn-sm btn-danger" onclick="deleteStudent(this)">Delete</button></div></td>
     </tr>`;
   }).join('') || `<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">No students yet.</td></tr>`;
   filterStudents();
@@ -235,6 +240,20 @@ async function loadInstructors(page){
   page = page || 1;
   const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/instructors?page=${page}`, { method: 'GET' });
   if (ok && data) renderInstructors(data.instructors || [], data.pagination);
+}
+
+async function toggleStudentActive(id){
+  const { ok } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/students/${id}/toggle-active`, { method: 'POST' });
+  if (!ok) return;
+  RCDA.showToast('Student status updated.', 'success');
+  loadStudents(1);
+}
+
+async function toggleInstructorActive(id){
+  const { ok } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/instructors/${id}/toggle-active`, { method: 'POST' });
+  if (!ok) return;
+  RCDA.showToast('Instructor status updated.', 'success');
+  loadInstructors(1);
 }
 
 function renderInstructors(instructors, pagination){
@@ -250,7 +269,7 @@ function renderInstructors(instructors, pagination){
       <td>—</td>
       <td>—</td>
       <td><span class="badge ${statusBadge}">${status}</span></td>
-      <td><button class="btn btn-sm btn-danger" onclick="deleteInstructor(this)">Delete</button></td>
+      <td><div style="display:flex;gap:6px;"><button class="btn btn-sm btn-ghost" onclick="toggleInstructorActive(${ins.id})">${ins.is_active ? 'Deactivate' : 'Activate'}</button><button class="btn btn-sm btn-danger" onclick="deleteInstructor(this)">Delete</button></div></td>
     </tr>`;
   }).join('') || `<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">No instructors yet.</td></tr>`;
   filterInstructors();
@@ -627,94 +646,96 @@ function filterInstructors(){
 }
 
 /* ============================================================
-   Add Instructor — reads the modal form, validates required
-   fields, appends a new row to the Instructor Roster table,
-   then resets and closes the modal.
+   Add Instructor — reads the modal form, creates the
+   instructor + login account via the API, refreshes the
+   roster, then resets and closes the modal.
    ============================================================ */
-function addInstructor(){
+async function addInstructor(){
   const name = (document.getElementById('newInstrName') || {}).value.trim();
-  const spec = (document.getElementById('newInstrSpec') || {}).value.trim();
-  const students = (document.getElementById('newInstrStudents') || {}).value.trim() || '0';
-  const sessions = (document.getElementById('newInstrSessions') || {}).value.trim() || '0';
-  const status = (document.getElementById('newInstrStatus') || {}).value || 'Active';
+  const email = (document.getElementById('newInstrEmail') || {}).value.trim();
+  const spec = (document.getElementById('newInstrSpec') || {}).value;
+  const phone = (document.getElementById('newInstrPhone') || {}).value.trim();
+  const license = (document.getElementById('newInstrLicense') || {}).value.trim();
+  const password = (document.getElementById('newInstrPassword') || {}).value;
 
   const errorEl = document.getElementById('newInstrError');
 
-  if (!name || !spec) {
+  if (!name || !email || !password) {
     if (errorEl) errorEl.style.display = 'block';
     return;
   }
   if (errorEl) errorEl.style.display = 'none';
 
-  const tbody = document.querySelector('#instructorsTable tbody');
-  if (!tbody) return;
+  const submitBtn = document.querySelector('#addInstructorModal .pay-modal-footer .btn-primary');
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
 
-  const badgeClass = status === 'On Leave' ? 'pending' : 'active';
+  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/instructors`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, email, specialization: spec, phone: phone || null, license_no: license || null, password })
+  });
 
-  const row = document.createElement('tr');
-  row.dataset.status = status;
-  row.innerHTML = `<td><b>${name}</b></td><td>${spec}</td><td>${students}</td><td>${sessions}</td><td><span class="badge ${badgeClass}">${status}</span></td><td><button class="btn btn-sm btn-danger" onclick="deleteInstructor(this)">Delete</button></td>`;
-  tbody.appendChild(row);
+  if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '+ Add Instructor'; }
+
+  if (!ok || !data) return;
+
+  RCDA.showToast('Instructor added.', 'success');
 
   // Reset form
   document.getElementById('newInstrName').value = '';
-  document.getElementById('newInstrSpec').value = '';
-  document.getElementById('newInstrStudents').value = '';
-  document.getElementById('newInstrSessions').value = '';
-  document.getElementById('newInstrStatus').value = 'Active';
+  document.getElementById('newInstrEmail').value = '';
+  document.getElementById('newInstrPhone').value = '';
+  document.getElementById('newInstrLicense').value = '';
+  document.getElementById('newInstrPassword').value = '';
 
   closeModal('addInstructorModal');
-  filterInstructors();
+  loadInstructors(1);
 }
 
 /* ============================================================
-   Add Student — reads the modal form, validates the name,
-   auto-generates the next RC-### ID, appends a new row to the
-   All Students table, then resets and closes the modal.
+   Add Student — reads the modal form, creates the student +
+   login account via the API, refreshes the All Students
+   table, then resets and closes the modal.
    ============================================================ */
-function addStudent(){
+async function addStudent(){
   const name = (document.getElementById('newStudName') || {}).value.trim();
-  const course = (document.getElementById('newStudCourse') || {}).value || 'TDC+PDC';
-  const instructor = (document.getElementById('newStudInstructor') || {}).value || '';
-  const payment = (document.getElementById('newStudPayment') || {}).value || 'Pending';
-  const status = (document.getElementById('newStudStatus') || {}).value || 'Active';
+  const email = (document.getElementById('newStudEmail') || {}).value.trim();
+  const phone = (document.getElementById('newStudPhone') || {}).value.trim();
+  const license = (document.getElementById('newStudLicense') || {}).value;
+  const password = (document.getElementById('newStudPassword') || {}).value;
 
   const errorEl = document.getElementById('newStudError');
 
-  if (!name) {
+  if (!name || !email || !password) {
     if (errorEl) errorEl.style.display = 'block';
     return;
   }
   if (errorEl) errorEl.style.display = 'none';
 
-  const tbody = document.querySelector('#studentsTable tbody');
-  if (!tbody) return;
+  const submitBtn = document.querySelector('#addStudentModal .pay-modal-footer .btn-primary');
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
 
-  const existingIds = Array.from(tbody.querySelectorAll('td.mono'))
-    .map(td => parseInt((td.textContent.match(/\d+/) || [0])[0], 10));
-  const nextNum = (existingIds.length ? Math.max(...existingIds) : 0) + 1;
-  const newId = 'RC-' + String(nextNum).padStart(3, '0');
+  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/students`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, email, phone: phone || null, license_type: license || null, password })
+  });
 
-  const tdc = course.includes('TDC') ? '0/5' : '—';
-  const pdc = course.includes('PDC') ? '0/8' : '—';
-  const paymentBadge = payment === 'Paid' ? 'verified' : 'pending';
-  const statusBadge = status === 'Active' ? 'active' : 'pending';
-  const courseLabel = course === 'TDC+PDC' ? 'TDC+PDC' : course;
+  if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '+ Add Student'; }
 
-  const row = document.createElement('tr');
-  row.dataset.status = status;
-  row.innerHTML = `<td class="mono" style="color:var(--gray);font-size:12px;">${newId}</td><td><b>${escapeHtml(name)}</b></td><td>${escapeHtml(courseLabel)}</td><td><span class="badge ${paymentBadge}">${payment}</span></td><td><span class="badge ${statusBadge}">${status}</span></td><td><div style="display:flex;gap:6px;"><button class="btn btn-sm btn-ghost" onclick="viewStudent(this)">View</button><button class="btn btn-sm btn-danger" onclick="deleteStudent(this)">Delete</button></div></td>`;
-  tbody.appendChild(row);
+  if (!ok || !data) return;
+
+  RCDA.showToast('Student added.', 'success');
 
   // Reset form
   document.getElementById('newStudName').value = '';
-  document.getElementById('newStudCourse').value = 'TDC+PDC';
-  document.getElementById('newStudInstructor').value = 'Mr. Santos';
-  document.getElementById('newStudPayment').value = 'Pending';
-  document.getElementById('newStudStatus').value = 'Active';
+  document.getElementById('newStudEmail').value = '';
+  document.getElementById('newStudPhone').value = '';
+  document.getElementById('newStudLicense').value = '';
+  document.getElementById('newStudPassword').value = '';
 
   closeModal('addStudentModal');
-  filterStudents();
+  loadStudents(1);
 }
 
 /* ============================================================
@@ -1279,43 +1300,55 @@ async function loadNotifications(){
   }).join('') : '<div style="color:var(--gray);padding:14px 0;">No notifications sent yet. They fire on registration, payment, and certificate issuance.</div>';
 }
 
-/* ---- STUDENT REQUESTS (instructor preference + reschedule) ---- */
-async function loadAdminRequests() {
+/* ---- STUDENT REQUESTS (booking + instructor preference + reschedule) ---- */
+async function loadAdminRequests(page) {
+  page = page || 1;
   const filter = document.getElementById('reqStatusFilter') ? document.getElementById('reqStatusFilter').value : 'pending';
   const qs = filter ? ('?status=' + encodeURIComponent(filter)) : '';
-  const { ok, data, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/requests` + qs);
-  const body = document.getElementById('adminRequestsBody');
-  if (!body) return;
-  if (!ok) { body.innerHTML = '<div style="color:var(--gray);">Could not load requests.</div>'; return; }
+  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/requests` + (qs ? (qs + '&page=' + page) : ('?page=' + page)));
+  const tb = document.getElementById('requestsTbody');
+  if (!tb) return;
+  if (!ok || !data) { tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">Could not load requests.</td></tr>'; return; }
 
   const list = data.requests || [];
-  if (!list.length) { body.innerHTML = '<div style="color:var(--gray);padding:14px 0;">No requests found.</div>'; return; }
+  if (!list.length) { tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">No requests found.</td></tr>'; return; }
 
-  body.innerHTML = list.map(r => {
-    const typeLabel = r.type === 'reschedule' ? 'Reschedule' : 'Instructor preference';
-    const badge = r.status === 'pending' ? 'pending' : (r.status === 'accepted' ? 'verified' : 'needs');
+  tb.innerHTML = list.map(r => {
+    const typeLabel = r.type === 'reschedule' ? 'Reschedule' : (r.type === 'booking' ? 'PDC Booking' : 'Instructor Preference');
+    const typeCls = r.type === 'reschedule' ? 'needs' : (r.type === 'booking' ? 'verified' : 'upcoming');
+    const statusCls = r.status === 'pending' ? 'pending' : (r.status === 'accepted' ? 'verified' : 'needs');
+
     let detail = '';
     if (r.type === 'reschedule') {
-      detail = `From: ${r.from_schedule ? escapeHtml((r.from_schedule.course || '') + ' · ' + r.from_schedule.date + ' ' + r.from_schedule.time_start) : '—'}
-      <br>To: ${r.to_schedule ? escapeHtml((r.to_schedule.course || '') + ' · ' + r.to_schedule.date + ' ' + r.to_schedule.time_start) : '—'}`;
+      detail = `From: ${r.from_schedule ? escapeHtml((r.from_schedule.course || '') + ' · ' + r.from_schedule.date + ' ' + r.from_schedule.time_start) : '—'}<br>To: ${r.to_schedule ? escapeHtml((r.to_schedule.course || '') + ' · ' + r.to_schedule.date + ' ' + r.to_schedule.time_start) : '—'}`;
+    } else if (r.type === 'booking') {
+      const inst = r.preferred_instructor ? r.preferred_instructor.name : 'Any available';
+      detail = `Preferred date: <b>${escapeHtml(String(r.preferred_date || '—'))}</b><br>Requested instructor: ${escapeHtml(inst)}`;
     } else {
       const pref = r.preferred_gender === 'male' ? 'Male' : (r.preferred_gender === 'female' ? 'Female' : 'No preference');
       detail = `Requested instructor gender: <b>${escapeHtml(pref)}</b>`;
     }
+    if (r.note) detail += `<br><span style="color:var(--gray);">Note: ${escapeHtml(r.note)}</span>`;
+
+    const when = r.created_at ? new Date(r.created_at).toLocaleDateString('en-PH') : '—';
+
     const actions = r.status === 'pending'
-      ? `<div style="display:flex;gap:8px;margin-top:10px;">
-           <button class="btn btn-sm btn-primary" onclick="acceptRequest(${r.id})">Accept</button>
-           <button class="btn btn-sm btn-ghost" onclick="rejectRequest(${r.id})">Reject</button>
+      ? `<div style="display:flex;gap:6px;justify-content:flex-end;">
+           <button class="btn btn-sm btn-success" onclick="acceptRequest(${r.id})">Accept</button>
+           <button class="btn btn-sm btn-danger" onclick="rejectRequest(${r.id})">Reject</button>
          </div>`
-      : `<div class="req-note" style="margin-top:8px;">${escapeHtml((r.admin_note || (r.status === 'accepted' ? 'Accepted' : 'Rejected')).toString())}</div>`;
-    const studentName = r.student_name ? escapeHtml(r.student_name) : ('#' + r.student_id);
-    return `<div class="req-card">
-      <h4>${escapeHtml(typeLabel)} <span class="badge ${badge}" style="margin-left:6px;">${escapeHtml(r.status)}</span></h4>
-      <div class="req-meta">Student: ${studentName} · ${r.note ? escapeHtml(r.note) : ''}</div>
-      <div style="font-size:13px;line-height:1.5;">${detail}</div>
-      ${actions}
-    </div>`;
+      : `<span style="font-size:11.5px;color:var(--gray);${r.admin_note ? '' : 'display:none;'}">${escapeHtml(String(r.admin_note || ''))}</span>`;
+
+    return `<tr data-id="${r.id}">
+      <td><b>${escapeHtml(r.student_name ? r.student_name : ('#' + r.student_id))}</b></td>
+      <td><span class="badge ${typeCls}">${typeLabel}</span></td>
+      <td style="font-size:12.5px;line-height:1.5;">${detail}</td>
+      <td style="white-space:nowrap;color:var(--gray);">${when}</td>
+      <td><span class="badge ${statusCls}">${escapeHtml(r.status)}</span></td>
+      <td>${actions}</td>
+    </tr>`;
   }).join('');
+  renderPagination(document.getElementById('requestsTable'), 'requestsPagination', data.pagination, 'loadAdminRequests');
 }
 
 async function acceptRequest(id) {

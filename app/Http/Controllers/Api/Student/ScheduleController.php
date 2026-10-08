@@ -34,7 +34,7 @@ class ScheduleController extends Controller
                         'name' => $schedule->course->name,
                         'type' => $schedule->course->type,
                     ],
-                    'date' => $schedule->date,
+                    'date' => $schedule->date?->format('Y-m-d'),
                     'time_start' => $schedule->time_start,
                     'time_end' => $schedule->time_end,
                     'venue' => $schedule->venue,

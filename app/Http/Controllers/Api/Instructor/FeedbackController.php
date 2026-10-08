@@ -36,7 +36,7 @@ class FeedbackController extends Controller
 
                 return [
                     'id' => $schedule->id,
-                    'date' => $schedule->date,
+                    'date' => $schedule->date?->format('Y-m-d'),
                     'course' => [
                         'name' => $schedule->course->name,
                         'type' => $schedule->course->type,

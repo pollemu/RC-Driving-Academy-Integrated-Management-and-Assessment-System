@@ -41,7 +41,7 @@ class DashboardController extends Controller
                     'id' => $booking->id,
                     'schedule_id' => $s->id,
                     'course' => ['name' => $s->course->name],
-                    'date' => $s->date,
+                    'date' => $s->date?->format('Y-m-d'),
                     'time_start' => $s->time_start,
                     'time_end' => $s->time_end,
                     'instructor_name' => $s->instructor->user->name,

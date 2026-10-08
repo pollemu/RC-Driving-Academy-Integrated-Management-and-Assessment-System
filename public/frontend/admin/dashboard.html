@@ -6,8 +6,8 @@
 <title>Admin Dashboard - RC Driving Academy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/base.css?v=29">
-<link rel="stylesheet" href="../css/admin.css?v=29">
+<link rel="stylesheet" href="../css/base.css?v=30">
+<link rel="stylesheet" href="../css/admin.css?v=30">
 </head>
 <body>
 
@@ -182,20 +182,25 @@
         <div class="card">
           <div class="card-head"><h3>Create a Session</h3><span style="font-size:13px;color:var(--gray);">Assign an instructor and open it for student booking</span></div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:8px;">
-            <div><label style="font-size:12px;color:var(--gray);">Course</label><select id="schedCourse" class="sched-pick"></select></div>
-            <div><label style="font-size:12px;color:var(--gray);">Instructor</label><select id="schedInstructor" class="sched-pick"></select></div>
-            <div><label style="font-size:12px;color:var(--gray);">Date</label><input id="schedDate" type="date" class="sched-pick"></div>
-            <div><label style="font-size:12px;color:var(--gray);">Start</label><input id="schedStart" type="time" class="sched-pick" value="08:00"></div>
-            <div><label style="font-size:12px;color:var(--gray);">End</label><input id="schedEnd" type="time" class="sched-pick" value="10:00"></div>
-            <div><label style="font-size:12px;color:var(--gray);">Capacity</label><input id="schedCap" type="number" min="1" value="10" class="sched-pick"></div>
+            <div><label style="font-size:12px;color:var(--gray);">Course</label><select id="schedCourse" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;background:var(--cream);"></select></div>
+            <div><label style="font-size:12px;color:var(--gray);">Instructor</label><select id="schedInstructor" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;background:var(--cream);"></select></div>
+            <div><label style="font-size:12px;color:var(--gray);">Date</label><input id="schedDate" type="date" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;background:var(--cream);"></div>
+            <div><label style="font-size:12px;color:var(--gray);">Start</label><input id="schedStart" type="time" value="08:00" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;background:var(--cream);"></div>
+            <div><label style="font-size:12px;color:var(--gray);">End</label><input id="schedEnd" type="time" value="10:00" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;background:var(--cream);"></div>
+            <div><label style="font-size:12px;color:var(--gray);">Capacity</label><input id="schedCap" type="number" min="1" value="10" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;background:var(--cream);"></div>
           </div>
-          <div style="margin-top:12px;"><label style="font-size:12px;color:var(--gray);">Venue</label><input id="schedVenue" class="sched-pick" placeholder="RC Driving Academy — Main Branch"></div>
+          <div style="margin-top:12px;"><label style="font-size:12px;color:var(--gray);">Venue</label><input id="schedVenue" placeholder="RC Driving Academy — Main Branch" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;background:var(--cream);"></div>
           <button class="btn btn-primary" style="margin-top:14px;width:100%;justify-content:center;" onclick="createAdminSchedule()">Create Session</button>
         </div>
         <div class="card" style="margin-top:18px;">
           <div class="card-head"><h3>All Sessions</h3></div>
-          <div id="adminScheduleList" style="display:flex;flex-direction:column;gap:8px;">
-            <div style="color:var(--gray);padding:14px;">Loading sessions…</div>
+          <div style="overflow-x:auto;">
+            <table id="adminSessionsTable">
+              <thead><tr><th>Course</th><th>Date</th><th>Time</th><th>Venue</th><th>Instructor</th><th>Slots</th><th>Status</th><th></th></tr></thead>
+              <tbody id="adminSessionsTbody">
+                <tr><td colspan="8" style="text-align:center;color:var(--gray);padding:20px;">Loading sessions…</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -375,14 +380,21 @@
       <div class="panel" id="admin-requests">
         <div class="card">
           <div class="card-head"><h3>Student Requests</h3>
-            <select id="reqStatusFilter" class="sched-pick" style="width:180px;" onchange="loadAdminRequests()">
+            <select id="reqStatusFilter" style="width:180px;padding:8px 12px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13px;background:var(--cream);" onchange="loadAdminRequests()">
               <option value="pending">Pending</option>
               <option value="">All</option>
               <option value="accepted">Accepted</option>
               <option value="rejected">Rejected</option>
             </select>
           </div>
-          <div id="adminRequestsBody"></div>
+          <div style="overflow-x:auto;">
+            <table id="requestsTable">
+              <thead><tr><th>Student</th><th>Type</th><th>Details</th><th>Requested</th><th>Status</th><th></th></tr></thead>
+              <tbody id="requestsTbody">
+                <tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">Loading requests…</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -474,27 +486,32 @@
         <input id="newInstrName" type="text" placeholder="e.g. Mr. Ramon Cruz" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);">
       </div>
       <div class="field">
+        <label>Email</label>
+        <input id="newInstrEmail" type="email" placeholder="e.g. ramon.cruz@rcdriving.ph" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);">
+      </div>
+      <div class="field">
         <label>Specialization</label>
-        <input id="newInstrSpec" type="text" placeholder="e.g. TDC + PDC (4W)" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);">
+        <select id="newInstrSpec" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);">
+          <option value="TDC">TDC</option>
+          <option value="PDC">PDC</option>
+          <option value="TDC+PDC">TDC + PDC</option>
+        </select>
       </div>
       <div class="two-col" style="gap:14px;">
         <div class="field">
-          <label>Students</label>
-          <input id="newInstrStudents" type="number" min="0" placeholder="0" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);">
+          <label>Phone</label>
+          <input id="newInstrPhone" type="text" placeholder="e.g. 0917 000 0000" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);">
         </div>
         <div class="field">
-          <label>Sessions/Month</label>
-          <input id="newInstrSessions" type="number" min="0" placeholder="0" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);">
+          <label>License No.</label>
+          <input id="newInstrLicense" type="text" placeholder="Optional" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);">
         </div>
       </div>
       <div class="field">
-        <label>Status</label>
-        <select id="newInstrStatus" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);">
-          <option value="Active">Active</option>
-          <option value="On Leave">On Leave</option>
-        </select>
+        <label>Temporary Password</label>
+        <input id="newInstrPassword" type="password" placeholder="Min 8 characters" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);">
       </div>
-      <p id="newInstrError" style="display:none;color:#dc2626;font-size:12.5px;margin:0;">Please fill in the instructor's name and specialization.</p>
+      <p id="newInstrError" style="display:none;color:#dc2626;font-size:12.5px;margin:0;">Please fill in the instructor's name, email, and password.</p>
     </div>
     <div class="pay-modal-footer">
       <button class="btn btn-sm btn-ghost" onclick="closeModal('addInstructorModal')">Cancel</button>
@@ -515,43 +532,30 @@
         <label>Full Name</label>
         <input id="newStudName" type="text" placeholder="e.g. Juan Dela Cruz" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);">
       </div>
-      <div class="two-col" style="gap:14px;">
-        <div class="field">
-          <label>Course</label>
-          <select id="newStudCourse" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);">
-            <option value="TDC+PDC">TDC + PDC</option>
-            <option value="TDC Only">TDC Only</option>
-            <option value="PDC Only">PDC Only</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Instructor</label>
-          <select id="newStudInstructor" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);">
-            <option>Mr. Santos</option>
-            <option>Ms. Lim</option>
-            <option>Mr. Dela Cruz</option>
-            <option>Ms. Garcia</option>
-            <option>Mr. Bautista</option>
-          </select>
-        </div>
+      <div class="field">
+        <label>Email</label>
+        <input id="newStudEmail" type="email" placeholder="e.g. juan.cruz@rcdriving.ph" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);">
       </div>
       <div class="two-col" style="gap:14px;">
         <div class="field">
-          <label>Payment</label>
-          <select id="newStudPayment" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);">
-            <option value="Paid">Paid</option>
-            <option value="Pending">Pending</option>
-          </select>
+          <label>Phone</label>
+          <input id="newStudPhone" type="text" placeholder="e.g. 0917 000 0000" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);">
         </div>
         <div class="field">
-          <label>Status</label>
-          <select id="newStudStatus" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);">
-            <option value="Active">Active</option>
-            <option value="Pending">Pending</option>
+          <label>License Type</label>
+          <select id="newStudLicense" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);">
+            <option value="">—</option>
+            <option value="non-pro">Non-Professional</option>
+            <option value="pro">Professional</option>
+            <option value="student-permit">Student Permit</option>
           </select>
         </div>
       </div>
-      <p id="newStudError" style="display:none;color:#dc2626;font-size:12.5px;margin:0;">Please enter the student's full name.</p>
+      <div class="field">
+        <label>Temporary Password</label>
+        <input id="newStudPassword" type="password" placeholder="Min 8 characters" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);">
+      </div>
+      <p id="newStudError" style="display:none;color:#dc2626;font-size:12.5px;margin:0;">Please enter the student's name, email, and password.</p>
     </div>
     <div class="pay-modal-footer">
       <button class="btn btn-sm btn-ghost" onclick="closeModal('addStudentModal')">Cancel</button>
@@ -667,9 +671,9 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
-<script src="../js/config.js?v=29"></script>
-<script src="../js/error-handler.js?v=29"></script>
-<script src="../js/shared.js?v=29"></script>
-<script src="../js/admin.js?v=29"></script>
+<script src="../js/config.js?v=30"></script>
+<script src="../js/error-handler.js?v=30"></script>
+<script src="../js/shared.js?v=30"></script>
+<script src="../js/admin.js?v=30"></script>
 </body>
 </html>

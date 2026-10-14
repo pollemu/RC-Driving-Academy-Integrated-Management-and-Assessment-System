@@ -17,6 +17,10 @@ use Illuminate\Http\Request;
 class ChatController extends Controller
 {
     protected const BOT_RULES = [
+        'onboarding' => [
+            'keywords' => ['after creat', 'after making', 'after register', 'after sign', 'after signup', 'created my account', 'create my account', 'new account', 'made my account', 'made an account', 'just signed up', 'just registered', 'i signed up', 'i registered', 'what next', 'what do i do', 'what should i do', 'now what', 'next step', 'next steps', 'steps', 'the process', 'onboarding', 'get started', 'how to start'],
+            'reply' => "Congrats on signing up! Here's what to do next: 1) Open the Enroll tab and pick ONE TDC course (Face-to-Face or Online) plus any PDC you want. 2) Go to Payments and settle the fee — TDC and PDC 2W need full payment; PDC 4W activates on a 50% downpayment. 3) Once your enrollment is active, book a slot in the Sessions tab (admin confirms your instructor). 4) Finish your TDC and pass the assessment (75+), then continue with your PDC sessions. 5) After you meet all requirements, admin issues your certificate. Need help with any step?",
+        ],
         'enroll' => [
             'keywords' => ['enroll', 'sign up', 'register', 'join', 'how to start', 'get started'],
             'reply' => "To enroll: open the Enroll tab, pick one TDC course (Face-to-Face or Online) and any PDC course, then pay the downpayment. PDC unlocks only after you finish TDC and get assessed. Need the step-by-step?",
@@ -63,7 +67,7 @@ class ChatController extends Controller
         ],
         'help' => [
             'keywords' => ['help', 'support', 'talk to human', 'agent', 'admin', 'hi', 'hello', 'hey'],
-            'reply' => "Hi! I'm the RCDA support bot. I can help with enrolling, payments, bookings, rescheduling, requesting a preferred instructor, tracking your requests, and certificates. Ask me anything — or type 'talk to human' and we'll route it to admin. How can I help?",
+            'reply' => "Hi! I'm the RCDA support bot. I can help with what to do after signing up, enrolling, payments, bookings, rescheduling, requesting a preferred instructor, tracking your requests, and certificates. Ask me anything — or type 'talk to human' and we'll route it to admin. How can I help?",
         ],
     ];
 
@@ -143,6 +147,6 @@ class ChatController extends Controller
             return $best;
         }
 
-        return "I'm not sure I caught that. I can help with enrolling, TDC/PDC, payments, bookings, rescheduling, instructor preferences, assessments, and certificates. Try rephrasing, or type 'talk to human' to reach our admin team.";
+        return "I'm not sure I caught that. I can help with getting started after signing up, TDC/PDC, enrolling, payments, bookings, rescheduling, instructor preferences, assessments, and certificates. Try rephrasing, or type 'talk to human' to reach our admin team.";
     }
 }

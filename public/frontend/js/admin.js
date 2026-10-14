@@ -6,7 +6,7 @@ const ADMIN_TITLES = {
   dashboard:'Dashboard', students:'Students', schedule:'Schedule',
   attendance:'Instructor Attendance', instructors:'Instructors',
   payments:'Payments', certifications:'Certifications', reports:'Reports',
-  notifications:'Notifications', bookings:'Pending Bookings', requests:'Student Requests'
+  notifications:'Notifications', bookings:'Pending Bookings', requests:'Student Requests', ai:'Grading AI'
 };
 
 function showPanel(panel, el){
@@ -44,22 +44,35 @@ function sampleNLP(type){
   if (el) el.value = nlpData[type].text;
 }
 
-function analyzeNLP(){
+async function analyzeNLP(){
   const txt = (document.getElementById('nlpInput') || {}).value || '';
-  const type = classifyNLP(txt);
-  const d = nlpData[type];
+  if (!txt) return;
 
-  const badge = document.getElementById('nlpBadge');
-  const score = document.getElementById('nlpScore');
-  const msg   = document.getElementById('nlpMsg');
-  const tokens= document.getElementById('nlpTokens');
-  const result= document.getElementById('nlpResult');
+  const badge  = document.getElementById('nlpBadge');
+  const score  = document.getElementById('nlpScore');
+  const msg    = document.getElementById('nlpMsg');
+  const tokens = document.getElementById('nlpTokens');
+  const result = document.getElementById('nlpResult');
 
-  if(badge){ badge.textContent = d.badge; badge.className = 'nlp-badge ' + d.cls; }
-  if(score) score.textContent = d.score + '%';
-  if(msg)   msg.textContent = d.msg;
-  if(tokens) tokens.innerHTML = d.tokens.map(t => `<span class="token-chip ${t.c}">${t.t}</span>`).join('');
-  if(result) result.style.display = 'block';
+  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/nlp/classify`, {
+    method: 'POST',
+    body: { text: txt }
+  });
+
+  if (ok && data && data.classification) {
+    const map = nlpData[data.classification] || nlpData.avg;
+    if(badge){ badge.textContent = map.badge; badge.className = 'nlp-badge ' + map.cls; }
+    if(score) score.textContent = Math.round((data.confidence || 0) * 100) + '%';
+    if(msg)   msg.textContent = data.recommendation + ' — learned from ' + data.training_size + ' assessments';
+    if(tokens) tokens.innerHTML = (data.tokens || []).map(t => `<span class="token-chip ${t.c}">${escapeHtml(t.t)}</span>`).join('') || '<span class="token-chip">—</span>';
+    if(result) result.style.display = 'block';
+  } else {
+    if(badge){ badge.textContent = 'Untrained'; badge.className = 'nlp-badge'; }
+    if(score) score.textContent = '—';
+    if(msg)   msg.textContent = (data && data.recommendation) || 'The model has no training data yet.';
+    if(tokens) tokens.innerHTML = '';
+    if(result) result.style.display = 'block';
+  }
 }
 
 function profileTab(tab){

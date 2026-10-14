@@ -35,6 +35,7 @@ class PaymentController extends Controller
 
     public function create(Request $request, Enrollment $enrollment)
     {
+        $this->authorizeEnrollment($request, $enrollment);
         $enrollment->load(['course', 'student.user']);
 
         return response()->json([
@@ -51,6 +52,8 @@ class PaymentController extends Controller
 
     public function store(Request $request, Enrollment $enrollment)
     {
+        $this->authorizeEnrollment($request, $enrollment);
+
         $data = $request->validate([
             'method' => ['required', 'in:gcash,bdo'],
             'reference_no' => ['nullable', 'string', 'max:255'],
@@ -67,29 +70,39 @@ class PaymentController extends Controller
 
         $paymongo = new PayMongoService();
         $reference = 'PAY-' . $enrollment->id . '-' . time();
-        $checkoutUrl = $paymongo->createPaymentIntentWithCheckout(
-            (int) round($course->fee * 100),
-            'RC Driving Academy - ' . $course->name,
-            $reference,
-            url('/student/dashboard'),
-            url('/api/student/payments/' . $enrollment->id)
-        );
+        $manual = ! empty($data['reference_no']) || $request->hasFile('receipt');
 
         $payment = Payment::create([
             'student_id' => $student->id,
             'course_id' => $course->id,
             'amount' => $course->fee,
             'method' => $data['method'],
-            'reference_no' => $data['reference_no'],
+            'reference_no' => $data['reference_no'] ?? null,
             'receipt_path' => $receiptPath,
-            'paymongo_id' => $checkoutUrl ? $reference : null,
             'status' => 'pending',
         ]);
 
         $payload = ['payment' => ['id' => $payment->id, 'status' => $payment->status]];
 
-        if ($checkoutUrl) {
-            $payload['checkout_url'] = $checkoutUrl;
+        // Online checkout only for card/e-wallet payments with no manual proof.
+        if (! $manual && $paymongo->isConfigured()) {
+            $session = $paymongo->createCheckoutSession(
+                (int) round($course->fee * 100),
+                'RC Driving Academy - ' . $course->name,
+                $reference,
+                url('/student/dashboard'),
+                url('/student/dashboard')
+            );
+
+            if ($session) {
+                $payment->paymongo_id = $session['id'];
+                $payment->save();
+
+                $payload['checkout_url'] = $session['url'];
+                $payload['session_id'] = $session['id'];
+            } else {
+                $payload['message'] = 'Online payment is unavailable. Please submit a reference number for manual verification.';
+            }
         }
 
         return response()->json($payload);
@@ -111,9 +124,9 @@ class PaymentController extends Controller
 
         /* DEMO ONLY: when 'fake' is true, skip PayMongo and mark the downpayments
            verified immediately so enrollments activate without a real gateway.
-           Never allowed in production — anyone could mark payments paid for free. */
+           Requires ALLOW_FAKE_PAYMENTS=true and is hard-disabled in production. */
         if (! empty($data['fake'])) {
-            if (app()->environment('production')) {
+            if (app()->environment('production') || ! config('app.allow_fake_payments')) {
                 return response()->json(['message' => 'Demo payments are not available.'], 403);
             }
             $payments = [];
@@ -236,10 +249,19 @@ class PaymentController extends Controller
         }
 
         $info = (new PayMongoService())->getCheckoutSession($sessionId);
-        if (! $info || empty($info['payment_id'])) {
+        if (! $info || empty($info['paid'])) {
             return response()->json([
                 'verified' => false,
                 'message' => 'PayMongo has not confirmed this payment yet.',
+            ]);
+        }
+
+        // Never activate on a partial or tampered amount.
+        $expected = (int) round($payments->sum('amount') * 100);
+        if ($info['paid_amount_centavos'] > 0 && $info['paid_amount_centavos'] < $expected) {
+            return response()->json([
+                'verified' => false,
+                'message' => 'The amount paid does not match the amount due. Please contact the academy.',
             ]);
         }
 
@@ -248,5 +270,12 @@ class PaymentController extends Controller
         }
 
         return response()->json(['verified' => true, 'payments' => $payments->count()]);
+    }
+
+    /* A student may only touch their own enrollments. */
+    private function authorizeEnrollment(Request $request, Enrollment $enrollment): void
+    {
+        $studentId = $request->user()->student?->id;
+        abort_unless($studentId && (int) $enrollment->student_id === (int) $studentId, 403, 'Not your enrollment.');
     }
 }

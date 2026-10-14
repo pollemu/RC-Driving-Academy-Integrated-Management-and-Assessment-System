@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Course;
+use App\Models\AiTrainingExample;
 use App\Models\Enrollment;
 use App\Models\Instructor;
 use App\Models\Payment;
@@ -216,5 +217,43 @@ class DatabaseSeeder extends Seeder
                 );
             }
         }
+
+        // Seed the teachable grading model with a small labeled corpus so the
+        // AI can classify right from the first demo (it keeps learning from
+        // every real assessment afterwards).
+        $this->seedNlpExamples();
+    }
+
+    private function seedNlpExamples(): void
+    {
+        AiTrainingExample::updateOrCreate(
+            ['raw_text' => 'Magaling siya mag-drive. Excellent steering control at outstanding safety awareness. Accurate lane discipline at well controlled speed sa lahat ng road types.'],
+            ['label' => 'fast', 'stars' => ['steering' => 5, 'speed' => 5, 'lane' => 5, 'parking' => 5, 'safety' => 5, 'mirror' => 5]]
+        );
+
+        AiTrainingExample::updateOrCreate(
+            ['raw_text' => 'Student shows excellent control. Parking mastered on first attempt. Very smooth and safe all throughout the session.'],
+            ['label' => 'fast', 'stars' => ['steering' => 5, 'speed' => 4, 'lane' => 5, 'parking' => 5, 'safety' => 5, 'mirror' => 4]]
+        );
+
+        AiTrainingExample::updateOrCreate(
+            ['raw_text' => 'Good progress sa steering pero kailangan pa ng practice sa parking. Lane discipline is improving. Speed management adequate pero can be better.'],
+            ['label' => 'average', 'stars' => ['steering' => 4, 'speed' => 3, 'lane' => 4, 'parking' => 2, 'safety' => 4, 'mirror' => 3]]
+        );
+
+        AiTrainingExample::updateOrCreate(
+            ['raw_text' => 'Adequate speed management but can be better. Basic maneuvers okay, kailangan lang ng consistency sa mirror checking.'],
+            ['label' => 'average', 'stars' => ['steering' => 3, 'speed' => 3, 'lane' => 3, 'parking' => 3, 'safety' => 4, 'mirror' => 3]]
+        );
+
+        AiTrainingExample::updateOrCreate(
+            ['raw_text' => 'Student has difficulty with lane discipline and unsafe speed on turns. Parking was incorrect multiple times. Poor control sa manibela.'],
+            ['label' => 'needs', 'stars' => ['steering' => 2, 'speed' => 2, 'lane' => 2, 'parking' => 2, 'safety' => 3, 'mirror' => 2]]
+        );
+
+        AiTrainingExample::updateOrCreate(
+            ['raw_text' => 'Delikado ang bilis sa highway, unsafe speed sa overtaking. Madalas mag-overshoot sa parking at nag-struggle sa basic maneuvers.'],
+            ['label' => 'needs', 'stars' => ['steering' => 2, 'speed' => 2, 'lane' => 2, 'parking' => 1, 'safety' => 2, 'mirror' => 2]]
+        );
     }
 }

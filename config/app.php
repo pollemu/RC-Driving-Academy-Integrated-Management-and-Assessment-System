@@ -56,6 +56,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Demo Payment Switch
+    |--------------------------------------------------------------------------
+    |
+    | When true, students may mark enrollment downpayments as paid without a
+    | real PayMongo checkout ("fake" payments). This exists ONLY for local
+    | demos and is hard-disabled whenever APP_ENV=production. Keep it false
+    | anywhere real money is involved.
+    |
+    */
+
+    'allow_fake_payments' => (bool) env('ALLOW_FAKE_PAYMENTS', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

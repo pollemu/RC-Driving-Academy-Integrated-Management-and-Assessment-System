@@ -185,3 +185,13 @@ tr.row-new{animation:rowIn 1.4s ease;}
 .rcda-page-btns{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
 .rcda-page-gap{color:var(--gray);padding:0 4px;}
 @media (max-width:600px){ .rcda-pagination{justify-content:center;} .rcda-page-info{width:100%;text-align:center;} }
+
+/* ========== GRADING AI PANEL (teachable model widget) ========== */
+.nlp-badge{display:inline-block;padding:6px 14px;border-radius:999px;font-size:12.5px;font-weight:800;letter-spacing:.3px;}
+.nlp-badge.fast{background:var(--success-bg);color:var(--success);}
+.nlp-badge.avg{background:var(--warn2-bg);color:#b45309;}
+.nlp-badge.needs{background:var(--danger2-bg);color:var(--danger2);}
+#nlpTokens{display:flex;gap:6px;flex-wrap:wrap;}
+.token-chip{padding:5px 10px;border-radius:999px;font-size:12px;font-weight:600;background:var(--cream);color:var(--gray);border:1px solid var(--gray-light);}
+.token-chip.pos{background:var(--success-bg);color:var(--success);border-color:transparent;}
+.token-chip.neg{background:var(--danger2-bg);color:var(--danger2);border-color:transparent;}

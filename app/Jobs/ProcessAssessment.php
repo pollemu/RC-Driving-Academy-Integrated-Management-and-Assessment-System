@@ -36,7 +36,7 @@ class ProcessAssessment implements ShouldQueue
             return;
         }
 
-        $this->trainModel();
+        $this->trainModel($assessment);
 
         $nlp = new NlpService();
         $result = $nlp->classify($this->feedback->raw_text);
@@ -69,31 +69,33 @@ class ProcessAssessment implements ShouldQueue
         ]);
     }
 
-    /* Sends this assessment's feedback to the NLP service so its classifier
-       is retrained/improved on every real instructor submission. */
-    protected function trainModel(): void
+/* Sends this assessment's feedback to the NLP service so its classifier
+       is retrained/improved on every real instructor submission. The label
+       taught is the (pre-NLP) rule-based classification — our answer key. */
+    protected function trainModel(Assessment $assessment): void
     {
         $stars = [
             'steering' => $this->feedback->star_steering,
-            'speed' => $this->feedback->star_speed,
-            'lane' => $this->feedback->star_lane,
-            'parking' => $this->feedback->star_parking,
-            'safety' => $this->feedback->star_safety,
-            'mirror' => $this->feedback->star_mirror,
+            'speed'    => $this->feedback->star_speed,
+            'lane'     => $this->feedback->star_lane,
+            'parking'  => $this->feedback->star_parking,
+            'safety'   => $this->feedback->star_safety,
+            'mirror'   => $this->feedback->star_mirror,
         ];
 
         $notes = [
             'steering' => $this->feedback->note_steering,
-            'speed' => $this->feedback->note_speed,
-            'lane' => $this->feedback->note_lane,
-            'parking' => $this->feedback->note_parking,
-            'safety' => $this->feedback->note_safety,
-            'mirror' => $this->feedback->note_mirror,
+            'speed'    => $this->feedback->note_speed,
+            'lane'     => $this->feedback->note_lane,
+            'parking'  => $this->feedback->note_parking,
+            'safety'   => $this->feedback->note_safety,
+            'mirror'   => $this->feedback->note_mirror,
         ];
 
         $nlp = new NlpService();
         $nlp->train([
             'text' => $this->feedback->raw_text,
+            'label' => $this->hasSafetyKeyword($this->feedback->raw_text) ? 'needs' : $assessment->classification,
             'stars' => $stars,
             'notes' => $notes,
             'schedule_id' => $this->feedback->schedule_id,

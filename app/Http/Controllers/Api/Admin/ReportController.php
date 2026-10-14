@@ -14,6 +14,7 @@ use App\Models\Schedule;
 use App\Models\Setting;
 use App\Models\Student;
 use App\Services\CertGateService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -42,14 +43,15 @@ class ReportController extends Controller
             ];
         });
 
+        // Group revenue by month in PHP so it works on any DB driver
+        // (strftime is sqlite-only, DATE_FORMAT is mysql-only).
         $revenueByMonth = Payment::where('status', 'verified')
-            ->select(DB::raw("strftime('%Y-%m', verified_at) as month"), DB::raw('SUM(amount) as total'))
-            ->groupBy('month')
-            ->orderBy('month')
-            ->get()
-            ->map(function ($row) {
-                return ['month' => $row->month, 'revenue' => (float) $row->total];
-            });
+            ->whereNotNull('verified_at')
+            ->get(['verified_at', 'amount'])
+            ->groupBy(fn ($payment) => \Illuminate\Support\Carbon::parse($payment->verified_at)->format('Y-m'))
+            ->map(fn ($rows, $month) => ['month' => $month, 'revenue' => (float) $rows->sum('amount')])
+            ->sortBy('month')
+            ->values();
 
         $paymentStatus = [
             'pending' => Payment::where('status', 'pending')->count(),

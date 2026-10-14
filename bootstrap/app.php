@@ -17,10 +17,6 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => \App\Http\Middleware\RoleMiddleware::class,
             'api.role' => \App\Http\Middleware\ApiRoleMiddleware::class,
         ]);
-
-        $middleware->validateCsrfTokens(except: [
-            'webhook/paymongo',
-        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

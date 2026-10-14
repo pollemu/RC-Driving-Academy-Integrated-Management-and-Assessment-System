@@ -44,4 +44,22 @@ return [
         'api_key' => env('GOOGLE_MAPS_API_KEY'),
     ],
 
+    'paymongo' => [
+        'public' => env('PAYMONGO_PUBLIC_KEY'),
+        'secret' => env('PAYMONGO_SECRET_KEY'),
+        'webhook_secret' => env('PAYMONGO_WEBHOOK_SECRET'),
+        'api_url' => env('PAYMONGO_API_URL', 'https://api.paymongo.com/v1'),
+        // Comma-separated payment method types enabled on the merchant account.
+        // Valid: card, gcash, grab_pay, paymaya, billease, dob, qrph.
+        'payment_methods' => env('PAYMONGO_PAYMENT_METHODS', ''),
+        'timeout' => (int) env('PAYMONGO_TIMEOUT', 20),
+        // Optional webhook replay window in seconds. 0 disables the check.
+        'webhook_tolerance' => (int) env('PAYMONGO_WEBHOOK_TOLERANCE', 0),
+    ],
+
+    'nlp' => [
+        'driver' => env('NLP_DRIVER', 'local'),
+        'url' => env('NLP_SERVICE_URL', ''),
+    ],
+
 ];

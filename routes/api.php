@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\Admin\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Api\Admin\CertificationController as AdminCertificationController;
 use App\Http\Controllers\Api\Admin\ReportController as AdminReportController;
 use App\Http\Controllers\Api\Admin\RequestController as AdminRequestController;
+use App\Http\Controllers\Api\Admin\NlpController as AdminNlpController;
 use App\Http\Controllers\Api\Student\RequestController as StudentRequestController;
 use App\Http\Controllers\Api\Student\ChatController as StudentChatController;
 use App\Http\Controllers\Api\Instructor\DashboardController as InstructorDashboardController;
@@ -42,6 +43,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/users/{user}/set-role', [AdminUserController::class, 'setRole'])->name('api.admin.users.set-role');
         Route::get('/users/role-changes', [AdminUserController::class, 'roleChanges'])->name('api.admin.users.role-changes');
         Route::get('/notifications', [AdminReportController::class, 'notifications'])->name('api.admin.notifications');
+        Route::post('/nlp/classify', [AdminNlpController::class, 'classify'])->name('api.admin.nlp.classify');
         Route::apiResource('instructors', AdminInstructorController::class)->except(['create', 'edit', 'show', 'update']);
         Route::post('/instructors/{instructor}/toggle-active', [AdminInstructorController::class, 'toggleActive'])->name('api.admin.instructors.toggle');
         Route::get('/schedules', [AdminScheduleController::class, 'index'])->name('api.admin.schedules.index');

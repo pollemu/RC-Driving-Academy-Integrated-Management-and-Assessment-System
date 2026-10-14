@@ -16,6 +16,7 @@ class PaymentController extends Controller
 {
     public function create(Enrollment $enrollment): View
     {
+        $this->authorizeEnrollment($enrollment);
         $enrollment->load(['course', 'student.user']);
 
         return view('student.payment', compact('enrollment'));
@@ -23,6 +24,8 @@ class PaymentController extends Controller
 
     public function store(Request $request, Enrollment $enrollment): RedirectResponse
     {
+        $this->authorizeEnrollment($enrollment);
+
         $data = $request->validate([
             'method' => ['required', 'in:gcash,bdo'],
             'reference_no' => ['nullable', 'string', 'max:255'],
@@ -39,30 +42,43 @@ class PaymentController extends Controller
 
         $paymongo = new PayMongoService();
         $reference = 'PAY-' . $enrollment->id . '-' . time();
-        $checkoutUrl = $paymongo->createPaymentIntentWithCheckout(
-            (int) round($course->fee * 100),
-            'RC Driving Academy - ' . $course->name,
-            $reference,
-            route('student.dashboard'),
-            route('student.payment.create', $enrollment)
-        );
+        $manual = ! empty($data['reference_no']) || $request->hasFile('receipt');
 
         $payment = Payment::create([
             'student_id' => $student->id,
             'course_id' => $course->id,
             'amount' => $course->fee,
             'method' => $data['method'],
-            'reference_no' => $data['reference_no'],
+            'reference_no' => $data['reference_no'] ?? null,
             'receipt_path' => $receiptPath,
-            'paymongo_id' => $checkoutUrl ? $reference : null,
             'status' => 'pending',
         ]);
 
-        if ($checkoutUrl) {
-            return redirect($checkoutUrl);
+        if (! $manual && $paymongo->isConfigured()) {
+            $session = $paymongo->createCheckoutSession(
+                (int) round($course->fee * 100),
+                'RC Driving Academy - ' . $course->name,
+                $reference,
+                route('student.dashboard'),
+                route('student.payment.create', $enrollment)
+            );
+
+            if ($session) {
+                $payment->paymongo_id = $session['id'];
+                $payment->save();
+
+                return redirect($session['url']);
+            }
         }
 
         return redirect()->route('student.dashboard')
-            ->with('status', 'Payment submitted for manual verification (PayMongo not configured).');
+            ->with('status', 'Payment submitted for manual verification.');
+    }
+
+    /* A student may only touch their own enrollments. */
+    private function authorizeEnrollment(Enrollment $enrollment): void
+    {
+        $studentId = auth()->user()?->student?->id;
+        abort_unless($studentId && (int) $enrollment->student_id === (int) $studentId, 403, 'Not your enrollment.');
     }
 }

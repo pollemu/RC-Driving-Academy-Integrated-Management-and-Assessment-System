@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/base.css?v=30">
-<link rel="stylesheet" href="../css/admin.css?v=30">
+<link rel="stylesheet" href="../css/admin.css?v=31">
 </head>
 <body>
 
@@ -68,6 +68,10 @@
       <div class="nav-item" onclick="showPanel('reports',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
         Reports
+      </div>
+      <div class="nav-item" onclick="showPanel('ai',this)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4"/><circle cx="12" cy="3" r="1"/><path d="M9 14l2 2 4-4"/></svg>
+        Grading AI
       </div>
       <div class="nav-item" onclick="showPanel('notifications',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
@@ -398,6 +402,36 @@
         </div>
       </div>
 
+    <!-- GRADING AI PANEL -->
+      <div class="panel" id="admin-ai">
+        <div class="card">
+          <div class="card-head">
+            <h3>Grading AI — teachable assessment model</h3>
+            <span style="font-size:12px;color:var(--gray);">Type feedback like an instructor. The AI classifies it and learns from every real assessment.</span>
+          </div>
+          <div style="margin-top:14px;" id="aiInfo"></div>
+          <div class="field" style="margin-top:12px;">
+            <label>A student's written feedback</label>
+            <textarea id="nlpInput" rows="5" placeholder="Describe a student's driving performance in detail..." style="width:100%;padding:13px 15px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);resize:vertical;"></textarea>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center;">
+            <button class="btn btn-sm btn-ghost" onclick="sampleNLP('fast')">Fill: Fast example</button>
+            <button class="btn btn-sm btn-ghost" onclick="sampleNLP('avg')">Fill: Average example</button>
+            <button class="btn btn-sm btn-ghost" onclick="sampleNLP('needs')">Fill: Needs example</button>
+            <button class="btn btn-sm btn-primary" onclick="analyzeNLP()">Classify with AI</button>
+          </div>
+          <div id="nlpResult" style="display:none;margin-top:16px;padding:16px;border-radius:12px;background:#fff;border:1.5px solid var(--gray-light);">
+            <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+              <span id="nlpBadge" class="nlp-badge"></span>
+              <span style="font-size:22px;font-weight:800;" id="nlpScore"></span>
+            </div>
+            <div id="nlpMsg" style="font-size:14px;color:var(--ink);margin-bottom:10px;"></div>
+            <div style="font-size:12px;color:var(--gray);margin-bottom:4px;">Words that drove this verdict:</div>
+            <div id="nlpTokens"></div>
+          </div>
+        </div>
+      </div>
+
     </div><!-- /dash-body -->
   </main>
 </div>
@@ -674,6 +708,6 @@
 <script src="../js/config.js?v=30"></script>
 <script src="../js/error-handler.js?v=30"></script>
 <script src="../js/shared.js?v=30"></script>
-<script src="../js/admin.js?v=30"></script>
+<script src="../js/admin.js?v=31"></script>
 </body>
 </html>

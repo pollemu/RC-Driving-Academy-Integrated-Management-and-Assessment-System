@@ -990,7 +990,7 @@ async function loadChat() {
   if (ok && data.messages && data.messages.length) {
     data.messages.forEach(m => chatBubble(m.sender === 'student' ? 'user' : 'bot', m.body));
   } else {
-    chatBubble('bot', "Hi! I'm the RCDA support bot. Ask me about enrolling, TDC/PDC, payments, bookings, rescheduling, instructor preferences, or certificates — or type 'talk to human' to reach our admin team.");
+    chatBubble('bot', "Hi! I'm the RCDA support bot. Ask me what to do after signing up, or about enrolling, TDC/PDC, payments, bookings, rescheduling, instructor preferences, or certificates — or type 'talk to human' to reach our admin team.");
   }
 }
 

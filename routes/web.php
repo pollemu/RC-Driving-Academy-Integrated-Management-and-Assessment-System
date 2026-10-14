@@ -18,21 +18,18 @@ use App\Http\Controllers\Student\EnrollController;
 use App\Http\Controllers\Student\PaymentController as StudentPayment;
 use App\Http\Controllers\Student\ProgressController;
 use App\Http\Controllers\Student\ScheduleController as StudentBookingController;
-use App\Http\Controllers\WebhookController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect('/frontend/index.html'));
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
-    Route::post('/login', [LoginController::class, 'login']);
+    Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:login');
     Route::get('/register', [RegisterController::class, 'showRegistrationForm'])->name('register');
-    Route::post('/register', [RegisterController::class, 'register']);
+    Route::post('/register', [RegisterController::class, 'register'])->middleware('throttle:register');
 });
 
 Route::post('/logout', [LogoutController::class, 'logout'])->name('logout')->middleware('auth');
-
-Route::post('/webhook/paymongo', [WebhookController::class, 'paymongo'])->name('webhook.paymongo');
 
 Route::middleware('auth')->group(function () {
 

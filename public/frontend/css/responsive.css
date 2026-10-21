@@ -17,7 +17,8 @@
   .logo{width:34px;height:34px;}
   .nav-links{display:none;}
   .nav-cta > .btn{display:none;}
-  .nav-burger{display:flex;}
+  .nav-burger{display:flex;border-color:var(--line);}
+  .nav-burger span{background:var(--charcoal);}
   .nav-mobile{
     display:none;position:absolute;top:100%;left:0;right:0;flex-direction:column;gap:4px;
     padding:14px 16px 18px;background:rgba(255,255,255,0.98);backdrop-filter:blur(14px);

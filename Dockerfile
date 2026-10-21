@@ -16,6 +16,12 @@ RUN { \
         echo 'opcache.max_accelerated_files=10000'; \
     } > /usr/local/etc/php/conf.d/opcache.ini
 
+# Serve PHP-FPM over a Unix socket (not TCP :9000) so only the nginx HTTP port
+# is exposed; a second bound port confuses Render's port detection.
+RUN sed -i 's#^listen = .*#listen = /run/php-fpm.sock#' /usr/local/etc/php-fpm.d/*.conf 2>/dev/null || true
+RUN printf '[www]\nlisten = /run/php-fpm.sock\nlisten.owner = www-data\nlisten.group = www-data\nlisten.mode = 0660\nclear_env = no\n' \
+        > /usr/local/etc/php-fpm.d/zz-listen.conf
+
 # Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 

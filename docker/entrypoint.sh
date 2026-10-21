@@ -49,6 +49,9 @@ php artisan view:cache 2>&1 | tail -n 2 || true
 
 echo "== boot complete; starting php-fpm + nginx =="
 
-# php-fpm in the background, nginx in the foreground (Render expects one process).
-php-fpm -D || echo "WARNING: php-fpm failed to start." >&2
+# php-fpm in the background (image pool uses daemonize=no), nginx in the
+# foreground (Render expects a single foreground process, and only nginx
+# should bind a port).
+php-fpm 2>&1 | sed 's/^/[fpm] /' &
+sleep 1
 exec nginx -g "daemon off;"

@@ -11,8 +11,8 @@
 @media(max-width:640px){
   .nav{padding:14px 16px;}
   .nav.scrolled{padding:12px 16px;}
-  .brand{font-size:15px;}
-  .brand span{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .brand{font-size:14px;gap:8px;}
+  .brand span{max-width:none;white-space:normal;line-height:1.1;}
   .logo{width:34px;height:34px;}
   .nav-links{display:none;}
   .nav-cta > .btn{display:none;}
@@ -20,7 +20,7 @@
   .nav-mobile{
     display:none;position:absolute;top:100%;left:0;right:0;flex-direction:column;gap:4px;
     padding:14px 16px 18px;background:rgba(255,255,255,0.98);backdrop-filter:blur(14px);
-    box-shadow:0 14px 30px rgba(0,0,0,0.14);border-top:1px solid var(--line);
+    box-shadow:0 14px 30px rgba(0,0,0,0.14);border-top:1px solid var(--line);z-index:120;
   }
   .nav-mobile.open{display:flex;}
   .nav-mobile a{color:var(--charcoal);font-weight:600;font-size:15px;padding:11px 6px;border-radius:8px;}
@@ -32,4 +32,6 @@
   .hero-stats{flex-wrap:wrap;gap:20px;}
   .footer-grid{grid-template-columns:1fr;}
   .section{padding:64px 20px;}
+  #courses .section-head h2{white-space:normal;}
+  .section.dark{margin:0 12px;border-radius:24px;}
 }

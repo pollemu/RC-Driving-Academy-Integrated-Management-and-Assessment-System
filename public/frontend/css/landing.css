@@ -19,7 +19,6 @@ body{
   .nav.scrolled .nav-links a{color:var(--charcoal-soft);}
   .nav-links a:hover{color:var(--orange);}
   .nav-cta{display:flex;gap:12px;align-items:center;}
-  .nav:not(.scrolled) .btn-ghost{border-color:var(--line);color:white;}
 
   /* Mobile menu button (hidden on desktop) */
   .nav-burger{display:none;flex-direction:column;justify-content:center;gap:5px;width:42px;height:42px;padding:0;border-radius:10px;border:1px solid rgba(255,255,255,0.3);background:transparent;cursor:pointer;}

@@ -27,6 +27,7 @@
   .nav-mobile.open{display:flex;}
   .nav-mobile a{color:var(--charcoal);font-weight:600;font-size:15px;padding:11px 6px;border-radius:8px;}
   .nav-mobile a:hover{background:var(--cream);color:var(--orange);}
+  .nav-mobile .btn-ghost{color:var(--charcoal);border-color:var(--gray-light);background:transparent;}
   .hero-inner{padding:120px 16px 72px;gap:36px;}
   .hero h1{font-size:30px;}
   .hero-actions{flex-direction:column;}

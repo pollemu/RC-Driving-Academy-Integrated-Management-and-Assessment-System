@@ -22,12 +22,12 @@ class DatabaseSeeder extends Seeder
 
     public function run(): void
     {
-        // Admin account — the only fixed super-user.
-        User::updateOrCreate(
+        // Admin account — the only fixed super-user. Inserted once, never
+        // overwritten, so re-seeding on deploy cannot reset a changed password.
+        User::firstOrCreate(
             ['email' => 'admin@rcdriving.ph'],
             [
                 'name' => 'RC Admin',
-                'email' => 'admin@rcdriving.ph',
                 'password' => Hash::make('admin123'),
                 'role' => 'admin',
                 'is_active' => true,

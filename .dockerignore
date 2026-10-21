@@ -1,0 +1,40 @@
+# Ignore everything not needed to build/run the app in the container.
+.git
+.gitignore
+.github
+
+# Local environment & secrets
+.env
+.env.*
+!.env.example
+
+# Local dependencies / build output
+vendor
+node_modules
+public/build
+public/hot
+
+# Local database & storage (the container uses Render Postgres + ephemeral disk)
+database/*.sqlite
+database/*.sqlite-*
+storage/app/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/logs/*
+bootstrap/cache/*.php
+
+# Docs / tests / tooling
+tests
+phpunit.xml
+.phpunit.cache
+.phpunit.result.cache
+*.log
+.idea
+.vscode
+.DS_Store
+
+# Deployment docs
+DEPLOY.md
+SETUP.md
+render.yaml

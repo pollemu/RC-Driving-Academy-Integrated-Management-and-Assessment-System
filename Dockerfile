@@ -1,11 +1,20 @@
-FROM php:8.3-fpm-alpine
+FROM php:8.4-fpm-alpine
 
 # System packages + PHP extensions Laravel needs (pgsql for Render Postgres).
+# opcache ships with the official image; just enable it.
 RUN apk add --no-cache \
-        nginx supervisor curl \
+        nginx curl \
         libpq-dev oniguruma-dev icu-dev libzip-dev \
-    && docker-php-ext-install pdo_pgsql pgsql mbstring intl zip bcmath opcache \
+    && docker-php-ext-install pdo_pgsql pgsql mbstring intl zip bcmath \
+    && docker-php-ext-enable opcache \
     && rm -rf /var/cache/apk/*
+
+RUN { \
+        echo 'opcache.enable=1'; \
+        echo 'opcache.validate_timestamps=0'; \
+        echo 'opcache.memory_consumption=128'; \
+        echo 'opcache.max_accelerated_files=10000'; \
+    } > /usr/local/etc/php/conf.d/opcache.ini
 
 # Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer

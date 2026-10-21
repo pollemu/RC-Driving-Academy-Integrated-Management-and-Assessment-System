@@ -6,10 +6,10 @@
 <title>RC Driving Academy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/base.css?v=30">
-<link rel="stylesheet" href="css/landing.css?v=30">
-<link rel="stylesheet" href="css/legal.css?v=30">
-<link rel="stylesheet" href="css/responsive.css?v=30">
+<link rel="stylesheet" href="css/base.css?v=31">
+<link rel="stylesheet" href="css/landing.css?v=31">
+<link rel="stylesheet" href="css/legal.css?v=31">
+<link rel="stylesheet" href="css/responsive.css?v=31">
 </head>
 <body>
 
@@ -26,6 +26,16 @@
     <div class="nav-cta">
       <button class="btn btn-ghost" onclick="location.href='login.html'">Log In</button>
       <button class="btn btn-primary" onclick="location.href='signup.html'">Enroll Now</button>
+      <button class="nav-burger" onclick="toggleLandingNav()" aria-label="Open menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+    <div class="nav-mobile" id="navMobile">
+      <a href="#about" onclick="toggleLandingNav()">About</a>
+      <a href="#courses" onclick="toggleLandingNav()">Courses</a>
+      <a href="#testimonials" onclick="toggleLandingNav()">Testimonials</a>
+      <a href="#contact" onclick="toggleLandingNav()">Contact</a>
+      <button class="btn btn-primary" style="margin-top:8px;" onclick="location.href='signup.html'">Enroll Now</button>
     </div>
   </nav>
 
@@ -393,6 +403,26 @@
   </div>
 </div>
 
-<script src="js/shared.js?v=30"></script>
+<script>
+  function toggleLandingNav(){
+    var m = document.getElementById('navMobile');
+    var b = document.querySelector('.nav-burger');
+    if(!m) return;
+    var open = m.classList.toggle('open');
+    if(b) b.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  (function(){
+    var nav = document.getElementById('mainNav');
+    if(!nav) return;
+    var onScroll = function(){ nav.classList.toggle('scrolled', window.scrollY > 40); };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive:true });
+    document.addEventListener('click', function(e){
+      var m = document.getElementById('navMobile');
+      if(m && m.classList.contains('open') && !nav.contains(e.target)) m.classList.remove('open');
+    });
+  })();
+</script>
+<script src="js/shared.js?v=31"></script>
 </body>
 </html>

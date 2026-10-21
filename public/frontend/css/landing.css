@@ -21,6 +21,13 @@ body{
   .nav-cta{display:flex;gap:12px;align-items:center;}
   .nav:not(.scrolled) .btn-ghost{border-color:var(--line);color:white;}
 
+  /* Mobile menu button (hidden on desktop) */
+  .nav-burger{display:none;flex-direction:column;justify-content:center;gap:5px;width:42px;height:42px;padding:0;border-radius:10px;border:1px solid rgba(255,255,255,0.3);background:transparent;cursor:pointer;}
+  .nav-burger span{display:block;width:20px;height:2px;margin:0 auto;background:white;border-radius:2px;transition:.2s;}
+  .nav.scrolled .nav-burger{border-color:var(--gray-light);}
+  .nav.scrolled .nav-burger span{background:var(--charcoal);}
+  .nav-mobile{display:none;}
+
   /* ========== HERO ========== */
   .hero{position:relative;min-height:100vh;display:flex;align-items:center;background:radial-gradient(ellipse 900px 500px at 80% 10%,rgba(192,57,43,0.18),transparent 60%),linear-gradient(180deg,#1c1c1f 0%,#131316 55%,#0e0e10 100%);overflow:hidden;}
   .hero-road{position:absolute;inset:0;opacity:.5;}

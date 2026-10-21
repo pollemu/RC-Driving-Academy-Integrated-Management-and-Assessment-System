@@ -54,7 +54,7 @@ return [
         'payment_methods' => env('PAYMONGO_PAYMENT_METHODS', ''),
         'timeout' => (int) env('PAYMONGO_TIMEOUT', 20),
         // Optional webhook replay window in seconds. 0 disables the check.
-        'webhook_tolerance' => (int) env('PAYMONGO_WEBHOOK_TOLERANCE', 0),
+        'webhook_tolerance' => (int) env('PAYMONGO_WEBHOOK_TOLERANCE', 300),
     ],
 
     'nlp' => [

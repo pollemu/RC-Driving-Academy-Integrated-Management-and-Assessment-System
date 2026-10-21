@@ -54,10 +54,9 @@ class DatabaseSeeder extends Seeder
 
         $admin = User::where('email', 'admin@rcdriving.ph')->first();
 
-        // Real instructor accounts (one TDC instructor, one PDC instructor).
+        // One demo instructor who covers both course types.
         $instructorSeeds = [
-            ['name' => 'Mario Santos', 'email' => 'mario.santos@rcdriving.ph', 'phone' => '09171234567', 'specialization' => 'TDC', 'license_no' => 'LIC-100001', 'gender' => 'male'],
-            ['name' => 'Elena Reyes', 'email' => 'elena.reyes@rcdriving.ph', 'phone' => '09179876543', 'specialization' => 'PDC', 'license_no' => 'LIC-100002', 'gender' => 'female'],
+            ['name' => 'Mario Santos', 'email' => 'mario.santos@rcdriving.ph', 'phone' => '09171234567', 'specialization' => 'TDC+PDC', 'license_no' => 'LIC-100001', 'gender' => 'male'],
         ];
 
         $instructors = collect();
@@ -78,15 +77,12 @@ class DatabaseSeeder extends Seeder
             ]));
         }
 
-        $tdcInstructor = $instructors->firstWhere('specialization', 'TDC');
-        $pdcInstructor = $instructors->firstWhere('specialization', 'PDC');
+        $tdcInstructor = $instructors->first();
+        $pdcInstructor = $instructors->first();
 
-        // Real student accounts (role = student).
+        // One demo student (TDC) so each role has exactly one seeded login.
         $studentSeeds = [
             ['name' => 'John Cruz', 'email' => 'john.cruz@rcdriving.ph', 'phone' => '09171230001', 'address' => 'Quezon City', 'birthdate' => '2002-05-12', 'license_type' => 'student-permit', 'course' => 'TDC', 'instructor' => 'TDC', 'gender' => 'male', 'pref' => 'female'],
-            ['name' => 'Anna Lim', 'email' => 'anna.lim@rcdriving.ph', 'phone' => '09171230002', 'address' => 'Makati City', 'birthdate' => '2001-09-30', 'license_type' => 'non-pro', 'course' => 'TDC', 'instructor' => 'TDC', 'gender' => 'female', 'pref' => 'male'],
-            ['name' => 'Paolo Garcia', 'email' => 'paolo.garcia@rcdriving.ph', 'phone' => '09171230003', 'address' => 'Pasig City', 'birthdate' => '2003-01-18', 'license_type' => 'student-permit', 'course' => 'PDC', 'instructor' => 'PDC', 'gender' => 'male', 'pref' => null],
-            ['name' => 'Maria Torres', 'email' => 'maria.torres@rcdriving.ph', 'phone' => '09171230004', 'address' => 'Taguig City', 'birthdate' => '2000-11-05', 'license_type' => 'pro', 'course' => 'PDC', 'instructor' => 'PDC', 'gender' => 'female', 'pref' => 'female'],
         ];
 
         $tdcCourse = Course::where('type', 'TDC')->where('format', 'Face to Face')->first();
@@ -176,12 +172,11 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
-        // A second PDC session on the first PDC day with a different instructor
-        // who has no bookings that day, so students see an available instructor
-        // in the booking calendar (green day -> available instructor).
+        // A second PDC session on the first PDC day (later, non-overlapping time)
+        // so the booking calendar shows another available slot.
         Schedule::create([
             'course_id' => $pdcCourse->id,
-            'instructor_id' => $tdcInstructor->id,
+            'instructor_id' => $pdcInstructor->id,
             'date' => $pdcSessions[0]['date']->format('Y-m-d'),
             'time_start' => '11:00',
             'time_end' => '13:00',
@@ -190,8 +185,8 @@ class DatabaseSeeder extends Seeder
             'status' => 'open',
         ]);
 
-        // Confirmed bookings: each TDC student booked into the first TDC session,
-        // each PDC student into their own PDC session.
+        // Confirmed booking: the demo student is booked into the first session
+        // for their course.
         $firstTdc = Schedule::where('course_id', $tdcCourse->id)->orderBy('date')->first();
         $firstPdc = Schedule::where('course_id', $pdcCourse->id)->orderBy('date')->first();
 

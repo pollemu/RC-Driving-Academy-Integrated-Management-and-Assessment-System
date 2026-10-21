@@ -34,6 +34,18 @@ class UserController extends Controller
 
         $fromRole = $user->role;
 
+        // Never leave the system without at least one active admin.
+        if ($fromRole === 'admin' && $data['role'] !== 'admin') {
+            $otherAdmins = User::where('role', 'admin')
+                ->where('is_active', true)
+                ->where('id', '!=', $user->id)
+                ->count();
+
+            if ($otherAdmins === 0) {
+                return response()->json(['message' => 'At least one active admin must remain.'], 422);
+            }
+        }
+
         if ($fromRole === $data['role']) {
             // Still allow updating instructor specialization without a role change.
             if ($data['role'] === 'instructor' && $user->instructor && isset($data['specialization'])) {

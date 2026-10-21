@@ -91,7 +91,7 @@ function statusBadge(status) {
     cancelled: ['', 'Cancelled'],
   };
   const [cls, label] = map[status] || ['', (status || '').charAt(0).toUpperCase() + (status || '').slice(1)];
-  return `<span class="badge ${cls}">${label}</span>`;
+  return `<span class="badge ${cls}">${escapeHtml(label)}</span>`;
 }
 
 function classBadge(cls) {
@@ -101,7 +101,7 @@ function classBadge(cls) {
     needs: ['needs', '⚠ Needs Improvement'],
   };
   const [c, l] = map[cls] || ['', '—'];
-  return `<span class="badge ${c}">${l}</span>`;
+  return `<span class="badge ${c}">${escapeHtml(l)}</span>`;
 }
 
 /* ---- HTML ESCAPING (prevents breaking layout / XSS on user data) ---- */
@@ -823,6 +823,11 @@ async function processPay(){
 
   if (data.checkout_url) {
     // Send the student straight to PayMongo's hosted page (GCash / Card / OTC).
+    // Remember the session id so the payment can be confirmed on return —
+    // PayMongo does not append it to the success_url.
+    if (data.session_id) {
+      try { localStorage.setItem('rcda_pending_session', JSON.stringify({ id: data.session_id, at: Date.now() })); } catch (e) {}
+    }
     window.location.href = data.checkout_url;
     return;
   }
@@ -848,12 +853,22 @@ async function processFakePay(){
 /* After PayMongo redirects back (success_url), confirm the payment automatically. */
 function handlePayMongoReturn(){
   const params = new URLSearchParams(window.location.search);
-  const session = params.get('checkout_session_id') || params.get('session') || params.get('payment_id');
+  let session = params.get('checkout_session_id') || params.get('session') || params.get('payment_id');
+
+  // Fall back to a remembered session id (recent only) if PayMongo did not
+  // include one in the redirect URL.
+  if (!session) {
+    try {
+      const saved = JSON.parse(localStorage.getItem('rcda_pending_session') || 'null');
+      if (saved && saved.id && (Date.now() - (saved.at || 0)) < 86400000) session = saved.id;
+    } catch (e) {}
+  }
   if (!session) return;
 
   (async () => {
     const { ok, data } = await RCDA.safeFetch(STUD_API() + '/student/payments/return?session=' + encodeURIComponent(session));
     if (ok && data.verified) {
+      try { localStorage.removeItem('rcda_pending_session'); } catch (e) {}
       RCDA.showToast(data.already ? 'Payment already confirmed.' : 'Payment confirmed — your enrollment is now active!', 'success');
       await Promise.all([loadStudentEnroll(), loadStudentPayments(), loadStudentProfile(), loadStudentSessions()]);
     } else {

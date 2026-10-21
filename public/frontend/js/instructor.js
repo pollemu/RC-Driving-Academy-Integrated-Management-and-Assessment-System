@@ -75,7 +75,7 @@ function statusBadge(status) {
     cancelled: ['', 'Cancelled'],
   };
   const [cls, label] = map[status] || ['', (status || '').charAt(0).toUpperCase() + (status || '').slice(1)];
-  return `<span class="badge ${cls}">${label}</span>`;
+  return `<span class="badge ${cls}">${escapeHtml(label)}</span>`;
 }
 
 function setText(id, value) {

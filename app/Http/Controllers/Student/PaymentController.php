@@ -37,7 +37,7 @@ class PaymentController extends Controller
 
         $receiptPath = null;
         if ($request->hasFile('receipt')) {
-            $receiptPath = $request->file('receipt')->store('receipts', 'public');
+            $receiptPath = $request->file('receipt')->store('receipts', 'local');
         }
 
         $paymongo = new PayMongoService();

@@ -1,0 +1,15 @@
+# Defense-in-depth for XAMPP/Apache setups where the document root may point at
+# the project root instead of /public. The correct document root is /public.
+
+<IfModule mod_authz_core.c>
+    <FilesMatch "(^\.env($|\..*)|^\.git.*|^composer\.(json|lock)$|^artisan$|^phpunit\.xml.*|^package(-lock)?\.json$)">
+        Require all denied
+    </FilesMatch>
+</IfModule>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Never serve application internals or the SQLite database over HTTP.
+    RewriteRule ^(app|bootstrap|config|database|resources|routes|storage|tests|vendor|\.git)(/|$) - [F,L]
+</IfModule>

@@ -65,7 +65,7 @@ class PaymentController extends Controller
 
         $receiptPath = null;
         if ($request->hasFile('receipt')) {
-            $receiptPath = $request->file('receipt')->store('receipts', 'public');
+            $receiptPath = $request->file('receipt')->store('receipts', 'local');
         }
 
         $paymongo = new PayMongoService();
@@ -256,9 +256,11 @@ class PaymentController extends Controller
             ]);
         }
 
-        // Never activate on a partial or tampered amount.
+        // Fail closed: the confirmed paid amount must cover the full total.
+        // A "paid" session that reports no amount (0/unknown) must never activate.
         $expected = (int) round($payments->sum('amount') * 100);
-        if ($info['paid_amount_centavos'] > 0 && $info['paid_amount_centavos'] < $expected) {
+        $paidAmount = (int) ($info['paid_amount_centavos'] ?? 0);
+        if ($expected <= 0 || $paidAmount < $expected) {
             return response()->json([
                 'verified' => false,
                 'message' => 'The amount paid does not match the amount due. Please contact the academy.',

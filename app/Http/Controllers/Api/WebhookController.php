@@ -57,9 +57,10 @@ class WebhookController extends Controller
             return response()->json(['received' => true, 'verified' => 0]);
         }
 
-        // Refuse to activate a partial or tampered payment.
+        // Fail closed: refuse a partial payment or one with no confirmed amount.
         $expected = (int) round($payments->sum('amount') * 100);
-        if ($info['paid_amount_centavos'] > 0 && $info['paid_amount_centavos'] < $expected) {
+        $paidAmount = (int) ($info['paid_amount_centavos'] ?? 0);
+        if ($expected <= 0 || $paidAmount < $expected) {
             return response()->json(['received' => true, 'verified' => 0, 'reason' => 'amount_mismatch']);
         }
 

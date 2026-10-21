@@ -343,7 +343,7 @@ function statusBadge(status) {
     active: ['enrolled', 'Active'], completed: ['done', 'Completed'],
   };
   const [cls, label] = map[status] || ['', (status || '').charAt(0).toUpperCase() + (status || '').slice(1)];
-  return `<span class="badge ${cls}">${label}</span>`;
+  return `<span class="badge ${cls}">${escapeHtml(label)}</span>`;
 }
 
 /* ============================================================

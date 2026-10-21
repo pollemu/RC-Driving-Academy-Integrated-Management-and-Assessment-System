@@ -99,9 +99,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/requests/reschedule', [StudentRequestController::class, 'reschedule'])->name('api.student.requests.reschedule');
         Route::delete('/requests/{studentRequest}', [StudentRequestController::class, 'destroy'])->name('api.student.requests.destroy');
         Route::get('/chat', [StudentChatController::class, 'index'])->name('api.student.chat.index');
-        Route::post('/chat', [StudentChatController::class, 'send'])->name('api.student.chat.send');
+        Route::post('/chat', [StudentChatController::class, 'send'])->middleware('throttle:30,1')->name('api.student.chat.send');
     });
 });
 
-/* Public PayMongo webhook (no auth). */
-Route::post('/webhooks/paymongo', [WebhookController::class, 'paymongo'])->name('api.webhooks.paymongo');
+/* Public PayMongo webhook (no auth). Throttled to blunt abuse; the signature is
+   still verified inside the controller. */
+Route::post('/webhooks/paymongo', [WebhookController::class, 'paymongo'])
+    ->middleware('throttle:60,1')
+    ->name('api.webhooks.paymongo');

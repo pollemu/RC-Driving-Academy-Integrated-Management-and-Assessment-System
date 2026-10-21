@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Api\Admin\StudentController as AdminStudentController;
@@ -26,10 +27,14 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:register');
+Route::post('/password/forgot', [ProfileController::class, 'forgotPassword'])->middleware('throttle:login');
 
 Route::middleware('auth:sanctum')->group(function () {
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/me/preferences', [AuthController::class, 'updatePreferences']);
+        Route::get('/profile', [ProfileController::class, 'show']);
+        Route::put('/profile', [ProfileController::class, 'update']);
+        Route::post('/profile/password', [ProfileController::class, 'updatePassword']);
         Route::post('/logout', [AuthController::class, 'logout']);
 
     Route::middleware('api.role:admin')->prefix('admin')->group(function () {

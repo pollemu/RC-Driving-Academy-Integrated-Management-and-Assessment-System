@@ -6,8 +6,8 @@
 <title>Student Dashboard - RC Driving Academy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/base.css?v=38">
-<link rel="stylesheet" href="../css/student.css?v=38">
+<link rel="stylesheet" href="../css/base.css?v=39">
+<link rel="stylesheet" href="../css/student.css?v=39">
 </head>
 <body>
 
@@ -32,6 +32,10 @@
       <div class="nav-item active" onclick="showPanel('profile',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         My Profile
+      </div>
+      <div class="nav-item" onclick="openProfileModal()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        Account Settings
       </div>
       <div class="nav-item" onclick="showPanel('handbook',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
@@ -344,9 +348,10 @@
   </div>
 </div>
 
-<script src="../js/config.js?v=38"></script>
-<script src="../js/error-handler.js?v=38"></script>
-<script src="../js/shared.js?v=38"></script>
-<script src="../js/student.js?v=38"></script>
+<script src="../js/config.js?v=39"></script>
+<script src="../js/error-handler.js?v=39"></script>
+<script src="../js/shared.js?v=39"></script>
+<script src="../js/profile.js?v=39"></script>
+<script src="../js/student.js?v=39"></script>
 </body>
 </html>

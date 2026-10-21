@@ -22,8 +22,13 @@ services:
         value: production
       - key: APP_DEBUG
         value: "false"
+      # Public base URL. Self-referencing RENDER_EXTERNAL_URL keeps this correct
+      # even if the service's onrender.com hostname changes.
       - key: APP_URL
-        value: https://rc-driving-academy-integrated-management.onrender.com
+        fromService:
+          type: web
+          name: rc-driving-academy
+          envVarKey: RENDER_EXTERNAL_URL
       # Paste the output of: php artisan key:generate --show  (starts with base64:)
       - key: APP_KEY
         sync: false

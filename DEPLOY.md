@@ -34,13 +34,13 @@ variables; `.env` is never committed.
    entrypoint runs `migrate --force` + `db:seed --force` (idempotent).
 
 The app will be live at:
-`https://rc-driving-academy-integrated-management.onrender.com`
+`https://rc-driving-academy.onrender.com`
 
 Health check: `/up`.
 
 ## Post-deploy
 - **PayMongo webhook:** add endpoint
-  `https://rc-driving-academy-integrated-management.onrender.com/api/webhooks/paymongo`
+  `https://rc-driving-academy.onrender.com/api/webhooks/paymongo`
   for `checkout_session.payment.paid`, then paste the signing secret as
   `PAYMONGO_WEBHOOK_SECRET` and redeploy (or update the env var and restart).
 - **Demo logins** (seeded once):

@@ -6,10 +6,10 @@
 <title>RC Driving Academy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/base.css?v=32">
-<link rel="stylesheet" href="css/landing.css?v=32">
-<link rel="stylesheet" href="css/legal.css?v=32">
-<link rel="stylesheet" href="css/responsive.css?v=32">
+<link rel="stylesheet" href="css/base.css?v=33">
+<link rel="stylesheet" href="css/landing.css?v=33">
+<link rel="stylesheet" href="css/legal.css?v=33">
+<link rel="stylesheet" href="css/responsive.css?v=33">
 </head>
 <body>
 
@@ -424,6 +424,24 @@
     });
   })();
 </script>
-<script src="js/shared.js?v=32"></script>
+<script src="js/shared.js?v=33"></script>
+<script>
+(function(){
+  function scan(){
+    var vw = document.documentElement.clientWidth;
+    var offenders = [];
+    document.querySelectorAll('body *').forEach(function(el){
+      var r = el.getBoundingClientRect();
+      if (r.right > vw + 1 || r.left < -1) {
+        offenders.push((el.tagName.toLowerCase()) + (el.id ? '#'+el.id : '') + (el.className && typeof el.className === 'string' ? '.'+el.className.trim().split(/\s+/).join('.') : '') + ' [right=' + Math.round(r.right) + ' vw=' + vw + ']');
+      }
+    });
+    var box = document.getElementById('rcdaOverflowDiag');
+    if (!box) { box = document.createElement('div'); box.id = 'rcdaOverflowDiag'; box.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#b91c1c;color:#fff;font:11px monospace;padding:8px;max-height:45vh;overflow:auto;white-space:pre-wrap;'; document.body.appendChild(box); }
+    box.textContent = 'OVERFLOW DIAG (scrollWidth=' + document.documentElement.scrollWidth + ', clientWidth=' + vw + ')\n' + (offenders.length ? offenders.join('\n') : 'none');
+  }
+  window.addEventListener('load', function(){ setTimeout(scan, 600); });
+})();
+</script>
 </body>
 </html>

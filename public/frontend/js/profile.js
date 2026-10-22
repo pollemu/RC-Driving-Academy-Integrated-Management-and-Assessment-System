@@ -42,6 +42,14 @@
     return '<div class="pf-field"><label>' + esc(f.label) + '</label>' + input + '</div>';
   }
 
+  function pwField(id, autocomplete) {
+    var eye = '<button type="button" class="pf-eye" onclick="pfTogglePw(\'' + id + '\',this)" aria-label="Show password" tabindex="-1">' +
+      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>' +
+      '</button>';
+    return '<div class="pf-pw-wrap"><input id="' + id + '" type="password" autocomplete="' + autocomplete + '">' + eye + '</div>';
+  }
+
   function buildModal(data) {
     var role = data.user.role;
     var detail = role === 'instructor' ? data.instructor : (role === 'student' ? data.student : null);
@@ -68,11 +76,11 @@
           '<div class="pf-section">' +
             '<h4 style="font-size:15px;font-weight:700;margin-bottom:14px;">Change Password</h4>' +
             '<div class="pf-grid">' +
-              '<div class="pf-field"><label>Current Password</label><input id="pf_current" type="password" autocomplete="current-password"></div>' +
+              '<div class="pf-field"><label>Current Password</label>' + pwField('pf_current', 'current-password') + '</div>' +
             '</div>' +
             '<div class="pf-grid">' +
-              '<div class="pf-field"><label>New Password</label><input id="pf_new" type="password" autocomplete="new-password"></div>' +
-              '<div class="pf-field"><label>Confirm New Password</label><input id="pf_confirm" type="password" autocomplete="new-password"></div>' +
+              '<div class="pf-field"><label>New Password</label>' + pwField('pf_new', 'new-password') + '</div>' +
+              '<div class="pf-field"><label>Confirm New Password</label>' + pwField('pf_confirm', 'new-password') + '</div>' +
             '</div>' +
             '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">' +
               '<button class="btn btn-primary" onclick="changePassword()">Update Password</button>' +
@@ -95,6 +103,11 @@
       '.pf-field label{font-size:12.5px;font-weight:600;color:var(--gray);}' +
       '.pf-field input,.pf-field select{padding:10px 12px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:14px;background:white;width:100%;box-sizing:border-box;font-family:inherit;color:var(--charcoal);}' +
       '.pf-field input:focus,.pf-field select:focus{outline:none;border-color:var(--orange);}' +
+      '.pf-pw-wrap{position:relative;display:flex;align-items:center;}' +
+      '.pf-pw-wrap input{padding-right:42px;}' +
+      '.pf-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:transparent;border:none;padding:6px;cursor:pointer;color:var(--gray);display:flex;align-items:center;border-radius:8px;}' +
+      '.pf-eye:hover{color:var(--charcoal);}' +
+      '.pf-eye.showing{color:var(--orange);}' +
       '#profileModal .modal-box{padding:24px;}' +
       '@media(max-width:600px){' +
         '#profileModal{padding:14px;}' +
@@ -106,6 +119,14 @@
   }
 
   function API() { return RCDA_CONFIG.getApiBaseUrl(); }
+
+  window.pfTogglePw = function (id, btn) {
+    var input = document.getElementById(id);
+    if (!input) return;
+    var showing = input.type === 'text';
+    input.type = showing ? 'password' : 'text';
+    if (btn) btn.classList.toggle('showing', !showing);
+  };
 
   window.openProfileModal = async function () {
     ensureStyles();

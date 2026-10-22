@@ -158,11 +158,17 @@ class PayMongoService
      * where each hash is HMAC-SHA256 of "<timestamp>.<raw-body>" keyed by the
      * webhook secret. We accept either the test (te) or live (li) hash, and we
      * reject stale timestamps to blunt replay of captured payloads.
+     *
+     * PayMongo scopes endpoints by mode (test vs live) and gives EACH endpoint
+     * its own signing secret, so PAYMONGO_WEBHOOK_SECRET may hold a
+     * comma-separated list of secrets (e.g. the test one and the live one).
+     * Any one of them may match.
      */
     public function verifyWebhookSignature(string $payload, string $signatureHeader): bool
     {
-        $secret = (string) config('services.paymongo.webhook_secret');
-        if ($secret === '' || str_contains($secret, 'xxxx') || trim($signatureHeader) === '') {
+        $configured = (string) config('services.paymongo.webhook_secret');
+        $secrets = array_values(array_filter(array_map('trim', explode(',', $configured))));
+        if (empty($secrets) || str_contains($configured, 'xxxx') || trim($signatureHeader) === '') {
             return false;
         }
 
@@ -187,11 +193,13 @@ class PayMongoService
             return false;
         }
 
-        $expected = hash_hmac('sha256', $timestamp . '.' . $payload, $secret);
+        foreach ($secrets as $secret) {
+            $expected = hash_hmac('sha256', $timestamp . '.' . $payload, $secret);
 
-        foreach (['te', 'li'] as $key) {
-            if (isset($parts[$key]) && hash_equals($expected, $parts[$key])) {
-                return true;
+            foreach (['te', 'li'] as $key) {
+                if (isset($parts[$key]) && hash_equals($expected, $parts[$key])) {
+                    return true;
+                }
             }
         }
 

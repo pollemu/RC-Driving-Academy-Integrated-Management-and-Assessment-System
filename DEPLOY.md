@@ -43,6 +43,11 @@ Health check: `/up`.
   `https://rc-driving-academy.onrender.com/api/webhooks/paymongo`
   for `checkout_session.payment.paid`, then paste the signing secret as
   `PAYMONGO_WEBHOOK_SECRET` and redeploy (or update the env var and restart).
+  - PayMongo issues a **separate signing secret per endpoint** and scopes
+    endpoints by mode (test vs live), so register one endpoint in each mode
+    and list both secrets comma-separated in `PAYMONGO_WEBHOOK_SECRET`.
+  - The signing secret is **not** your `sk_test_`/`sk_live_` API key.
+  - Verify with Dashboard -> Webhooks -> your endpoint -> Test Events -> Send.
 - **Demo logins** (seeded once):
   - Admin: `admin@rcdriving.ph` / `admin123`
   - Instructor: `mario.santos@rcdriving.ph` / `instructor123`

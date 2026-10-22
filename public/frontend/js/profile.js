@@ -95,6 +95,12 @@
       '.pf-field label{font-size:12.5px;font-weight:600;color:var(--gray);}' +
       '.pf-field input,.pf-field select{padding:10px 12px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:14px;background:white;width:100%;box-sizing:border-box;font-family:inherit;color:var(--charcoal);}' +
       '.pf-field input:focus,.pf-field select:focus{outline:none;border-color:var(--orange);}' +
+      '#profileModal .modal-box{padding:24px;}' +
+      '@media(max-width:600px){' +
+        '#profileModal{padding:14px;}' +
+        '#profileModal .modal-box{padding:20px 16px;max-height:90vh;border-radius:16px;}' +
+        '.pf-field input,.pf-field select{font-size:16px;}' +
+      '}' +
       '@media(max-width:520px){.pf-grid{grid-template-columns:1fr;}}';
     document.head.appendChild(s);
   }

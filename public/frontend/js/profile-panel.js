@@ -63,6 +63,69 @@
   }
 
   window.RCDAProfile = {
+    /* Read-only view of who you are. The editable form lives in
+       "Account Settings" so the two pages are not duplicates. */
+    renderSummary: function (opts) {
+      opts = opts || {};
+      var container = typeof opts.container === 'string' ? document.getElementById(opts.container) : opts.container;
+      if (!container) return;
+
+      container.innerHTML = '<div class="rp-loading">Loading profile...</div>';
+
+      fetch(apiBase() + '/profile', { headers: { 'Accept': 'application/json', 'Authorization': token() ? 'Bearer ' + token() : '' } })
+        .then(function (res) { return res.json().then(function (d) { return { ok: res.ok, data: d }; }); })
+        .then(function (r) {
+          if (!r.ok) throw new Error(r.data && r.data.message ? r.data.message : 'Could not load profile.');
+          this.paintSummary(container, r.data);
+        }.bind(this))
+        .catch(function (e) {
+          container.innerHTML = '<div class="rp-error">' + esc(e.message) + '</div>';
+        }.bind(this));
+    },
+
+    paintSummary: function (container, data) {
+      var user = data.user || {};
+      var student = data.student || {};
+      var instructor = data.instructor || {};
+      var name = user.name || 'User';
+      var initials = name.split(' ').filter(Boolean).map(function (w) { return w[0]; }).slice(0, 2).join('').toUpperCase();
+      var roleLabel = user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : '—';
+
+      var rows = [];
+      function row(label, value) {
+        rows.push('<div class="rp-row"><span>' + esc(label) + '</span><b>' + esc(value || '—') + '</b></div>');
+      }
+      row('Email', user.email);
+      row('Role', roleLabel);
+      row('Email status', user.email_verified ? 'Verified' : 'Not verified yet');
+      if (user.role === 'student') {
+        row('Phone', student.phone);
+        row('Address', student.address);
+        row('License type', student.license_type);
+        row('Gender', student.gender);
+      } else if (user.role === 'instructor') {
+        row('Phone', instructor.phone);
+        row('Specialization', instructor.specialization);
+        row('License no.', instructor.license_no);
+        row('Gender', instructor.gender);
+      }
+
+      var html = '<div class="card rp-summary-card">';
+      html += '<div class="card-head"><h3>My Profile</h3>' +
+        '<span class="rp-pill' + (user.email_verified ? ' ok' : '') + '">' +
+        (user.email_verified ? 'Email verified' : 'Email not verified') + '</span></div>';
+      html += '<div class="rp-identity">';
+      html += '<div class="rp-avatar">' + esc(initials) + '</div>';
+      html += '<div><h4>' + esc(name) + '</h4><span>' + esc(user.email) + '</span></div>';
+      html += '</div>';
+      html += '<div class="rp-rows">' + rows.join('') + '</div>';
+      html += '<p class="rp-hint">Use <b>Account Settings</b> to change your name, email, phone, password and email verification.</p>';
+      html += '</div>';
+
+      container.innerHTML = html;
+      this.styles();
+    },
+
     render: function (opts) {
       opts = opts || {};
       var container = typeof opts.container === 'string' ? document.getElementById(opts.container) : opts.container;
@@ -71,8 +134,8 @@
       var mode = opts.mode || 'self';
       var userId = opts.userId || null;
       var url = (mode === 'adminEdit' && userId)
-        ? apiBase() + '/api/admin/users/' + userId + '/profile'
-        : apiBase() + '/api/profile';
+        ? apiBase() + '/admin/users/' + userId + '/profile'
+        : apiBase() + '/profile';
 
       container.innerHTML = '<div class="rp-loading">Loading profile...</div>';
 
@@ -216,8 +279,8 @@
       var userId = host ? host.getAttribute('data-rp-user-id') : '';
       var payload = this._collect(host);
       var url = (mode === 'adminEdit' && userId)
-        ? apiBase() + '/api/admin/users/' + userId + '/profile'
-        : apiBase() + '/api/profile';
+        ? apiBase() + '/admin/users/' + userId + '/profile'
+        : apiBase() + '/profile';
 
       this._send(btn, 'PUT', url, payload, 'Profile saved.', function () {
         if (mode === 'self' && window.RCDA_AUTH && RCDA_AUTH.setUser) {
@@ -244,7 +307,7 @@
         payload.password_confirmation = val('confirm');
         if (!payload.password) { toast('Enter the new password.', 'error'); return; }
         if (payload.password !== payload.password_confirmation) { toast('New passwords do not match.', 'error'); return; }
-        this._send(btn, 'POST', apiBase() + '/api/profile/password', payload, 'Password updated.', function () {
+        this._send(btn, 'POST', apiBase() + '/profile/password', payload, 'Password updated.', function () {
           ['current', 'new', 'confirm'].forEach(function (key) {
             var el = scope.querySelector('#' + p + key); if (el) el.value = '';
           });
@@ -267,13 +330,13 @@
       if (details.license_no !== undefined) payload.license_no = details.license_no;
       if (details.gender !== undefined) payload.gender = details.gender;
 
-      this._send(btn, 'PUT', apiBase() + '/api/admin/users/' + userId + '/profile', payload, 'Password reset.', function () {
+      this._send(btn, 'PUT', apiBase() + '/admin/users/' + userId + '/profile', payload, 'Password reset.', function () {
         var el = scope.querySelector('#' + p + 'new'); if (el) el.value = '';
       });
     },
 
     sendVerifyCode: function (btn) {
-      this._send(btn, 'POST', apiBase() + '/api/profile/verify-email', {}, 'Verification code sent.', null, true);
+      this._send(btn, 'POST', apiBase() + '/profile/verify-email', {}, 'Verification code sent.', null, true);
     },
 
     requestForgotPassword: function (e) {
@@ -283,7 +346,7 @@
       var p = (scope.getAttribute && scope.getAttribute('data-rp-prefix')) || '';
       var el = scope.querySelector('#' + p + 'email');
       var email = el ? el.value : '';
-      fetch(apiBase() + '/api/password/forgot', {
+      fetch(apiBase() + '/password/forgot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify({ email: email })
@@ -302,7 +365,7 @@
       var el = scope.querySelector('#' + p + 'code');
       var code = el ? el.value.trim() : '';
       if (!code) { toast('Enter the verification code.', 'error'); return; }
-      this._send(btn, 'POST', apiBase() + '/api/profile/verify-email/confirm', { code: code }, 'Email verified.', function () {
+      this._send(btn, 'POST', apiBase() + '/profile/verify-email/confirm', { code: code }, 'Email verified.', function () {
         if (el) el.value = '';
       });
     },
@@ -348,11 +411,21 @@
         '.rp-link:hover{text-decoration:underline;}',
         '.rp-verify{margin-top:16px;padding-top:16px;border-top:1px solid var(--gray-light);display:flex;flex-direction:column;gap:12px;}',
         '.rp-hint{font-size:12px;color:var(--gray);margin:0;}',
+        '.rp-summary-card{max-width:760px;}',
+        '.rp-identity{display:flex;align-items:center;gap:14px;margin-bottom:18px;}',
+        '.rp-avatar{width:56px;height:56px;border-radius:50%;background:var(--orange);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;flex:0 0 auto;letter-spacing:.5px;}',
+        '.rp-identity h4{margin:0 0 3px;font-size:18px;color:var(--charcoal);}',
+        '.rp-identity span{font-size:13px;color:var(--gray);word-break:break-all;}',
+        '.rp-rows{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 18px;}',
+        '.rp-row{display:flex;flex-direction:column;gap:2px;padding:10px 12px;background:var(--cream);border-radius:10px;border:1px solid var(--gray-light);}',
+        '.rp-row span{font-size:11.5px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.3px;}',
+        '.rp-row b{font-size:14px;color:var(--charcoal);font-weight:600;word-break:break-word;}',
+        '.rp-summary-card .rp-hint{margin-top:16px;}',
         '.rp-pill{font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:999px;background:var(--gray-light);color:var(--gray);}',
         '.rp-pill.ok{background:var(--success-bg);color:var(--success);}',
         '.rp-loading,.rp-error{padding:18px;font-size:13.5px;color:var(--gray);}',
         '.rp-error{color:var(--orange);}',
-        '@media(max-width:900px){.rp-wrap.two-col{grid-template-columns:1fr;}}',
+        '@media(max-width:900px){.rp-wrap.two-col{grid-template-columns:1fr;}.rp-rows{grid-template-columns:1fr;}}',
         '@media(max-width:600px){.rp-field input,.rp-field select{font-size:16px;}.rp-actions .btn{flex:1 1 100%;}}'
       ].join('');
       document.head.appendChild(s);

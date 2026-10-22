@@ -6,7 +6,8 @@ const ADMIN_TITLES = {
   dashboard:'Dashboard', students:'Students', schedule:'Schedule',
   attendance:'Instructor Attendance', instructors:'Instructors',
   payments:'Payments', certifications:'Certifications', reports:'Reports',
-  notifications:'Notifications', bookings:'Pending Bookings', requests:'Student Requests', ai:'Grading AI', profile:'My Profile'
+  notifications:'Notifications', bookings:'Pending Bookings', requests:'Student Requests', ai:'Grading AI',
+  profile:'My Profile', settings:'Account Settings'
 };
 
 function showPanel(panel, el){
@@ -30,9 +31,18 @@ function showPanel(panel, el){
   if (panel === 'requests') loadAdminRequests();
   if (panel === 'profile') {
     if (window.RCDAProfile) {
-      const c = document.getElementById('adminProfilePanel');
+      const c = document.getElementById('adminProfileSummary');
       if (c && !c.dataset.rpLoaded) {
-        RCDAProfile.render({ container: c, mode: 'self', apiBase: RCDA_CONFIG.getApiBaseUrl() });
+        RCDAProfile.renderSummary({ container: c });
+        c.dataset.rpLoaded = '1';
+      }
+    }
+  }
+  if (panel === 'settings') {
+    if (window.RCDAProfile) {
+      const c = document.getElementById('adminSettingsPanel');
+      if (c && !c.dataset.rpLoaded) {
+        RCDAProfile.render({ container: c, mode: 'self' });
         c.dataset.rpLoaded = '1';
       }
     }
@@ -379,8 +389,7 @@ function openUserProfile(userId, name){
     RCDAProfile.render({
       container: document.getElementById('userProfileBody'),
       mode: 'adminEdit',
-      userId: userId,
-      apiBase: RCDA_CONFIG.getApiBaseUrl()
+      userId: userId
     });
   }
 }

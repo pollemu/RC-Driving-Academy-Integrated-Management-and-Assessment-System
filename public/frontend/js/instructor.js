@@ -5,7 +5,7 @@
 const INSTR_TITLES = {
   dashboard: 'My Dashboard', mystudents: 'My Students',
   myschedule: 'My Schedule', myassessment: 'Assess Students',
-  attendance: 'Session Attendance', profile: 'My Profile'
+  attendance: 'Session Attendance', profile: 'My Profile', settings: 'Account Settings'
 };
 
 function showPanel(panel, el) {
@@ -25,9 +25,16 @@ function showPanel(panel, el) {
 
   if (panel === 'myschedule') highlightToday();
   if (panel === 'profile' && window.RCDAProfile) {
-    const c = document.getElementById('instrProfilePanel');
+    const c = document.getElementById('instrProfileSummary');
     if (c && !c.dataset.rpLoaded) {
-      RCDAProfile.render({ container: c, mode: 'self', apiBase: RCDA_CONFIG.getApiBaseUrl() });
+      RCDAProfile.renderSummary({ container: c });
+      c.dataset.rpLoaded = '1';
+    }
+  }
+  if (panel === 'settings' && window.RCDAProfile) {
+    const c = document.getElementById('instrSettingsPanel');
+    if (c && !c.dataset.rpLoaded) {
+      RCDAProfile.render({ container: c, mode: 'self' });
       c.dataset.rpLoaded = '1';
     }
   }

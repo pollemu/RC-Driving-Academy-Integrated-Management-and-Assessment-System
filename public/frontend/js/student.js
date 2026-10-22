@@ -11,7 +11,8 @@ window.addEventListener('scroll', () => {
 const STUD_TITLES = {
   profile: 'My Profile', handbook: 'Handbook',
   sessions: 'My Sessions', myassess: 'My Results',
-  enroll: 'Enroll', payment: 'Payment', requests: 'Requests'
+  enroll: 'Enroll', payment: 'Payment', requests: 'Requests',
+  settings: 'Account Settings'
 };
 
 function showPanel(panel, el) {
@@ -29,6 +30,13 @@ function showPanel(panel, el) {
   }
   closeAllSidebars();
   if (panel === 'requests') loadStudentRequests();
+  if (panel === 'settings' && window.RCDAProfile) {
+    const c = document.getElementById('studSettingsPanel');
+    if (c && !c.dataset.rpLoaded) {
+      RCDAProfile.render({ container: c, mode: 'self' });
+      c.dataset.rpLoaded = '1';
+    }
+  }
 }
 
 /* ---- HANDBOOK (book-like chapters) ---- */
@@ -119,13 +127,6 @@ function escapeHtml(str) {
 async function loadStudentProfile() {
   const body = document.getElementById('studProfileBody');
   const API = STUD_API();
-
-  // Editable profile form (name, email, details, password).
-  const editBox = document.getElementById('studProfileEdit');
-  if (editBox && window.RCDAProfile && !editBox.dataset.rpLoaded) {
-    RCDAProfile.render({ container: editBox, mode: 'self', apiBase: RCDA_CONFIG.getApiBaseUrl() });
-    editBox.dataset.rpLoaded = '1';
-  }
 
   const [me, dash, pay, prog] = await Promise.all([
     RCDA.safeFetch(API + '/me'),

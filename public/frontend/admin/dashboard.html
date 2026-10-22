@@ -6,8 +6,8 @@
 <title>Admin Dashboard - RC Driving Academy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/base.css?v=41">
-<link rel="stylesheet" href="../css/admin.css?v=41">
+<link rel="stylesheet" href="../css/base.css?v=42">
+<link rel="stylesheet" href="../css/admin.css?v=42">
 </head>
 <body>
 
@@ -28,7 +28,7 @@
     </div>
     <nav class="sidebar-nav">
       <div class="sidebar-section-label">Management</div>
-      <div class="nav-item" onclick="openProfileModal()">
+      <div class="nav-item" onclick="showPanel('profile',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 016-6h4a6 6 0 016 6v1"/></svg>
         My Profile
       </div>
@@ -436,6 +436,10 @@
         </div>
       </div>
 
+      <div class="panel" id="admin-profile">
+        <div id="adminProfilePanel"></div>
+      </div>
+
     </div><!-- /dash-body -->
   </main>
 </div>
@@ -706,13 +710,27 @@
   </div>
 </div>
 
+<!-- EDIT USER PROFILE MODAL (admin edits any student/instructor profile) -->
+<div class="modal-overlay" id="userProfileModal">
+  <div class="modal-box" style="max-width:720px;">
+    <div class="modal-head">
+      <h3 id="userProfileTitle">Edit Profile</h3>
+      <button class="modal-close" onclick="closeModal('userProfileModal')">✕</button>
+    </div>
+    <div id="userProfileBody" style="padding:4px 0;"></div>
+    <div class="pay-modal-footer">
+      <button class="btn btn-sm btn-ghost" onclick="closeModal('userProfileModal')">Close</button>
+    </div>
+  </div>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
-<script src="../js/config.js?v=41"></script>
-<script src="../js/error-handler.js?v=41"></script>
-<script src="../js/shared.js?v=41"></script>
-<script src="../js/profile.js?v=41"></script>
-<script src="../js/admin.js?v=41"></script>
+<script src="../js/config.js?v=42"></script>
+<script src="../js/error-handler.js?v=42"></script>
+<script src="../js/shared.js?v=42"></script>
+<script src="../js/profile-panel.js?v=42"></script>
+<script src="../js/profile.js?v=42"></script>
+<script src="../js/admin.js?v=42"></script>
 </body>
 </html>

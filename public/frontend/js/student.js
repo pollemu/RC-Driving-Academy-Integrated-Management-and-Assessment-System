@@ -119,6 +119,14 @@ function escapeHtml(str) {
 async function loadStudentProfile() {
   const body = document.getElementById('studProfileBody');
   const API = STUD_API();
+
+  // Editable profile form (name, email, details, password).
+  const editBox = document.getElementById('studProfileEdit');
+  if (editBox && window.RCDAProfile && !editBox.dataset.rpLoaded) {
+    RCDAProfile.render({ container: editBox, mode: 'self', apiBase: RCDA_CONFIG.getApiBaseUrl() });
+    editBox.dataset.rpLoaded = '1';
+  }
+
   const [me, dash, pay, prog] = await Promise.all([
     RCDA.safeFetch(API + '/me'),
     RCDA.safeFetch(API + '/student/dashboard'),

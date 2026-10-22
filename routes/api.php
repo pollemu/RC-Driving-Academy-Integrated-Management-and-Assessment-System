@@ -35,6 +35,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/profile', [ProfileController::class, 'show']);
         Route::put('/profile', [ProfileController::class, 'update']);
         Route::post('/profile/password', [ProfileController::class, 'updatePassword']);
+        Route::post('/profile/verify-email', [ProfileController::class, 'sendVerification']);
+        Route::post('/profile/verify-email/confirm', [ProfileController::class, 'confirmVerification']);
         Route::post('/logout', [AuthController::class, 'logout']);
 
     Route::middleware('api.role:admin')->prefix('admin')->group(function () {
@@ -47,6 +49,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/bookings/{studentSchedule}/reject', [AdminStudentController::class, 'rejectBooking'])->name('api.admin.bookings.reject');
         Route::post('/users/{user}/set-role', [AdminUserController::class, 'setRole'])->name('api.admin.users.set-role');
         Route::get('/users/role-changes', [AdminUserController::class, 'roleChanges'])->name('api.admin.users.role-changes');
+        Route::get('/users/{user}/profile', [ProfileController::class, 'adminShow'])->name('api.admin.users.profile.show');
+        Route::put('/users/{user}/profile', [ProfileController::class, 'adminUpdate'])->name('api.admin.users.profile.update');
         Route::get('/notifications', [AdminReportController::class, 'notifications'])->name('api.admin.notifications');
         Route::post('/nlp/classify', [AdminNlpController::class, 'classify'])->name('api.admin.nlp.classify');
         Route::apiResource('instructors', AdminInstructorController::class)->except(['create', 'edit', 'show', 'update']);

@@ -6,8 +6,8 @@
 <title>Instructor Dashboard - RC Driving Academy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/base.css?v=41">
-<link rel="stylesheet" href="../css/instructor.css?v=41">
+<link rel="stylesheet" href="../css/base.css?v=42">
+<link rel="stylesheet" href="../css/instructor.css?v=42">
 </head>
 <body>
 
@@ -28,7 +28,7 @@
     </div>
     <nav class="sidebar-nav">
       <div class="sidebar-section-label">Instructor</div>
-      <div class="nav-item" onclick="openProfileModal()">
+      <div class="nav-item" onclick="showPanel('profile',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 016-6h4a6 6 0 016 6v1"/></svg>
         My Profile
       </div>
@@ -232,6 +232,10 @@
         </div>
       </div>
 
+      <div class="panel" id="instr-profile">
+        <div id="instrProfilePanel"></div>
+      </div>
+
     </div><!-- /dash-body -->
   </main>
 
@@ -270,10 +274,11 @@
   </div>
 </div>
 
-<script src="../js/config.js?v=41"></script>
-<script src="../js/error-handler.js?v=41"></script>
-<script src="../js/shared.js?v=41"></script>
-<script src="../js/profile.js?v=41"></script>
-<script src="../js/instructor.js?v=41"></script>
+<script src="../js/config.js?v=42"></script>
+<script src="../js/error-handler.js?v=42"></script>
+<script src="../js/shared.js?v=42"></script>
+<script src="../js/profile-panel.js?v=42"></script>
+<script src="../js/profile.js?v=42"></script>
+<script src="../js/instructor.js?v=42"></script>
 </body>
 </html>

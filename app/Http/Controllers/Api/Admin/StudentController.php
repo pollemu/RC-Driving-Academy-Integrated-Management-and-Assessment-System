@@ -36,6 +36,7 @@ class StudentController extends Controller
 
             return [
                 'id' => $student->id,
+                'user_id' => $student->user_id,
                 'name' => $student->user->name,
                 'email' => $student->user->email,
                 'phone' => $student->phone,

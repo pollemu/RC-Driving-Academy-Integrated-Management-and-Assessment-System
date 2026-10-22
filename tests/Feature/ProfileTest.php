@@ -86,4 +86,109 @@ class ProfileTest extends TestCase
         $this->postJson('/api/password/forgot', ['email' => 'someone@example.com'])
             ->assertStatus(503);
     }
+
+    public function test_changing_email_clears_the_verified_flag(): void
+    {
+        $user = User::factory()->student()->create(['email_verified_at' => now()]);
+        Student::factory()->create(['user_id' => $user->id]);
+
+        $this->actingAs($user)->putJson('/api/profile', [
+            'name' => 'Still Same',
+            'email' => 'moved@example.com',
+        ])->assertOk();
+
+        $this->assertNull($user->fresh()->email_verified_at);
+    }
+
+    public function test_verification_code_is_stubbed_until_a_channel_is_live(): void
+    {
+        $user = User::factory()->student()->unverified()->create();
+
+        $this->actingAs($user)->postJson('/api/profile/verify-email')
+            ->assertStatus(503)
+            ->assertJsonPath('ok', false);
+    }
+
+    public function test_verification_code_can_be_sent_and_confirmed(): void
+    {
+        config(['services.email_verification.enabled' => true]);
+
+        $user = User::factory()->student()->unverified()->create();
+
+        $this->actingAs($user)->postJson('/api/profile/verify-email')
+            ->assertOk()
+            ->assertJsonPath('ok', true);
+
+        $this->assertNotNull($user->fresh()->email_verification_code);
+
+        // A wrong code is rejected.
+        $this->actingAs($user)->postJson('/api/profile/verify-email/confirm', ['code' => '000000'])
+            ->assertStatus(422);
+
+        // The real code (stored hashed) is accepted.
+        $code = '123456';
+        $user->forceFill([
+            'email_verification_code' => Hash::make($code),
+            'email_verification_expires_at' => now()->addMinutes(15),
+        ])->save();
+
+        $this->actingAs($user)->postJson('/api/profile/verify-email/confirm', ['code' => $code])
+            ->assertOk()
+            ->assertJsonPath('ok', true);
+
+        $this->assertNotNull($user->fresh()->email_verified_at);
+    }
+
+    public function test_already_verified_email_needs_no_code(): void
+    {
+        $user = User::factory()->student()->create(['email_verified_at' => now()]);
+
+        $this->actingAs($user)->postJson('/api/profile/verify-email')
+            ->assertOk()
+            ->assertJsonPath('already_verified', true);
+    }
+
+    public function test_admin_can_read_and_update_any_profile(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $student = User::factory()->student()->create(['name' => 'Student One']);
+        $profile = Student::factory()->create(['user_id' => $student->id]);
+
+        $this->actingAs($admin)->getJson("/api/admin/users/{$student->id}/profile")
+            ->assertOk()
+            ->assertJsonPath('user.name', 'Student One')
+            ->assertJsonPath('user.role', 'student');
+
+        $this->actingAs($admin)->putJson("/api/admin/users/{$student->id}/profile", [
+            'name' => 'Renamed By Admin',
+            'email' => $student->email,
+            'phone' => '09181234567',
+        ])->assertOk()->assertJsonPath('user.name', 'Renamed By Admin');
+
+        $this->assertDatabaseHas('users', ['id' => $student->id, 'name' => 'Renamed By Admin']);
+        $this->assertDatabaseHas('students', ['id' => $profile->id, 'phone' => '09181234567']);
+    }
+
+    public function test_admin_can_reset_another_users_password(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $student = User::factory()->student()->create(['password' => Hash::make('oldpassword')]);
+
+        $this->actingAs($admin)->putJson("/api/admin/users/{$student->id}/profile", [
+            'name' => $student->name,
+            'email' => $student->email,
+            'password' => 'resetpassword123',
+        ])->assertOk();
+
+        $this->assertTrue(Hash::check('resetpassword123', $student->fresh()->password));
+    }
+
+    public function test_non_admin_cannot_edit_another_users_profile(): void
+    {
+        $student = User::factory()->student()->create();
+        $other = User::factory()->student()->create();
+
+        $this->actingAs($student)->getJson("/api/admin/users/{$other->id}/profile")
+            ->assertStatus(403);
+    }
 }

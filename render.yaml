@@ -76,6 +76,11 @@ services:
       - key: MAIL_PASSWORD
         sync: false
 
+      # Email verification codes for "My Profile".
+      # Off until an email channel can actually deliver (Brevo HTTPS API).
+      - key: EMAIL_VERIFICATION_ENABLED
+        value: "false"
+
       # SMS (Semaphore)
       - key: SMS_ENABLED
         value: "true"

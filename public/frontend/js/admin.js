@@ -6,7 +6,7 @@ const ADMIN_TITLES = {
   dashboard:'Dashboard', students:'Students', schedule:'Schedule',
   attendance:'Instructor Attendance', instructors:'Instructors',
   payments:'Payments', certifications:'Certifications', reports:'Reports',
-  notifications:'Notifications', bookings:'Pending Bookings', requests:'Student Requests', ai:'Grading AI'
+  notifications:'Notifications', bookings:'Pending Bookings', requests:'Student Requests', ai:'Grading AI', profile:'My Profile'
 };
 
 function showPanel(panel, el){
@@ -28,6 +28,15 @@ function showPanel(panel, el){
   if (panel === 'reports') loadReports();
   if (panel === 'notifications') loadNotifications();
   if (panel === 'requests') loadAdminRequests();
+  if (panel === 'profile') {
+    if (window.RCDAProfile) {
+      const c = document.getElementById('adminProfilePanel');
+      if (c && !c.dataset.rpLoaded) {
+        RCDAProfile.render({ container: c, mode: 'self', apiBase: RCDA_CONFIG.getApiBaseUrl() });
+        c.dataset.rpLoaded = '1';
+      }
+    }
+  }
 }
 
 function markAttend(btn, type){
@@ -242,7 +251,7 @@ function renderStudents(students, pagination){
       <td><span class="badge ${payBadge}">${escapeHtml(st.payment_status)}</span></td>
       <td><span class="badge ${statusBadge}">${status}</span></td>
       <td>${instructor}</td>
-      <td><div style="display:flex;gap:6px;"><button class="btn btn-sm btn-ghost" onclick="viewStudent(this)">View</button><button class="btn btn-sm btn-primary" onclick="openAssignInstructorModal(${st.id})">Assign</button><button class="btn btn-sm btn-ghost" onclick="toggleStudentActive(${st.id})">${st.is_active ? 'Deactivate' : 'Activate'}</button><button class="btn btn-sm btn-danger" onclick="deleteStudent(this)">Delete</button></div></td>
+      <td><div style="display:flex;gap:6px;"><button class="btn btn-sm btn-ghost" onclick="viewStudent(this)">View</button><button class="btn btn-sm btn-ghost" onclick="openUserProfile(${st.user_id || 0},'${escapeHtml(st.name).replace(/'/g, "\\'")}')">Edit Profile</button><button class="btn btn-sm btn-primary" onclick="openAssignInstructorModal(${st.id})">Assign</button><button class="btn btn-sm btn-ghost" onclick="toggleStudentActive(${st.id})">${st.is_active ? 'Deactivate' : 'Activate'}</button><button class="btn btn-sm btn-danger" onclick="deleteStudent(this)">Delete</button></div></td>
     </tr>`;
   }).join('') || `<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">No students yet.</td></tr>`;
   filterStudents();
@@ -282,7 +291,7 @@ function renderInstructors(instructors, pagination){
       <td>—</td>
       <td>—</td>
       <td><span class="badge ${statusBadge}">${status}</span></td>
-      <td><div style="display:flex;gap:6px;"><button class="btn btn-sm btn-ghost" onclick="toggleInstructorActive(${ins.id})">${ins.is_active ? 'Deactivate' : 'Activate'}</button><button class="btn btn-sm btn-danger" onclick="deleteInstructor(this)">Delete</button></div></td>
+      <td><div style="display:flex;gap:6px;"><button class="btn btn-sm btn-ghost" onclick="openUserProfile(${ins.user_id || 0},'${escapeHtml(ins.name).replace(/'/g, "\\'")}')">Edit Profile</button><button class="btn btn-sm btn-ghost" onclick="toggleInstructorActive(${ins.id})">${ins.is_active ? 'Deactivate' : 'Activate'}</button><button class="btn btn-sm btn-danger" onclick="deleteInstructor(this)">Delete</button></div></td>
     </tr>`;
   }).join('') || `<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">No instructors yet.</td></tr>`;
   filterInstructors();
@@ -357,6 +366,23 @@ async function openAssignInstructorModal(studentId){
       ADMIN_INSTRUCTORS.map(i => `<option value="${i.id}">${escapeHtml(i.name)}</option>`).join('');
   }
   openModal('assignInstructorModal');
+}
+
+/* Admin edits the full profile (name, email, details) of any
+   student or instructor, and can reset their password. */
+function openUserProfile(userId, name){
+  if (!userId) { RCDA.showToast('Could not identify that user.', 'error'); return; }
+  const title = document.getElementById('userProfileTitle');
+  if (title) title.textContent = 'Edit Profile — ' + (name || 'User');
+  openModal('userProfileModal');
+  if (window.RCDAProfile) {
+    RCDAProfile.render({
+      container: document.getElementById('userProfileBody'),
+      mode: 'adminEdit',
+      userId: userId,
+      apiBase: RCDA_CONFIG.getApiBaseUrl()
+    });
+  }
 }
 
 async function submitAssignInstructor(){

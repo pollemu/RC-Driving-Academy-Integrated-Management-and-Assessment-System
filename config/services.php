@@ -44,6 +44,11 @@ return [
         'api_key' => env('GOOGLE_MAPS_API_KEY'),
     ],
 
+    'email_verification' => [
+        // Off until an email channel (Brevo HTTPS API / SMTP) is live.
+        'enabled' => (bool) env('EMAIL_VERIFICATION_ENABLED', false),
+    ],
+
     'paymongo' => [
         'public' => env('PAYMONGO_PUBLIC_KEY'),
         'secret' => env('PAYMONGO_SECRET_KEY'),

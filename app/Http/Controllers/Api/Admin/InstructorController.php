@@ -17,6 +17,7 @@ class InstructorController extends Controller
         $data = $instructors->getCollection()->map(function (Instructor $instructor) {
             return [
                 'id' => $instructor->id,
+                'user_id' => $instructor->user_id,
                 'name' => $instructor->user->name,
                 'email' => $instructor->user->email,
                 'phone' => $instructor->phone,

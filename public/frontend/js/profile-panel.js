@@ -191,7 +191,6 @@
 
       html += '<div class="rp-actions">' +
         '<button class="btn btn-primary" onclick="RCDAProfile.saveProfile(this)">Save Changes</button>' +
-        '<a href="#" class="rp-link" onclick="RCDAProfile.requestForgotPassword(event)">Forgot password?</a>' +
         '</div>';
 
       if (isSelf && !user.email_verified) {
@@ -221,7 +220,9 @@
       html += '<p class="rp-hint">Password must be at least 8 characters.</p>';
       html += '<div class="rp-actions">' +
         '<button class="btn btn-primary" onclick="RCDAProfile.savePassword(this)">' +
-        (isSelf ? 'Update Password' : 'Reset Password') + '</button></div>';
+        (isSelf ? 'Update Password' : 'Reset Password') + '</button>' +
+        (isSelf ? '<a href="#" class="rp-link" onclick="RCDAProfile.requestForgotPassword(event)">Forgot password?</a>' : '') +
+        '</div>';
       html += '</div></div>';
 
       html += '</div>';

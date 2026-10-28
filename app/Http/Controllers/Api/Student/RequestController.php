@@ -20,7 +20,7 @@ class RequestController extends Controller
     {
         $student = $request->user()->student;
 
-        $items = $student->requests()->latest()->get()->map(function (StudentRequest $r) {
+        $items = $student->requests()->with(['fromSchedule.course', 'schedule.course', 'preferredInstructor.user'])->latest()->get()->map(function (StudentRequest $r) {
             return $this->shape($r);
         });
 
@@ -246,12 +246,16 @@ class RequestController extends Controller
                 'date' => $r->fromSchedule->date?->format('Y-m-d'),
                 'time_start' => $r->fromSchedule->time_start,
                 'time_end' => $r->fromSchedule->time_end,
+                'course' => $r->fromSchedule->course?->name,
+                'course_id' => $r->fromSchedule->course_id,
             ] : null,
             'to_schedule' => $r->schedule ? [
                 'id' => $r->schedule->id,
                 'date' => $r->schedule->date?->format('Y-m-d'),
                 'time_start' => $r->schedule->time_start,
                 'time_end' => $r->schedule->time_end,
+                'course' => $r->schedule->course?->name,
+                'course_id' => $r->schedule->course_id,
             ] : null,
             'created_at' => $r->created_at,
         ];

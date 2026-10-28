@@ -50,6 +50,11 @@ function showPanel(panel, el){
       }
     }
   }
+  if (panel === 'students') loadStudents();
+  if (panel === 'instructors') loadInstructors();
+  if (panel === 'payments') loadPayments();
+  if (panel === 'bookings') loadBookings();
+  if (panel === 'attendance') loadInstructorAttendance();
   if (typeof rememberPanel === 'function') rememberPanel(panel);
 }
 

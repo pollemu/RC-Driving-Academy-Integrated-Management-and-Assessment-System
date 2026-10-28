@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdminNotification;
 use App\Models\Certification;
 use App\Models\Course;
 use App\Models\Enrollment;
@@ -15,21 +16,40 @@ class CertificationController extends Controller
 {
     public function index()
     {
-        $certifications = Certification::with(['student.user', 'course'])->latest()->get();
+        $certifications = Certification::with(['student.user', 'course', 'issuedBy'])->latest('issued_at')->latest('id')->get();
 
-        $data = $certifications->map(function (Certification $certification) {
-            return [
-                'id' => $certification->id,
-                'student_name' => $certification->student->user->name,
-                'student_id' => $certification->student_id,
-                'course' => ['name' => $certification->course->name],
-                'certificate_no' => $certification->certificate_no,
-                'status' => $certification->status,
-                'issued_at' => $certification->issued_at,
-            ];
-        });
+        $data = $certifications->map(fn (Certification $certification) => $this->payload($certification));
 
         return response()->json(['certifications' => $data]);
+    }
+
+    /* One certificate, with everything the admin UI needs to re-open and print
+       it long after it was issued. */
+    public function show(Certification $certification)
+    {
+        $certification->load(['student.user', 'course', 'issuedBy']);
+
+        return response()->json(['certification' => $this->payload($certification)]);
+    }
+
+    protected function payload(Certification $certification): array
+    {
+        return [
+            'id' => $certification->id,
+            'student_id' => $certification->student_id,
+            'student_name' => $certification->student?->user?->name,
+            'course_id' => $certification->course_id,
+            'course' => [
+                'id' => $certification->course?->id,
+                'name' => $certification->course?->name,
+                'type' => $certification->course?->type,
+                'format' => $certification->course?->format,
+            ],
+            'certificate_no' => $certification->certificate_no,
+            'status' => $certification->status,
+            'issued_at' => $certification->issued_at?->toIso8601String(),
+            'issued_by' => $certification->issuedBy?->name,
+        ];
     }
 
     public function coursesFor(Student $student)
@@ -154,6 +174,24 @@ class CertificationController extends Controller
                 $certification->student,
                 $certification->course->name,
                 $certification->certificate_no
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        try {
+            AdminNotification::push(
+                AdminNotification::CATEGORY_CERTIFICATE,
+                'Certificate issued',
+                $certification->certificate_no . ' — '
+                    . ($certification->student->user?->name ?? 'A student')
+                    . ' (' . $certification->course->name . ').',
+                [
+                    'certification_id' => $certification->id,
+                    'student_id' => $certification->student_id,
+                    'panel' => 'certifications',
+                ],
+                $certification->student->user_id
             );
         } catch (\Throwable $e) {
             report($e);

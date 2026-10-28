@@ -13,14 +13,18 @@
             <label>Feedback / Observations</label>
             <textarea name="raw_text" required>{{ old('raw_text', $feedback->raw_text ?? '') }}</textarea>
         </div>
-        <div class="grid">
-            @foreach(['steering'=>'Steering','speed'=>'Speed','lane'=>'Lane','parking'=>'Parking','safety'=>'Safety','mirror'=>'Mirror'] as $k=>$lbl)
-                <div class="form-group">
-                    <label>{{ $lbl }} (1-5)</label>
-                    <input type="number" name="star_{{ $k }}" min="1" max="5" value="{{ old('star_'.$k, $feedback->{'star_'.$k} ?? '') }}">
-                </div>
-            @endforeach
-        </div>
+        @if($schedule->course->type === 'PDC')
+            <div class="grid">
+                @foreach(['steering'=>'Steering','brake'=>'Braking','mirror'=>'Side Mirror &amp; Observation'] as $k=>$lbl)
+                    <div class="form-group">
+                        <label>{!! $lbl !!} (1-5)</label>
+                        <input type="number" name="star_{{ $k }}" min="1" max="5" value="{{ old('star_'.$k, $feedback->{'star_'.$k} ?? '') }}">
+                    </div>
+                @endforeach
+            </div>
+        @else
+            <p class="muted">TDC is exam-only — use the exam score field in the assessment screen.</p>
+        @endif
         <button class="btn" type="submit">Save Feedback</button>
     </form>
 </div>

@@ -20,10 +20,7 @@ class FeedbackFactory extends Factory
             'schedule_id' => Schedule::factory(),
             'raw_text' => fake()->paragraph(),
             'star_steering' => fake()->numberBetween(1, 5),
-            'star_speed' => fake()->numberBetween(1, 5),
-            'star_lane' => fake()->numberBetween(1, 5),
-            'star_parking' => fake()->numberBetween(1, 5),
-            'star_safety' => fake()->numberBetween(1, 5),
+            'star_brake' => fake()->numberBetween(1, 5),
             'star_mirror' => fake()->numberBetween(1, 5),
         ];
     }

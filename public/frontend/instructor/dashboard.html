@@ -6,10 +6,16 @@
 <title>Instructor Dashboard - RC Driving Academy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/base.css?v=44">
-<link rel="stylesheet" href="../css/instructor.css?v=44">
+<link rel="stylesheet" href="../css/base.css?v=65">
+<link rel="stylesheet" href="../css/instructor.css?v=65">
 </head>
 <body>
+
+<!-- Opaque splash: covers the dashboard until its data has loaded -->
+<div id="rcdaPageLoading" class="show" role="status" aria-live="polite">
+  <div class="rcda-pl-card"><div class="rcda-pl-spin"></div><div class="rcda-pl-label">Loading…</div></div>
+</div>
+<noscript><style>#rcdaPageLoading{display:none!important;}</style></noscript>
 
 <div class="dash-shell">
 
@@ -159,7 +165,7 @@
           <div class="card-head">
             <div>
               <h3>Assess a Student</h3>
-              <p style="font-size:12.5px;color:var(--gray);margin-top:3px;">Rate each driving skill, then pick a quick note (Average) per category. The student's training suggestion is generated from these.</p>
+              <p style="font-size:12.5px;color:var(--gray);margin-top:3px;">PDC: rate steering, braking and side-mirror observation (1–5 stars), then describe the performance below. The AI reads your feedback and predicts Fast Learner, Average Learner, or Needs Improvement. TDC is exam-only.</p>
             </div>
           </div>
           <div class="two-col">
@@ -173,15 +179,13 @@
                 </div>
               </div>
 
-              <p style="font-size:12.5px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 12px;" id="ratingLabel">Skills Rating</p>
+              <p style="font-size:12.5px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 12px;" id="ratingLabel">PDC Skills Rating</p>
               <div class="skills-rating-grid" id="skillsGrid">
-                <div class="skill-rate-row" data-cat="steering"><label>Steering Control</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span></div><div class="preset-btns"><button type="button" class="pbtn" onclick="pickNote(this,'steering')">Average</button></div></div>
-                <div class="skill-rate-row" data-cat="speed"><label>Speed Management</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span></div><div class="preset-btns"><button type="button" class="pbtn" onclick="pickNote(this,'speed')">Average</button></div></div>
-                <div class="skill-rate-row" data-cat="lane"><label>Lane Discipline</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span></div><div class="preset-btns"><button type="button" class="pbtn" onclick="pickNote(this,'lane')">Average</button></div></div>
-                <div class="skill-rate-row" data-cat="parking"><label>Parking</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span></div><div class="preset-btns"><button type="button" class="pbtn" onclick="pickNote(this,'parking')">Average</button></div></div>
-                <div class="skill-rate-row" data-cat="safety"><label>Safety Awareness</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span></div><div class="preset-btns"><button type="button" class="pbtn" onclick="pickNote(this,'safety')">Average</button></div></div>
-                <div class="skill-rate-row" data-cat="mirror"><label>Mirror &amp; Observation</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span></div><div class="preset-btns"><button type="button" class="pbtn" onclick="pickNote(this,'mirror')">Average</button></div></div>
+                <div class="skill-rate-row" data-cat="steering"><label>Steering Control</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span></div></div>
+                <div class="skill-rate-row" data-cat="brake"><label>Braking</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span></div></div>
+                <div class="skill-rate-row" data-cat="mirror"><label>Side Mirror &amp; Observation</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span></div></div>
               </div>
+              <p style="font-size:12px;color:var(--gray);margin-top:8px;">Tap a star to rate 1–5. All three skills are required for PDC.</p>
 
               <div class="field" id="examField" style="display:none;margin-top:18px;">
                 <label>Exam Score (%)</label>
@@ -282,11 +286,11 @@
   </div>
 </div>
 
-<script src="../js/config.js?v=44"></script>
-<script src="../js/error-handler.js?v=44"></script>
-<script src="../js/shared.js?v=44"></script>
-<script src="../js/profile-panel.js?v=44"></script>
-<script src="../js/profile.js?v=44"></script>
-<script src="../js/instructor.js?v=44"></script>
+<script src="../js/config.js?v=65"></script>
+<script src="../js/error-handler.js?v=65"></script>
+<script src="../js/shared.js?v=65"></script>
+<script src="../js/profile-panel.js?v=65"></script>
+<script src="../js/profile.js?v=65"></script>
+<script src="../js/instructor.js?v=65"></script>
 </body>
 </html>

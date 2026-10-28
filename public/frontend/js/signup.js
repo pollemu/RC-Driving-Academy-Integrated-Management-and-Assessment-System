@@ -24,7 +24,11 @@ function registerAccount(){
 
   const allFilled = validateRequiredFields(['regFirst','regLast','regEmail','regPhone','regPass','regPassConfirm']);
   if(!allFilled){ if(errEl){ errEl.style.display='block'; errEl.textContent='Please fill in all fields.'; } return; }
+  if(!isValidPersonName(first)){ setFieldError('regFirst', true); clearFieldErrorOnInput('regFirst'); if(errEl){ errEl.style.display='block'; errEl.textContent='First name should use letters only (2–40 characters).'; } return; }
+  if(!isValidPersonName(last)){ setFieldError('regLast', true); clearFieldErrorOnInput('regLast'); if(errEl){ errEl.style.display='block'; errEl.textContent='Last name should use letters only (2–40 characters).'; } return; }
+  if(`${first} ${last}`.replace(/\s+/g, ' ').trim().length > 60){ setFieldError('regLast', true); clearFieldErrorOnInput('regLast'); if(errEl){ errEl.style.display='block'; errEl.textContent='Your full name must be 60 characters or fewer.'; } return; }
   if(!/^\S+@\S+\.\S+$/.test(email)){ setFieldError('regEmail', true); clearFieldErrorOnInput('regEmail'); if(errEl){ errEl.style.display='block'; errEl.textContent='Please enter a valid email address.'; } return; }
+  if(!isValidPhMobile(phone)){ setFieldError('regPhone', true); clearFieldErrorOnInput('regPhone'); if(errEl){ errEl.style.display='block'; errEl.textContent='Enter an 11-digit mobile number starting with 09 (numbers only).'; } return; }
   if(pass !== confirm){ setFieldError('regPass', true); setFieldError('regPassConfirm', true); clearFieldErrorOnInput('regPass'); clearFieldErrorOnInput('regPassConfirm'); if(errEl){ errEl.style.display='block'; errEl.textContent='Passwords do not match.'; } return; }
   if(pass.length < 8){ setFieldError('regPass', true); clearFieldErrorOnInput('regPass'); if(errEl){ errEl.style.display='block'; errEl.textContent='Password must be at least 8 characters.'; } return; }
   if(!consent){ setFieldError('regConsent', true); clearFieldErrorOnInput('regConsent'); if(errEl){ errEl.style.display='block'; errEl.textContent='Please agree to the Terms & Conditions and Privacy Policy to continue.'; } return; }
@@ -35,7 +39,7 @@ function registerAccount(){
   (async () => {
     const reg = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/register`, {
       method: 'POST',
-      body: { name: `${first} ${last}`, email, phone, password: pass, password_confirmation: confirm }
+      body: { name: `${first} ${last}`.replace(/\s+/g, ' ').trim(), email, phone, password: pass, password_confirmation: confirm }
     });
     if (!reg.ok) {
       if (btn) { btn.disabled = false; btn.classList.remove('loading'); }

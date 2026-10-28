@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdminNotification;
 use App\Models\Student;
 use App\Models\User;
 use App\Notifications\NotificationService;
+use App\Support\Phone;
+use App\Support\ValidationRules;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -44,12 +47,14 @@ class AuthController extends Controller
 
     public function register(Request $request)
     {
+        $request->merge(['phone' => Phone::normalize($request->input('phone'))]);
+
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ValidationRules::NAME,
             'email' => ['required', 'email', 'max:255', 'unique:users'],
-            'phone' => ['nullable', 'string', 'max:50'],
-            'address' => ['nullable', 'string'],
-            'birthdate' => ['nullable', 'date'],
+            'phone' => ValidationRules::PHONE,
+            'address' => ['nullable', 'string', 'max:500'],
+            'birthdate' => ['nullable', 'date', 'before:today'],
             'license_type' => ['nullable', 'in:non-pro,pro,student-permit'],
             'gender' => ['nullable', 'in:male,female,other'],
             'preferred_instructor_gender' => ['nullable', 'in:male,female,any'],
@@ -64,7 +69,7 @@ class AuthController extends Controller
             'is_active' => true,
         ]);
 
-        $user->student()->save(new Student([
+        $student = $user->student()->save(new Student([
             'phone' => $data['phone'] ?? null,
             'address' => $data['address'] ?? null,
             'birthdate' => $data['birthdate'] ?? null,
@@ -79,6 +84,18 @@ class AuthController extends Controller
 
         try {
             (new NotificationService())->registration($user);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        try {
+            AdminNotification::push(
+                AdminNotification::CATEGORY_ACCOUNT,
+                'New student account',
+                "{$user->name} just created an account ({$user->email}).",
+                ['student_id' => $student->id, 'panel' => 'students'],
+                $user->id
+            );
         } catch (\Throwable $e) {
             report($e);
         }

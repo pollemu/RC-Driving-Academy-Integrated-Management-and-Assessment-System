@@ -60,19 +60,16 @@ class FeedbackController extends Controller
 
         $isTdc = $schedule->course->type === 'TDC';
 
+        // PDC always rates the three practical skills. TDC is exam-only, so
+        // those fields are simply absent and stay nullable.
+        $starRule = $isTdc ? 'nullable' : 'required';
         $rules = [
             'raw_text' => ['required', 'string', 'min:10'],
-            'star_steering' => ['nullable', 'integer', 'between:1,5'],
-            'star_speed' => ['nullable', 'integer', 'between:1,5'],
-            'star_lane' => ['nullable', 'integer', 'between:1,5'],
-            'star_parking' => ['nullable', 'integer', 'between:1,5'],
-            'star_safety' => ['nullable', 'integer', 'between:1,5'],
-            'star_mirror' => ['nullable', 'integer', 'between:1,5'],
+            'star_steering' => [$starRule, 'integer', 'between:1,5'],
+            'star_brake' => [$starRule, 'integer', 'between:1,5'],
+            'star_mirror' => [$starRule, 'integer', 'between:1,5'],
             'note_steering' => ['nullable', 'string', 'max:120'],
-            'note_speed' => ['nullable', 'string', 'max:120'],
-            'note_lane' => ['nullable', 'string', 'max:120'],
-            'note_parking' => ['nullable', 'string', 'max:120'],
-            'note_safety' => ['nullable', 'string', 'max:120'],
+            'note_brake' => ['nullable', 'string', 'max:120'],
             'note_mirror' => ['nullable', 'string', 'max:120'],
             'exam_score' => $isTdc ? ['required', 'numeric', 'between:0,100'] : ['nullable', 'numeric', 'between:0,100'],
         ];
@@ -84,68 +81,43 @@ class FeedbackController extends Controller
         );
 
         $queued = false;
-        if ($schedule->course->type === 'PDC') {
-            ProcessAssessment::dispatch($feedback);
-            $queued = true;
-        }
+        $exam = $data['exam_score'] ?? null;
 
         // TDC is classroom theory — graded by EXAM score only (no driving stars).
-        // PDC is behind-the-wheel — graded by the driving star ratings (+optional exam).
+        // PDC is behind-the-wheel — graded by steering / braking / side mirror
+        // star ratings plus the instructor's written feedback.
         if ($isTdc) {
-            $exam = $data['exam_score'] ?? null;
-            $score = $exam;
-            $passed = $exam !== null ? $exam >= 75 : null;
-            $classification = $exam === null ? 'avg'
-                : ($exam >= 85 ? 'fast' : ($exam >= 75 ? 'avg' : 'needs'));
             $stars = [];
+            $notes = [];
+            $score = $exam;
+            $classification = $exam === null ? 'average'
+                : ($exam >= 85 ? 'fast' : ($exam >= 75 ? 'average' : 'needs'));
+            $built = ['failed' => [], 'suggestions' => []];
         } else {
             $stars = [
                 'steering' => $feedback->star_steering,
-                'speed'    => $feedback->star_speed,
-                'lane'     => $feedback->star_lane,
-                'parking'  => $feedback->star_parking,
-                'safety'   => $feedback->star_safety,
+                'brake'    => $feedback->star_brake,
                 'mirror'   => $feedback->star_mirror,
             ];
-        }
-        $notes = [
-            'steering' => $feedback->note_steering,
-            'speed'    => $feedback->note_speed,
-            'lane'     => $feedback->note_lane,
-            'parking'  => $feedback->note_parking,
-            'safety'   => $feedback->note_safety,
-            'mirror'   => $feedback->note_mirror,
-        ];
+            $notes = [
+                'steering' => $feedback->note_steering,
+                'brake'    => $feedback->note_brake,
+                'mirror'   => $feedback->note_mirror,
+            ];
 
-        $built = AssessmentSuggestion::build($stars, $notes);
-
-        // For PDC, classify from the driving stars; for TDC we already set
-        // $classification from the exam score above.
-        if (! $isTdc) {
+            $built = AssessmentSuggestion::build($stars, $notes);
             $classification = AssessmentSuggestion::classify($stars);
-        }
 
-        // Composite score + pass/fail.
-        //  - TDC: exam score only (classroom theory, no driving stars).
-        //  - PDC: practical star average (0-5 -> 0-100), blended 50/50 with
-        //    exam if one was recorded. Passed when score >= 75.
-        if ($isTdc) {
-            $exam = $data['exam_score'] ?? null;
-            $avg = null;
-            $practical = null;
-            $score = $exam;
-        } else {
+            // Practical star average (0-5 -> 0-100), blended 50/50 with an
+            // optional exam score. Passed when score >= 75.
             $avg = collect($stars)->filter()->avg();
             $practical = $avg ? round($avg / 5 * 100, 2) : null;
-            $exam = $data['exam_score'] ?? null;
             if ($practical !== null && $exam !== null) {
                 $score = round(($practical + $exam) / 2, 2);
             } elseif ($practical !== null) {
                 $score = $practical;
-            } elseif ($exam !== null) {
-                $score = $exam;
             } else {
-                $score = null;
+                $score = $exam;
             }
         }
         $passed = $score !== null ? $score >= 75 : null;
@@ -169,6 +141,15 @@ class FeedbackController extends Controller
             ]
         );
 
+        // Enrich with the NLP model *after* the rule-based assessment exists,
+        // otherwise a synchronous queue would see no assessment to enrich.
+        if (! $isTdc) {
+            ProcessAssessment::dispatch($feedback);
+            $queued = true;
+        }
+
+        $final = Assessment::where('feedback_id', $feedback->id)->first();
+
         // Mark the student's booking for this session as finished, and finish
         // the schedule itself once every booked student has been assessed.
         StudentSchedule::where('schedule_id', $schedule->id)
@@ -184,6 +165,13 @@ class FeedbackController extends Controller
 
         return response()->json([
             'feedback' => ['id' => $feedback->id],
+            'assessment' => [
+                'classification' => $final?->classification ?? $classification,
+                'confidence_score' => $final?->confidence_score,
+                'score' => $final?->score ?? $score,
+                'passed' => $final?->passed ?? $passed,
+                'course_type' => $schedule->course->type,
+            ],
             'queued' => $queued,
         ]);
     }

@@ -7,6 +7,8 @@ use App\Models\Enrollment;
 use App\Models\Student;
 use App\Models\StudentSchedule;
 use App\Models\User;
+use App\Support\Phone;
+use App\Support\ValidationRules;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
@@ -43,6 +45,7 @@ class StudentController extends Controller
                 'license_type' => $student->license_type,
                 'course' => $courseLabel,
                 'payment_status' => $paymentStatus,
+                'id_status' => $student->id_status ?: Student::ID_NONE,
                 'is_active' => $student->user->is_active,
                 'instructor_name' => optional($student->instructor)->user->name ?? null,
                 'created_at' => $student->user->created_at,
@@ -69,12 +72,14 @@ class StudentController extends Controller
 
     public function store(Request $request)
     {
+        $request->merge(['phone' => Phone::normalize($request->input('phone'))]);
+
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ValidationRules::NAME,
             'email' => ['required', 'email', 'max:255', 'unique:users'],
-            'phone' => ['nullable', 'string', 'max:50'],
-            'address' => ['nullable', 'string'],
-            'birthdate' => ['nullable', 'date'],
+            'phone' => ValidationRules::PHONE,
+            'address' => ['nullable', 'string', 'max:500'],
+            'birthdate' => ['nullable', 'date', 'before:today'],
             'license_type' => ['nullable', 'in:non-pro,pro,student-permit'],
             'password' => ['required', 'string', 'min:8'],
         ]);
@@ -101,12 +106,14 @@ class StudentController extends Controller
 
     public function update(Request $request, Student $student)
     {
+        $request->merge(['phone' => Phone::normalize($request->input('phone'))]);
+
         $data = $request->validate([
-            'name' => ['nullable', 'string', 'max:255'],
+            'name' => ValidationRules::NAME,
             'email' => ['nullable', 'email', 'max:255', 'unique:users,email,' . $student->user_id],
-            'phone' => ['nullable', 'string', 'max:50'],
-            'address' => ['nullable', 'string'],
-            'birthdate' => ['nullable', 'date'],
+            'phone' => ValidationRules::PHONE,
+            'address' => ['nullable', 'string', 'max:500'],
+            'birthdate' => ['nullable', 'date', 'before:today'],
             'license_type' => ['nullable', 'in:non-pro,pro,student-permit'],
         ]);
 
@@ -178,14 +185,15 @@ class StudentController extends Controller
                     'schedule' => [
                         'id' => $booking->schedule->id,
                         'date' => $booking->schedule->date?->format('Y-m-d'),
+                        'end_date' => $booking->schedule->end_date?->format('Y-m-d'),
                         'time_start' => $booking->schedule->time_start,
                         'time_end' => $booking->schedule->time_end,
                         'venue' => $booking->schedule->venue,
                         'course' => $booking->schedule->course->name,
-                        'instructor' => [
+                        'instructor' => $booking->schedule->instructor ? [
                             'id' => $booking->schedule->instructor->id,
-                            'name' => $booking->schedule->instructor->user->name,
-                        ],
+                            'name' => $booking->schedule->instructor->user?->name,
+                        ] : null,
                     ],
                 ];
             });

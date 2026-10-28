@@ -137,26 +137,39 @@ class DatabaseSeeder extends Seeder
             return $date->dayOfWeek === Carbon::SUNDAY ? $date->copy()->addDay() : $date;
         };
 
-        // Sessions: TDC sessions hold up to 10 students; PDC sessions hold 1 student.
-        $tdcSessions = [
-            ['date' => $nextWeekday(now()->addDays(7)), 'time_start' => '08:00', 'time_end' => '10:00', 'venue' => 'RC Driving Academy — Main Branch'],
-            ['date' => $nextWeekday(now()->addDays(14)), 'time_start' => '13:00', 'time_end' => '15:00', 'venue' => 'RC Driving Academy — Main Branch'],
-        ];
-        foreach ($tdcSessions as $s) {
+        // TDC runs in fixed 2-day blocks (Mon–Tue, Wed–Thu, Fri–Sat). Seed a
+        // week of upcoming blocks so a learner can pick the one that suits them.
+        $monday = now()->copy()->startOfWeek(Carbon::MONDAY);
+        $tdcBlocks = [];
+        foreach ([0, 2, 4] as $offset) {
+            $start = $monday->copy()->addWeek()->addDays($offset);
+            $tdcBlocks[] = [
+                'date' => $start,
+                'end_date' => $start->copy()->addDay(),
+                'time_start' => '08:00',
+                'time_end' => '12:00',
+                'venue' => 'RC Driving Academy — Main Branch',
+            ];
+        }
+        foreach ($tdcBlocks as $s) {
             Schedule::create([
                 'course_id' => $tdcCourse->id,
                 'instructor_id' => $tdcInstructor->id,
                 'date' => $s['date']->format('Y-m-d'),
+                'end_date' => $s['end_date']->format('Y-m-d'),
                 'time_start' => $s['time_start'],
                 'time_end' => $s['time_end'],
                 'venue' => $s['venue'],
-                'max_students' => 10,
+                'max_students' => 20,
                 'status' => 'open',
+                'auto_generated' => true,
             ]);
         }
 
+        // PDC lessons are 1-on-1 and run in the afternoon, after the TDC block
+        // that ends at noon, so the single demo instructor is never double-booked.
         $pdcSessions = [
-            ['date' => $nextWeekday(now()->addDays(9)), 'time_start' => '09:00', 'time_end' => '11:00', 'venue' => 'RC Driving Academy — Driving Range'],
+            ['date' => $nextWeekday(now()->addDays(9)), 'time_start' => '13:00', 'time_end' => '15:00', 'venue' => 'RC Driving Academy — Driving Range'],
             ['date' => $nextWeekday(now()->addDays(16)), 'time_start' => '14:00', 'time_end' => '16:00', 'venue' => 'RC Driving Academy — Driving Range'],
         ];
         foreach ($pdcSessions as $s) {
@@ -178,16 +191,19 @@ class DatabaseSeeder extends Seeder
             'course_id' => $pdcCourse->id,
             'instructor_id' => $pdcInstructor->id,
             'date' => $pdcSessions[0]['date']->format('Y-m-d'),
-            'time_start' => '11:00',
-            'time_end' => '13:00',
+            'time_start' => '15:00',
+            'time_end' => '17:00',
             'venue' => 'RC Driving Academy — Driving Range',
             'max_students' => 1,
             'status' => 'open',
         ]);
 
         // Confirmed booking: the demo student is booked into the first session
-        // for their course.
-        $firstTdc = Schedule::where('course_id', $tdcCourse->id)->orderBy('date')->first();
+        // for their course. TDC only needs one 2-day block.
+        $firstTdc = Schedule::where('course_id', $tdcCourse->id)
+            ->whereNotNull('end_date')
+            ->orderBy('date')
+            ->first();
         $firstPdc = Schedule::where('course_id', $pdcCourse->id)->orderBy('date')->first();
 
         foreach ($students as $student) {
@@ -201,22 +217,11 @@ class DatabaseSeeder extends Seeder
             }
         }
 
-        // One PENDING booking to showcase the admin "accept the instructor" workflow.
-        $secondTdc = Schedule::where('course_id', $tdcCourse->id)->orderBy('date')->skip(1)->first();
-        if ($secondTdc) {
-            $pendingStudent = $students->where('instructor_id', $tdcInstructor->id)->first();
-            if ($pendingStudent) {
-                StudentSchedule::firstOrCreate(
-                    ['student_id' => $pendingStudent->id, 'schedule_id' => $secondTdc->id],
-                    ['booked_at' => now()->subDays(1), 'status' => 'pending']
-                );
-            }
-        }
-
         // Seed the teachable grading model with a small labeled corpus so the
         // AI can classify right from the first demo (it keeps learning from
         // every real assessment afterwards).
         $this->seedNlpExamples();
+        $this->call(AdminNotificationSeeder::class);
     }
 
     private function seedNlpExamples(): void

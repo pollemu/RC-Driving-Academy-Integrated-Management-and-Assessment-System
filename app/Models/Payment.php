@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\AdminNotification;
 use App\Notifications\NotificationService;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -59,14 +60,35 @@ class Payment extends Model
         // Notify the student. The admin manual "record payment" path creates the
         // row already verified, so it relies on notify=true to fire once.
         if ($notify) {
+            $student = $this->student;
+            $courseName = $this->course?->name ?? 'course';
+
             try {
                 (new NotificationService())->paymentVerified(
-                    $this->student,
-                    $this->course?->name ?? 'course',
+                    $student,
+                    $courseName,
                     (float) $this->amount
                 );
             } catch (\Throwable $e) {
                 // Notifications must never break payment verification.
+                report($e);
+            }
+
+            try {
+                AdminNotification::record(
+                    AdminNotification::CATEGORY_PAYMENT,
+                    'Payment verified',
+                    ($student?->user?->name ?? 'A student')
+                        . ' paid ₱' . number_format((float) $this->amount, 2)
+                        . " for {$courseName}.",
+                    [
+                        'payment_id' => $this->id,
+                        'student_id' => $this->student_id,
+                        'panel' => 'payments',
+                    ],
+                    $student?->user_id
+                );
+            } catch (\Throwable $e) {
                 report($e);
             }
         }

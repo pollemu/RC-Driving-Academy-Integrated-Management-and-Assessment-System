@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdminNotification;
 use App\Models\Assessment;
 use App\Models\Attendance;
 use App\Models\Certification;
@@ -16,6 +17,7 @@ use App\Models\Student;
 use App\Services\CertGateService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 /**
  * Admin reporting. The dashboard endpoint (/admin/dashboard) returns a few
@@ -105,36 +107,80 @@ class ReportController extends Controller
     }
 
     /* Recent notification log (SMS/Email/Maps attempts) so admins can verify
-       the notification subsystem is firing even before provider keys exist. */
-    public function notifications()
+       the notification subsystem is firing even before provider keys exist.
+       Also returns the in-app admin feed (tabs: payments, accounts, requests,
+       chat escalations, certificates). */
+    public function notifications(Request $request)
     {
-        $logs = NotificationLog::with('user')
-            ->latest()
-            ->paginate(20);
+        $category = $request->query('category');
+        $loadLog = $request->boolean('load_log') || $category === 'log';
 
-        $data = $logs->getCollection()->map(function (NotificationLog $log) {
+        $feed = AdminNotification::with('user:id,name')
+            ->when(in_array($category, AdminNotification::CATEGORIES, true), fn ($q) => $q->where('category', $category))
+            ->latest()
+            ->paginate(20, ['id', 'category', 'title', 'body', 'meta', 'user_id', 'read_at', 'created_at'], 'feed_page');
+
+        $feedData = $feed->getCollection()->map(function (AdminNotification $n) {
             return [
-                'id' => $log->id,
-                'channel' => $log->channel,
-                'event' => $log->event,
-                'recipient' => $log->recipient,
-                'message' => $log->message,
-                'sent' => $log->sent,
-                'error' => $log->error,
-                'user_name' => $log->user?->name,
-                'created_at' => $log->created_at,
+                'id' => $n->id,
+                'category' => $n->category,
+                'title' => $n->title,
+                'body' => $n->body,
+                'meta' => $n->meta ?: [],
+                'user_name' => $n->user?->name,
+                'read' => $n->read_at !== null,
+                'read_at' => $n->read_at,
+                'created_at' => $n->created_at,
             ];
         });
+
+        $logs = collect();
+        $logsPagination = null;
+
+        if ($loadLog) {
+            $logQuery = NotificationLog::with('user:id,name')
+                ->latest()
+                ->paginate(20, ['*'], 'log_page');
+
+            $logsPagination = [
+                'current_page' => $logQuery->currentPage(),
+                'last_page' => $logQuery->lastPage(),
+                'per_page' => $logQuery->perPage(),
+                'total' => $logQuery->total(),
+            ];
+
+            $logs = $logQuery->getCollection()->map(function (NotificationLog $log) {
+                return [
+                    'id' => $log->id,
+                    'channel' => $log->channel,
+                    'event' => $log->event,
+                    'recipient' => $log->recipient,
+                    'message' => $log->message,
+                    'sent' => $log->sent,
+                    'error' => $log->error,
+                    'user_name' => $log->user?->name,
+                    'created_at' => $log->created_at,
+                ];
+            })->values();
+        }
 
         $gate = new CertGateService();
 
         return response()->json([
-            'logs' => $data->values(),
-            'pagination' => [
-                'current_page' => $logs->currentPage(),
-                'last_page' => $logs->lastPage(),
-                'per_page' => $logs->perPage(),
-                'total' => $logs->total(),
+            'feed' => $feedData->values(),
+            'feed_pagination' => [
+                'current_page' => $feed->currentPage(),
+                'last_page' => $feed->lastPage(),
+                'per_page' => $feed->perPage(),
+                'total' => $feed->total(),
+            ],
+            'counts' => $this->notificationCounts(),
+            'logs' => $logs,
+            'pagination' => $logsPagination ?? [
+                'current_page' => 1,
+                'last_page' => 1,
+                'per_page' => 20,
+                'total' => 0,
             ],
             'channels' => [
                 'sms_enabled' => config('notifications.sms.enabled') && ! empty(config('services.semaphore.api_key')),
@@ -147,6 +193,68 @@ class ReportController extends Controller
                 'require_safety_clear' => $gate->requireSafetyClear(),
             ],
         ]);
+    }
+
+    /* Light-weight unread badge for the sidebar (no feed payload). */
+    public function notificationSummary()
+    {
+        return response()->json(['counts' => $this->notificationCounts()]);
+    }
+
+    /* Mark feed entries read: by ids, by category, or everything. */
+    public function markNotificationsRead(Request $request)
+    {
+        $data = $request->validate([
+            'ids' => ['nullable', 'array'],
+            'ids.*' => ['integer'],
+            'category' => ['nullable', Rule::in(AdminNotification::CATEGORIES)],
+            'all' => ['nullable', 'boolean'],
+        ]);
+
+        $query = AdminNotification::whereNull('read_at');
+
+        if (! empty($data['ids'])) {
+            $query->whereIn('id', $data['ids']);
+        } elseif (! empty($data['category'])) {
+            $query->where('category', $data['category']);
+        } elseif (empty($data['all'])) {
+            return response()->json(['message' => 'Nothing to mark as read.'], 422);
+        }
+
+        $updated = $query->update(['read_at' => now()]);
+
+        return response()->json([
+            'updated' => $updated,
+            'counts' => $this->notificationCounts(),
+        ]);
+    }
+
+    /* Total + unread counters per category for the notification tabs. */
+    protected function notificationCounts(): array
+    {
+        $counts = [];
+        foreach (AdminNotification::CATEGORIES as $category) {
+            $counts[$category] = ['total' => 0, 'unread' => 0];
+        }
+
+        AdminNotification::query()
+            ->selectRaw('category, COUNT(*) as total, SUM(CASE WHEN read_at IS NULL THEN 1 ELSE 0 END) as unread')
+            ->groupBy('category')
+            ->get()
+            ->each(function ($row) use (&$counts) {
+                if (isset($counts[$row->category])) {
+                    $counts[$row->category] = [
+                        'total' => (int) $row->total,
+                        'unread' => (int) $row->unread,
+                    ];
+                }
+            });
+
+        return [
+            'categories' => $counts,
+            'total' => array_sum(array_column($counts, 'total')),
+            'unread' => array_sum(array_column($counts, 'unread')),
+        ];
     }
 
     /* Update configurable certification gates. */

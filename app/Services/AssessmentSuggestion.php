@@ -16,14 +16,11 @@ class AssessmentSuggestion
 {
     public const PASS_THRESHOLD = 3;
 
-    /** category key => [label, weak training module]. */
+    /** category key => [label, weak training module]. PDC rates three skills. */
     public const CATEGORIES = [
         'steering' => ['Steering Control', 'Steering precision drills — cone weave & low-speed control'],
-        'speed'    => ['Speed Management', 'Speed regulation module — braking distance & eco-driving'],
-        'lane'     => ['Lane Discipline', 'Lane positioning & signalling workshop'],
-        'parking'  => ['Parking', 'Parking mastery — parallel, reverse & angle parking'],
-        'safety'   => ['Safety Awareness', 'Defensive driving & hazard perception course'],
-        'mirror'   => ['Mirror & Observation', 'Mirror & blind-spot observation exercises'],
+        'brake'    => ['Braking', 'Braking control — smooth stops, pedal feel & safe following distance'],
+        'mirror'   => ['Side Mirror & Observation', 'Side-mirror and blind-spot observation exercises'],
     ];
 
     /**

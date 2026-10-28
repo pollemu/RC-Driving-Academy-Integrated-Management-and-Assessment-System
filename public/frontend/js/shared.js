@@ -22,13 +22,15 @@ function rcdaLoading(label){
 }
 
 /* Centered full-screen loading overlay with a spinning circle.
-   Styles are injected so it renders even if base.css is cached/fails. */
+   Opaque (cream) so the dashboard never shows behind it while data loads.
+   Styles are also in base.css so splash markup in the HTML paints correctly
+   on the very first frame; this copy is the fallback if base.css is stale. */
 const PAGE_LOADING_CSS = `
-  #rcdaPageLoading{position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .2s ease;}
-  #rcdaPageLoading.show{opacity:1;}
-  .rcda-pl-card{display:flex;flex-direction:column;align-items:center;gap:16px;}
-  .rcda-pl-spin{width:54px;height:54px;border:4px solid rgba(192,57,43,0.18);border-top-color:#C0392B;border-radius:50%;animation:rcda-pl-spin .8s linear infinite;}
-  .rcda-pl-label{font-family:'Inter',system-ui,sans-serif;font-size:15px;font-weight:600;color:#C0392B;letter-spacing:.2px;}
+  #rcdaPageLoading{position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;background:#FAF8F6;opacity:1;visibility:visible;transition:opacity .18s ease,visibility .18s ease;}
+  #rcdaPageLoading:not(.show){opacity:0;visibility:hidden;pointer-events:none;}
+  #rcdaPageLoading .rcda-pl-card{display:flex;flex-direction:column;align-items:center;gap:16px;}
+  #rcdaPageLoading .rcda-pl-spin{width:54px;height:54px;border:4px solid rgba(192,57,43,0.18);border-top-color:#C0392B;border-radius:50%;animation:rcda-pl-spin .8s linear infinite;}
+  #rcdaPageLoading .rcda-pl-label{font-family:'Inter',system-ui,sans-serif;font-size:15px;font-weight:600;color:#C0392B;letter-spacing:.2px;}
   @keyframes rcda-pl-spin{to{transform:rotate(360deg);}}
 `;
 function ensurePageLoadingStyles(){
@@ -43,20 +45,29 @@ RCDA.showPageLoading = function(label){
   let el = document.getElementById('rcdaPageLoading');
   if (!el) {
     el = document.createElement('div');
-    el.id = 'rcdaPageLoading';
     document.body.appendChild(el);
   }
+  el.id = 'rcdaPageLoading';
   el.innerHTML = '<div class="rcda-pl-card"><div class="rcda-pl-spin"></div><div class="rcda-pl-label">' +
     (label || 'Loading…') + '</div></div>';
+  el.style.display = '';
+  clearTimeout(el._hideTimer);
+  clearTimeout(el._failsafeTimer);
+  // Never let a hung request trap the user on a blank screen.
+  el._failsafeTimer = setTimeout(() => { RCDA.hidePageLoading(); }, 15000);
+  // Force a reflow so a splash already painted opaque stays put, then show.
   el.classList.add('show');
   return el;
 };
 RCDA.hidePageLoading = function(){
   const el = document.getElementById('rcdaPageLoading');
   if (!el) return;
+  clearTimeout(el._failsafeTimer);
   el.classList.remove('show');
-  el.style.display = 'none';
-  if (el.parentNode) el.parentNode.removeChild(el);
+  clearTimeout(el._hideTimer);
+  el._hideTimer = setTimeout(() => {
+    if (el.parentNode) el.parentNode.removeChild(el);
+  }, 220);
 };
 
 /* ---- AUTH GUARD (dashboards) ----
@@ -134,11 +145,64 @@ function closeAllSidebars(){
   if (overlay) overlay.classList.remove('active');
 }
 
+/* ---- ACTIVE DASHBOARD PANEL (survives reloads) ----
+   Each dashboard stores the sidebar tab it is showing in the URL hash, e.g.
+   student/dashboard.html#sessions. Reloading, or opening a shared link, then
+   lands on the same tab instead of falling back to the default panel. */
+function rememberPanel(panel) {
+  if (!panel) return;
+  try {
+    if (location.hash !== '#' + panel) {
+      history.replaceState(null, '', '#' + panel);
+    }
+  } catch (e) { /* history blocked — the tab still works, it just won't deep-link */ }
+}
+
+function panelFromHash() {
+  return (location.hash || '').replace(/^#/, '');
+}
+
+/* Finds the sidebar button that opens `panel` so the highlight is restored too. */
+function navItemForPanel(panel) {
+  const items = document.querySelectorAll('.sidebar-nav .nav-item');
+  for (let i = 0; i < items.length; i++) {
+    const handler = items[i].getAttribute('onclick') || '';
+    if (handler.indexOf("'" + panel + "'") !== -1) return items[i];
+  }
+  return null;
+}
+
 /* ---- SCROLL NAV (landing page only) ---- */
 window.addEventListener('scroll', () => {
   const nav = document.getElementById('mainNav');
   if (nav) nav.classList.toggle('scrolled', window.scrollY > 40);
 });
+
+/* ---- NAME + PHONE INPUT GUARDS (shared by signup, profile and admin forms) ----
+   Names accept letters (any language), spaces, period, apostrophe and hyphen.
+   PH mobile numbers are stored as 11 digits in 09XXXXXXXXX form. Keeping the
+   client in sync with the server rules avoids a round-trip just to say "no
+   digits in a name". */
+function sanitizeNameInput(el){
+  if (!el) return;
+  const clean = el.value.replace(/[^\p{L}\s.'-]/gu, '').replace(/\s{2,}/g, ' ');
+  if (clean !== el.value) el.value = clean;
+}
+
+function sanitizePhoneInput(el){
+  if (!el) return;
+  const digits = el.value.replace(/\D+/g, '').slice(0, 11);
+  if (digits !== el.value) el.value = digits;
+}
+
+function isValidPersonName(value){
+  const v = String(value || '').trim();
+  return v.length >= 2 && v.length <= 60 && /^\p{L}[\p{L}\s.'-]*$/u.test(v);
+}
+
+function isValidPhMobile(value){
+  return /^09\d{9}$/.test(String(value || '').trim());
+}
 
 /* ---- FIELD VALIDATION ----
    Marks/unmarks a field (by id) as invalid — adds a red outline via
@@ -195,19 +259,19 @@ function rateStar(star){
 /* ---- NLP DATA ---- */
 const nlpData = {
   fast: {
-    text: "Student shows excellent steering control and outstanding safety awareness. Very accurate lane discipline throughout the session. Parking was mastered on the first attempt. Speed management was well controlled on all road types.",
-    tokens: [{t:'excellent',c:'pos'},{t:'outstanding',c:'pos'},{t:'mastered',c:'pos'},{t:'accurate',c:'pos'},{t:'well controlled',c:'pos'}],
+    text: "Student shows excellent steering control, smooth braking and accurate side-mirror checks. Braking distance was outstanding on every stop, and mirror observation was mastered throughout the session.",
+    tokens: [{t:'excellent',c:'pos'},{t:'outstanding',c:'pos'},{t:'mastered',c:'pos'},{t:'accurate',c:'pos'},{t:'smooth',c:'pos'}],
     badge: '⚡ Fast Learner', cls: 'fast', score: 91,
     msg: 'Excellent performance. Continue at current pace.'
   },
   avg: {
-    text: "Student shows good progress with steering but needs more practice on parking. Lane discipline is improving. Speed management is adequate but can be better.",
-    tokens: [{t:'good',c:'pos'},{t:'improving',c:'pos'},{t:'adequate',c:''},{t:'needs practice',c:'neg'},{t:'can be better',c:'neg'}],
+    text: "Student shows good progress with steering and side-mirror checks, but braking still needs more practice. Mirror observation is improving. Braking is adequate but can be smoother.",
+    tokens: [{t:'good',c:'pos'},{t:'improving',c:'pos'},{t:'adequate',c:''},{t:'needs practice',c:'neg'},{t:'can be smoother',c:'neg'}],
     badge: '📊 Average Learner', cls: 'avg', score: 65,
-    msg: 'Steady progress. Focus on parking and speed consistency.'
+    msg: 'Steady progress. Focus on braking consistency and mirror checks.'
   },
   needs: {
-    text: "Student has difficulty with lane discipline and unsafe speed on turns. Parking was incorrect multiple times. Steering shows poor control and struggle with basic maneuvers.",
+    text: "Student has difficulty with steering control and unsafe braking on turns. Side-mirror checks were incorrect multiple times. Braking shows poor control and struggle with basic maneuvers.",
     tokens: [{t:'difficulty',c:'neg'},{t:'unsafe',c:'neg'},{t:'incorrect',c:'neg'},{t:'poor',c:'neg'},{t:'struggle',c:'neg'}],
     badge: '⚠ Needs Improvement', cls: 'needs', score: 38,
     msg: 'Instructor intervention recommended. Additional sessions advised.'

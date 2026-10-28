@@ -38,6 +38,7 @@ function showPanel(panel, el) {
       c.dataset.rpLoaded = '1';
     }
   }
+  if (typeof rememberPanel === 'function') rememberPanel(panel);
 }
 
 /* ============================================================
@@ -225,7 +226,7 @@ function toggleAssessMode(sch) {
   const label = document.getElementById('ratingLabel');
   if (grid) grid.style.display = isTdc ? 'none' : 'grid';
   if (exam) exam.style.display = isTdc ? 'block' : 'none';
-  if (label) label.textContent = isTdc ? 'Exam Score' : 'Skills Rating';
+  if (label) label.textContent = isTdc ? 'Exam Score' : 'PDC Skills Rating';
 }
 
 /* ============================================================
@@ -296,7 +297,16 @@ function closeAddStudentModal() {
   if (overlay) overlay.classList.remove('open');
 }
 
-const CLASSIFICATION_LABELS = { fast: 'Fast Learner', avg: 'Average', needs: 'Needs Help' };
+const CLASSIFICATION_LABELS = {
+  fast: 'Fast Learner',
+  average: 'Average Learner',
+  avg: 'Average Learner',
+  needs: 'Needs Improvement',
+};
+
+function classificationLabel(cls) {
+  return CLASSIFICATION_LABELS[cls] || '—';
+}
 
 /* Local-only helper: the instructor has no "create student" endpoint,
    so adding here is a client-side convenience that preps an Assess row. */
@@ -387,20 +397,14 @@ function saveAssessment() {
     body.exam_score = Number(exam);
   } else {
     const stars = readStars();
-    const notes = readNotes();
+    if (!stars.steering || !stars.brake || !stars.mirror) {
+      RCDA.showToast('Rate steering, braking and side mirror (1–5 stars) first.');
+      return;
+    }
     Object.assign(body, {
-      star_steering: stars.steering || null,
-      star_speed: stars.speed || null,
-      star_lane: stars.lane || null,
-      star_parking: stars.parking || null,
-      star_safety: stars.safety || null,
-      star_mirror: stars.mirror || null,
-      note_steering: notes.steering || null,
-      note_speed: notes.speed || null,
-      note_lane: notes.lane || null,
-      note_parking: notes.parking || null,
-      note_safety: notes.safety || null,
-      note_mirror: notes.mirror || null,
+      star_steering: stars.steering,
+      star_brake: stars.brake,
+      star_mirror: stars.mirror,
     });
   }
 
@@ -409,20 +413,27 @@ function saveAssessment() {
     body
   }).then(({ ok, data, error }) => {
     if (!ok) { RCDA.showToast(error || 'Could not save assessment.'); return; }
-    RCDA.showToast('Assessment saved — training suggestion generated.', 'success');
-    loadRecentAssessments();
+    const result = (data && data.assessment) || null;
+    const verdict = result ? classificationLabel(result.classification) : '';
+    RCDA.showToast(
+      'Assessment saved' + (verdict ? ' — ' + verdict : '') + '. The student can now see it under My Results.',
+      'success'
+    );
+    loadRecentAssessments(result);
   });
 }
 
-function loadRecentAssessments() {
+function loadRecentAssessments(result) {
   const body = document.getElementById('recentAssessBody');
   if (!body) return;
-  const schedSel = document.getElementById('assessSchedule');
   const stuSel = document.getElementById('assessStudent');
-  const schedTxt = schedSel ? (schedSel.options[schedSel.selectedIndex]?.text || 'this session') : 'this session';
   const stuTxt = stuSel ? (stuSel.options[stuSel.selectedIndex]?.text || 'student') : 'student';
   const now = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  const row = `<tr><td>${escapeHtml(stuTxt)}</td><td>${now}</td><td>—</td><td><span class="badge badge-pill" style="background:var(--green-light);color:#15803d;">Saved</span></td></tr>`;
+  const scoreTxt = result && result.score != null ? Math.round(Number(result.score)) + '%' : '—';
+  const levelTxt = result && result.classification
+    ? `<span class="badge ${escapeHtml(result.classification)}">${escapeHtml(classificationLabel(result.classification))}</span>`
+    : '—';
+  const row = `<tr><td>${escapeHtml(stuTxt)}</td><td>${now}</td><td>${scoreTxt}</td><td>${levelTxt}</td></tr>`;
   const placeholder = body.querySelector('td[colspan="4"]');
   if (placeholder) body.innerHTML = row;
   else body.insertAdjacentHTML('afterbegin', row);
@@ -498,19 +509,33 @@ async function saveInstructorAttendance(){
   loadInstructorAttendance();
 }
 
+/* Re-open the sidebar tab the instructor was last on (see rememberPanel). */
+function restoreInstructorPanel() {
+  const panel = typeof panelFromHash === 'function' ? panelFromHash() : '';
+  if (!panel || !document.getElementById('instr-' + panel)) return;
+  showPanel(panel, typeof navItemForPanel === 'function' ? navItemForPanel(panel) : null);
+}
+
 /* ---- INIT ---- */
 document.addEventListener('DOMContentLoaded', async () => {
+  RCDA.showPageLoading('Loading…');
   if (!await requireAuth('instructor')) return;
+
+  // Wait for the default panel only (like the student dashboard), then let
+  // the other panels populate in the background.
   try {
-    await Promise.all([
-      loadInstructorDashboard(),
-      loadInstructorStudents(),
-      loadInstructorSchedule(),
-    ]);
-    setupAssessForm();
-    loadInstructorAttendance();
+    await loadInstructorDashboard();
   } catch (e) {
     console.error('[RCDA instructor]', e);
     RCDA.showToast('Some of your data failed to load.');
+  } finally {
+    RCDA.hidePageLoading();
   }
+  restoreInstructorPanel();
+  Promise.allSettled([
+    loadInstructorStudents(),
+    loadInstructorSchedule(),
+    setupAssessForm(),
+    loadInstructorAttendance(),
+  ]);
 });

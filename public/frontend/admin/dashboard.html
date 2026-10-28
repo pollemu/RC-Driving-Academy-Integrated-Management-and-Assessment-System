@@ -6,10 +6,16 @@
 <title>Admin Dashboard - RC Driving Academy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/base.css?v=44">
-<link rel="stylesheet" href="../css/admin.css?v=44">
+<link rel="stylesheet" href="../css/base.css?v=65">
+<link rel="stylesheet" href="../css/admin.css?v=65">
 </head>
 <body>
+
+<!-- Opaque splash: covers the dashboard until its data has loaded -->
+<div id="rcdaPageLoading" class="show" role="status" aria-live="polite">
+  <div class="rcda-pl-card"><div class="rcda-pl-spin"></div><div class="rcda-pl-label">Loading…</div></div>
+</div>
+<noscript><style>#rcdaPageLoading{display:none!important;}</style></noscript>
 
 <div class="dash-shell">
 
@@ -43,6 +49,10 @@
       <div class="nav-item" onclick="showPanel('students',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
         Students
+      </div>
+      <div class="nav-item" onclick="showPanel('idverification',this)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="11" r="2"/><path d="M5 16c0-1.7 1.3-3 3-3s3 1.3 3 3"/><line x1="14" y1="10" x2="19" y2="10"/><line x1="14" y1="14" x2="19" y2="14"/></svg>
+        ID Verification
       </div>
       <div class="nav-item" onclick="showPanel('schedule',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -84,6 +94,7 @@
       <div class="nav-item" onclick="showPanel('notifications',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
         Notifications
+        <span class="nav-badge" id="notifNavBadge" hidden>0</span>
       </div>
     </nav>
       <div class="sidebar-footer">
@@ -126,7 +137,7 @@
             <div class="card-head"><h3>Recent Enrollments</h3><button class="btn btn-sm btn-ghost" onclick="showPanel('students',document.querySelector('[onclick*=students]'))">View All</button></div>
             <table>
               <thead><tr><th>Student</th><th>Course</th><th>Date</th><th>Status</th></tr></thead>
-              <tbody>
+              <tbody id="recentEnrollmentsBody">
                 <tr><td><b>Kervin Alcazar</b></td><td>TDC + PDC</td><td>Apr 15</td><td><span class="badge enrolled">Enrolled</span></td></tr>
                 <tr><td><b>Robin Padilla</b></td><td>PDC Only</td><td>Apr 16</td><td><span class="badge pending">Pending</span></td></tr>
                 <tr><td><b>Coco Martin</b></td><td>TDC Only</td><td>Apr 17</td><td><span class="badge enrolled">Enrolled</span></td></tr>
@@ -137,7 +148,7 @@
           </div>
           <div class="card">
             <div class="card-head"><h3>Learner Proficiency Distribution</h3></div>
-            <div class="prof-bars">
+            <div class="prof-bars" id="proficiencyBars">
               <div class="prof-bar-item"><label>Fast Learners <span>38%</span></label><div class="prof-bar-track"><div class="prof-bar-fill fast" style="width:38%"></div></div></div>
               <div class="prof-bar-item"><label>Average Learners <span>49%</span></label><div class="prof-bar-track"><div class="prof-bar-fill avg" style="width:49%"></div></div></div>
               <div class="prof-bar-item"><label>Needs Improvement <span>13%</span></label><div class="prof-bar-track"><div class="prof-bar-fill needs" style="width:13%"></div></div></div>
@@ -145,8 +156,8 @@
             <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--gray-light);">
               <div style="font-size:12.5px;color:var(--gray);margin-bottom:8px;font-weight:600;">COURSE BREAKDOWN</div>
               <div style="display:flex;gap:14px;font-size:13px;">
-                <div style="flex:1;background:rgba(99,102,241,0.08);border-radius:10px;padding:12px;text-align:center;"><b style="font-size:18px;font-family:'Poppins';">89</b><br><span style="font-size:11.5px;color:var(--gray);">TDC Students</span></div>
-                <div style="flex:1;background:rgba(192,57,43,0.08);border-radius:10px;padding:12px;text-align:center;"><b style="font-size:18px;font-family:'Poppins';">73</b><br><span style="font-size:11.5px;color:var(--gray);">PDC Students</span></div>
+                <div style="flex:1;background:rgba(99,102,241,0.08);border-radius:10px;padding:12px;text-align:center;"><b id="courseTdcCount" style="font-size:18px;font-family:'Poppins';">89</b><br><span style="font-size:11.5px;color:var(--gray);">TDC Students</span></div>
+                <div style="flex:1;background:rgba(192,57,43,0.08);border-radius:10px;padding:12px;text-align:center;"><b id="coursePdcCount" style="font-size:18px;font-family:'Poppins';">73</b><br><span style="font-size:11.5px;color:var(--gray);">PDC Students</span></div>
               </div>
             </div>
           </div>
@@ -180,9 +191,9 @@
           </div>
           <div style="overflow-x:auto;">
             <table id="studentsTable">
-              <thead><tr><th>ID</th><th>Student</th><th>Course</th><th>Payment</th><th>Status</th><th>Instructor</th><th></th></tr></thead>
+              <thead><tr><th>ID</th><th>Student</th><th>Course</th><th>Payment</th><th>Status</th><th>Valid ID</th><th>Instructor</th><th></th></tr></thead>
               <tbody>
-                <tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">Loading students…</td></tr>
+                <tr><td colspan="8" style="text-align:center;color:var(--gray);padding:20px;">Loading students…</td></tr>
               </tbody>
             </table>
           </div>
@@ -192,14 +203,29 @@
       <!-- SCHEDULE PANEL -->
       <div class="panel" id="admin-schedule">
         <div class="card">
-          <div class="card-head"><h3>Create a Session</h3><span style="font-size:13px;color:var(--gray);">Assign an instructor and open it for student booking</span></div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:8px;">
-            <div><label style="font-size:12px;color:var(--gray);">Course</label><select id="schedCourse" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;background:var(--cream);"></select></div>
-            <div><label style="font-size:12px;color:var(--gray);">Instructor</label><select id="schedInstructor" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;background:var(--cream);"></select></div>
-            <div><label style="font-size:12px;color:var(--gray);">Date</label><input id="schedDate" type="date" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;background:var(--cream);"></div>
+          <div class="card-head sched-card-head"><h3>Create a Session</h3><span>TDC runs as one fixed 2-day block (Mon–Tue, Wed–Thu, Fri–Sat) and can be scheduled without an instructor. PDC is 1-on-1 and needs an instructor.</span></div>
+          <div class="sched-form-grid">
+            <div><label style="font-size:12px;color:var(--gray);">Course</label><select id="schedCourse" onchange="syncScheduleForm()" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;background:var(--cream);"></select></div>
+            <div><label style="font-size:12px;color:var(--gray);">Instructor <span style="font-weight:400;">(PDC required)</span></label><select id="schedInstructor" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;background:var(--cream);"></select></div>
+            <div id="schedDateCell">
+              <label style="font-size:12px;color:var(--gray);"><span id="schedDateLabel">Date</span> <span id="schedDateHint" style="font-weight:400;"></span></label>
+              <input id="schedDate" type="date" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;background:var(--cream);">
+              <div id="schedBlockPicker" class="sched-block-picker" style="display:none;">
+                <div class="sched-block-top">
+                  <span class="sched-block-title">Pick a 2-day block</span>
+                  <div class="sched-block-nav">
+                    <button type="button" class="sched-nav-btn" id="schedBlockPrev" onclick="shiftBlockWeek(-1)" aria-label="Previous week">‹</button>
+                    <span id="schedBlockWeekLabel" class="sched-block-week"></span>
+                    <button type="button" class="sched-nav-btn" id="schedBlockNext" onclick="shiftBlockWeek(1)" aria-label="Next week">›</button>
+                  </div>
+                </div>
+                <div id="schedBlockBtns" class="sched-block-grid"></div>
+                <div id="schedBlockNote" class="sched-block-note"></div>
+              </div>
+            </div>
             <div><label style="font-size:12px;color:var(--gray);">Start</label><input id="schedStart" type="time" value="08:00" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;background:var(--cream);"></div>
-            <div><label style="font-size:12px;color:var(--gray);">End</label><input id="schedEnd" type="time" value="10:00" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;background:var(--cream);"></div>
-            <div><label style="font-size:12px;color:var(--gray);">Capacity</label><input id="schedCap" type="number" min="1" value="10" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;background:var(--cream);"></div>
+            <div><label style="font-size:12px;color:var(--gray);">End</label><input id="schedEnd" type="time" value="12:00" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;background:var(--cream);"></div>
+            <div><label style="font-size:12px;color:var(--gray);">Capacity</label><input id="schedCap" type="number" min="1" value="20" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;background:var(--cream);"></div>
           </div>
           <div style="margin-top:12px;"><label style="font-size:12px;color:var(--gray);">Venue</label><input id="schedVenue" placeholder="RC Driving Academy — Main Branch" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;background:var(--cream);"></div>
           <button class="btn btn-primary" style="margin-top:14px;width:100%;justify-content:center;" onclick="createAdminSchedule()">Create Session</button>
@@ -328,16 +354,43 @@
         </div>
       </div>
 
+      <!-- ID VERIFICATION PANEL -->
+      <div class="panel" id="admin-idverification">
+        <div class="card">
+          <div class="card-head">
+            <h3>Valid ID Verification</h3>
+            <div class="toolbar">
+              <input id="idSearchInput" oninput="loadIdVerifications()" placeholder="Search student..." style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;width:200px;">
+              <select id="idStatusFilter" onchange="loadIdVerifications()" style="width:180px;padding:8px 12px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13px;background:var(--cream);">
+                <option value="pending">Pending review</option>
+                <option value="all">All submissions</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
+          </div>
+          <div id="idCounts" style="display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 16px;"></div>
+          <div style="overflow-x:auto;">
+            <table id="idVerificationsTable">
+              <thead><tr><th>Student</th><th>ID Type</th><th>Submitted</th><th>Status</th><th>Reviewed</th><th></th></tr></thead>
+              <tbody>
+                <tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- CERTIFICATIONS PANEL -->
       <div class="panel" id="admin-certifications">
         <div class="card">
-          <div class="card-head"><h3>Certifications Ready to Issue</h3></div>
-          <div id="certsReadyList">
+          <div class="card-head"><h3>Issued Certificates</h3></div>
+          <div id="certsIssuedList">
             <div style="font-size:12px;color:var(--gray);padding:14px 0;">Loading…</div>
           </div>
           <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--gray-light);">
-            <div class="card-head" style="margin-bottom:14px;"><h3 style="font-size:14px;">Recently Issued</h3></div>
-            <div id="certsIssuedList">
+            <div class="card-head" style="margin-bottom:14px;"><h3 style="font-size:14px;">Certificates Ready to Issue</h3></div>
+            <div id="certsReadyList">
               <div style="font-size:12px;color:var(--gray);padding:14px 0;">Loading…</div>
             </div>
           </div>
@@ -381,10 +434,32 @@
 
       <!-- NOTIFICATIONS PANEL -->
       <div class="panel" id="admin-notifications">
-        <div class="card" style="margin-bottom:20px;">
-          <div class="card-head"><h3>Notification Log</h3><span style="font-size:12px;color:var(--gray);">SMS / Email / Maps</span></div>
-          <div id="notifChannels" style="display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 16px;"></div>
-          <div id="notifLog" style="font-size:13.5px;"></div>
+        <div class="card">
+          <div class="card-head notif-head">
+            <h3>Notifications</h3>
+            <div class="notif-head-actions">
+              <span class="notif-summary" id="notifUnreadSummary"></span>
+              <button type="button" class="btn btn-sm btn-ghost" id="notifMarkAll" onclick="markAllNotificationsRead()">Mark all as read</button>
+            </div>
+          </div>
+
+          <div class="notif-tabs" id="notifTabs" role="tablist"></div>
+
+          <div id="notifFeedPane">
+            <div class="notif-feed" id="notifFeed"></div>
+            <div class="notif-pager" id="notifPager"></div>
+          </div>
+
+          <div id="notifLogPane" hidden>
+            <div class="notif-log-head">
+              <div>
+                <b>Delivery log</b>
+                <p>SMS, email and maps attempts. Entries stay here even when no provider keys are configured.</p>
+              </div>
+              <div class="notif-channels" id="notifChannels"></div>
+            </div>
+            <div id="notifLog" style="font-size:13.5px;"></div>
+          </div>
         </div>
       </div>
 
@@ -731,14 +806,41 @@
     </div>
   </div>
 </div>
+<!-- ISSUED CERTIFICATE PREVIEW MODAL -->
+<div class="modal-overlay" id="certificateModal">
+  <div class="modal-box" style="max-width:820px;">
+    <div class="modal-head">
+      <h3 id="certificateModalTitle">Issued Certificate</h3>
+      <button class="modal-close" onclick="closeModal('certificateModal')">✕</button>
+    </div>
+    <div id="certificateModalBody" style="padding:4px 0 12px;"></div>
+    <div class="pay-modal-footer">
+      <button class="btn btn-sm btn-ghost" onclick="closeModal('certificateModal')">Close</button>
+      <button class="btn btn-sm btn-ghost" id="certRevokeBtn" onclick="revokeCertificate()" style="display:none;">Revoke</button>
+      <button class="btn btn-sm btn-primary" onclick="printCertificateSheet()">Print / Save as PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- VALID ID DOCUMENT PREVIEW MODAL -->
+<div class="modal-overlay" id="idDocumentModal">
+  <div class="modal-box" style="max-width:880px;">
+    <div class="modal-head">
+      <h3 id="idDocumentTitle">Valid ID</h3>
+      <button class="modal-close" onclick="closeIdDocumentModal()">✕</button>
+    </div>
+    <div id="idDocumentBody" style="min-height:240px;display:flex;align-items:center;justify-content:center;background:var(--cream);border-radius:12px;overflow:auto;padding:10px;"></div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
-<script src="../js/config.js?v=44"></script>
-<script src="../js/error-handler.js?v=44"></script>
-<script src="../js/shared.js?v=44"></script>
-<script src="../js/profile-panel.js?v=44"></script>
-<script src="../js/profile.js?v=44"></script>
-<script src="../js/admin.js?v=44"></script>
+<script src="../js/config.js?v=65"></script>
+<script src="../js/error-handler.js?v=65"></script>
+<script src="../js/shared.js?v=65"></script>
+<script src="../js/profile-panel.js?v=65"></script>
+<script src="../js/profile.js?v=65"></script>
+<script src="../js/admin.js?v=65"></script>
 </body>
 </html>

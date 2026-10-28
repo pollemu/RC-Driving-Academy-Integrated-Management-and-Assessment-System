@@ -13,15 +13,20 @@ class DashboardController extends Controller
     {
         $instructor = $request->user()->instructor;
 
+        $todayString = now()->toDateString();
+
         $today = Schedule::with('course')
             ->where('instructor_id', $instructor->id)
-            ->whereDate('date', now()->toDateString())
+            ->where('status', '!=', 'cancelled')
+            // A TDC block spans two days, so it is "today" on either day.
+            ->whereRaw('date <= ?', [$todayString])
+            ->whereRaw('COALESCE(end_date, date) >= ?', [$todayString])
             ->get()
             ->map(fn ($s) => $this->shape($s));
 
         $upcoming = Schedule::with('course')
             ->where('instructor_id', $instructor->id)
-            ->where('date', '>', now()->toDateString())
+            ->where('date', '>', $todayString)
             ->where('status', '!=', 'cancelled')
             ->orderBy('date')
             ->get()
@@ -35,6 +40,8 @@ class DashboardController extends Controller
         return [
             'id' => $schedule->id,
             'course' => ['name' => $schedule->course->name],
+            'date' => $schedule->date?->format('Y-m-d'),
+            'end_date' => $schedule->end_date?->format('Y-m-d'),
             'time_start' => $schedule->time_start,
             'time_end' => $schedule->time_end,
             'venue' => $schedule->venue,

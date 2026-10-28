@@ -76,19 +76,13 @@ class ProcessAssessment implements ShouldQueue
     {
         $stars = [
             'steering' => $this->feedback->star_steering,
-            'speed'    => $this->feedback->star_speed,
-            'lane'     => $this->feedback->star_lane,
-            'parking'  => $this->feedback->star_parking,
-            'safety'   => $this->feedback->star_safety,
+            'brake'    => $this->feedback->star_brake,
             'mirror'   => $this->feedback->star_mirror,
         ];
 
         $notes = [
             'steering' => $this->feedback->note_steering,
-            'speed'    => $this->feedback->note_speed,
-            'lane'     => $this->feedback->note_lane,
-            'parking'  => $this->feedback->note_parking,
-            'safety'   => $this->feedback->note_safety,
+            'brake'    => $this->feedback->note_brake,
             'mirror'   => $this->feedback->note_mirror,
         ];
 

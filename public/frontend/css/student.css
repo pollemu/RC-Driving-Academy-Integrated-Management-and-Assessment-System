@@ -34,6 +34,12 @@
   .session-dot{width:10px;height:10px;border-radius:50%;background:var(--orange);flex-shrink:0;}
   .session-dot.done{background:#16a34a;}
   .session-dot.upcoming{background:var(--gray-light);border:2px solid var(--gray);}
+  /* Clickable assessment history (student My Results) */
+  .assessment-row{cursor:pointer;border-radius:10px;padding:12px 10px;border-bottom:1px solid var(--gray-light);transition:background .15s ease,box-shadow .15s ease;}
+  .assessment-row:hover{background:var(--cream);}
+  .assessment-row:focus-visible{outline:2px solid var(--orange);outline-offset:2px;}
+  .assessment-row.selected{background:var(--cream);box-shadow:inset 3px 0 0 var(--orange);}
+  .assessment-row.selected b{color:var(--orange);}
 
 
   /* ========== RESPONSIVE (payment) ========== */
@@ -245,11 +251,13 @@
 /* ========= PDC BOOKING CALENDAR ========= */
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;max-width:520px;}
 .cal-dow{font-size:11px;font-weight:700;color:var(--gray);text-align:center;padding-bottom:4px;}
-.cal-cell{min-height:46px;border:1px solid var(--gray-light);border-radius:10px;display:flex;align-items:center;justify-content:center;background:#f6f6f6;color:var(--gray);}
+.cal-cell{min-height:46px;border:1px solid var(--gray-light);border-radius:10px;display:flex;align-items:center;justify-content:center;background:#fff;color:var(--gray);}
 .cal-empty{background:transparent;border:none;}
-.cal-past{opacity:.45;}
-.cal-sunday{background:#fdecea;border-color:#e0a8a3;color:#c0392b;cursor:not-allowed;}
+.cal-past{opacity:.4;}
+.cal-sunday{background:#f0f0f0;border-color:#d9d9d9;color:#9aa0a6;cursor:not-allowed;}
 .cal-green{background:#eafaf0;border-color:#7bc89a;color:var(--charcoal);cursor:pointer;}
+.cal-taken{background:#fdecea;border-color:#e0a8a3;color:#c0392b;cursor:not-allowed;}
+.cal-pref{background:#fff;border-color:#c9c9c9;color:var(--charcoal);cursor:pointer;}
 .cal-sel{outline:2px solid var(--orange);outline-offset:-2px;}
 .cal-day{font-size:14px;font-weight:600;}
 .cal-day-btn{width:100%;height:100%;min-height:46px;border:none;background:transparent;color:var(--charcoal);font-weight:700;font-size:14px;cursor:pointer;border-radius:10px;}
@@ -257,5 +265,18 @@
 .cal-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle;}
 .cal-dot-green{background:#7bc89a;}
 .cal-dot-red{background:#e0a8a3;border:1px solid #c0392b;}
+.cal-dot-white{background:#fff;border:1px solid #b9b9b9;}
+.cal-dot-gray{background:#d9d9d9;}
 .cal-dot-muted{background:#cfcfcf;}
 @media(max-width:520px){.cal-cell{min-height:38px;}.cal-day,.cal-day-btn{font-size:12px;}}
+
+/* ========= VALID ID REMINDER (dashboard) ========= */
+.id-reminder{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;background:#fff4e5;border:1px solid #f5c26b;border-left:4px solid #d97706;border-radius:12px;padding:14px 18px;margin-bottom:20px;}
+.id-reminder.is-bad{background:#fdecea;border-color:#e0a8a3;border-left-color:#c0392b;}
+.id-reminder-text{flex:1;min-width:240px;}
+.id-reminder-text b{display:block;font-size:13.5px;color:#8a4b00;margin-bottom:3px;}
+.id-reminder.is-bad .id-reminder-text b{color:#9b2c22;}
+.id-reminder-text span{font-size:12.5px;color:#9a6200;line-height:1.55;display:block;}
+.id-reminder.is-bad .id-reminder-text span{color:#a33a30;}
+.id-reminder .btn{white-space:nowrap;flex:0 0 auto;}
+@media(max-width:520px){.id-reminder{padding:13px 15px;}.id-reminder .btn{width:100%;}}

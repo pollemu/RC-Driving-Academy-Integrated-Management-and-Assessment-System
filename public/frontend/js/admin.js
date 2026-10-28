@@ -7,6 +7,7 @@ const ADMIN_TITLES = {
   attendance:'Instructor Attendance', instructors:'Instructors',
   payments:'Payments', certifications:'Certifications', reports:'Reports',
   notifications:'Notifications', bookings:'Pending Bookings', requests:'Student Requests', ai:'Grading AI',
+  idverification:'ID Verification',
   profile:'My Profile', settings:'Account Settings'
 };
 
@@ -27,8 +28,10 @@ function showPanel(panel, el){
 
   if (panel === 'schedule') { highlightToday(); loadAdminSchedules(); }
   if (panel === 'reports') loadReports();
-  if (panel === 'notifications') loadNotifications();
+  if (panel === 'notifications') { loadNotifications(); loadNotifSummary(); }
   if (panel === 'requests') loadAdminRequests();
+  if (panel === 'idverification') loadIdVerifications();
+  if (panel === 'certifications') loadCertifications();
   if (panel === 'profile') {
     if (window.RCDAProfile) {
       const c = document.getElementById('adminProfileSummary');
@@ -47,6 +50,14 @@ function showPanel(panel, el){
       }
     }
   }
+  if (typeof rememberPanel === 'function') rememberPanel(panel);
+}
+
+/* Re-open the sidebar tab the admin was last on (see rememberPanel). */
+function restoreAdminPanel() {
+  const panel = typeof panelFromHash === 'function' ? panelFromHash() : '';
+  if (!panel || !document.getElementById('admin-' + panel)) return;
+  showPanel(panel, typeof navItemForPanel === 'function' ? navItemForPanel(panel) : null);
 }
 
 function markAttend(btn, type){
@@ -131,18 +142,34 @@ document.addEventListener('DOMContentLoaded', highlightToday);
 /* Cached instructor list for the Assign Instructor dropdown. */
 let ADMIN_INSTRUCTORS = [];
 
+/* Cached session list — used to show how full each TDC block already is. */
+let ADMIN_SCHEDULES = [];
+
 document.addEventListener('DOMContentLoaded', async () => {
+  RCDA.showPageLoading('Loading…');
   const ok = await requireAuth('admin');
   if (!ok) return;
-  loadDashboardStats();
-  loadStudents();
-  loadPayments();
-  loadInstructors();
-  loadCertifications();
-  loadInstructorList();
-  loadBookings();
-  loadInstructorAttendance();
-  loadAdminSchedules();
+
+  // Same pattern as the student dashboard: keep the splash up only until the
+  // default panel (Dashboard) has its numbers, then let the side panels fill
+  // in from the background.
+  try {
+    await loadDashboardStats();
+  } finally {
+    RCDA.hidePageLoading();
+  }
+  restoreAdminPanel();
+  Promise.allSettled([
+    loadStudents(),
+    loadPayments(),
+    loadInstructors(),
+    loadCertifications(),
+    loadInstructorList(),
+    loadBookings(),
+    loadInstructorAttendance(),
+    loadAdminSchedules(),
+    loadNotifSummary(),
+  ]);
 });
 
 async function loadInstructorList(){
@@ -158,15 +185,193 @@ async function loadAdminCourses() {
   ADMIN_COURSES = (ok && data && data.courses) || [];
   const sel = document.getElementById('schedCourse');
   if (sel) sel.innerHTML = ADMIN_COURSES.map(c => `<option value="${c.id}">${escapeHtml(c.name)} (${escapeHtml((c.type || '').toUpperCase())})</option>`).join('');
+  syncScheduleForm();
+}
+
+/* TDC blocks always start Monday, Wednesday or Friday, run 08:00–12:00 and
+   hold a whole class. PDC stays a single 1-on-1 slot. */
+function syncScheduleForm() {
+  const courseId = (document.getElementById('schedCourse') || {}).value;
+  const course = ADMIN_COURSES.find(c => String(c.id) === String(courseId));
+  const isTdc = course && String(course.type).toUpperCase() === 'TDC';
+
+  const hint = document.getElementById('schedDateHint');
+  if (hint) hint.textContent = '';
+
+  const dateInput = document.getElementById('schedDate');
+  const picker = document.getElementById('schedBlockPicker');
+  const dateCell = document.getElementById('schedDateCell');
+  const dateLabel = document.getElementById('schedDateLabel');
+  if (dateInput) dateInput.style.display = isTdc ? 'none' : 'block';
+  if (picker) picker.style.display = isTdc ? 'block' : 'none';
+  if (dateLabel) dateLabel.textContent = isTdc ? 'Class block' : 'Date';
+  // The 2-day picker needs the full row — three chips do not fit in one cell.
+  if (dateCell) dateCell.style.gridColumn = isTdc ? '1 / -1' : '';
+
+  const cap = document.getElementById('schedCap');
+  if (cap) cap.value = isTdc ? 20 : 1;
+
+  if (isTdc) {
+    const start = document.getElementById('schedStart');
+    const end = document.getElementById('schedEnd');
+    if (start) start.value = '08:00';
+    if (end) end.value = '12:00';
+    syncTdcBlockPicker();
+  }
+}
+
+/* ---- TDC block quick-pick: Mon–Tue / Wed–Thu / Fri–Sat for 4 weeks ---- */
+const ADMIN_BLOCK_WEEKS = 4;
+let ADMIN_BLOCK_WEEK = 0;
+
+function adminBlockYmd(date) {
+  return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0')
+    + '-' + String(date.getDate()).padStart(2, '0');
+}
+
+function adminBlockAddDays(date, days) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function adminBlockMonday(date) {
+  const monday = new Date(date);
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  return monday;
+}
+
+function adminBlockShort(date) {
+  return date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+}
+
+function adminBlockWeekMonday() {
+  return adminBlockAddDays(adminBlockMonday(new Date()), ADMIN_BLOCK_WEEK * 7);
+}
+
+/* Keep the hidden date input and the visible week in sync. */
+function syncTdcBlockPicker() {
+  const input = document.getElementById('schedDate');
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+
+  let selected = input && input.value ? new Date(input.value + 'T00:00:00') : null;
+  const valid = selected && !isNaN(selected) && [1, 3, 5].includes(selected.getDay()) && selected >= today;
+
+  if (!valid) {
+    // First block that has not started; roll into next week when this one is done.
+    let monday = adminBlockMonday(today);
+    let first = [0, 2, 4].map(offset => adminBlockAddDays(monday, offset)).find(day => day >= today);
+    if (!first) {
+      monday = adminBlockAddDays(monday, 7);
+      first = monday;
+    }
+    if (input) input.value = adminBlockYmd(first);
+    selected = first;
+  }
+
+  const daysAhead = Math.round((adminBlockMonday(selected) - adminBlockMonday(today)) / 86400000);
+  ADMIN_BLOCK_WEEK = Math.max(0, Math.min(ADMIN_BLOCK_WEEKS - 1, Math.round(daysAhead / 7)));
+
+  renderTdcBlockPicker();
+}
+
+function renderTdcBlockPicker() {
+  const host = document.getElementById('schedBlockBtns');
+  if (!host) return;
+
+  const input = document.getElementById('schedDate');
+  const selectedDate = input ? input.value : '';
+  const monday = adminBlockWeekMonday();
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const courseId = (document.getElementById('schedCourse') || {}).value;
+
+  // Existing blocks for the selected TDC course, keyed by start date, so each
+  // chip can show how many seats are already taken.
+  const existing = {};
+  ADMIN_SCHEDULES.forEach(s => {
+    if (!s || s.status === 'cancelled') return;
+    if (!s.course || String(s.course.type).toUpperCase() !== 'TDC') return;
+    if (courseId && String(s.course.id) !== String(courseId)) return;
+    existing[String(s.date).slice(0, 10)] = s;
+  });
+
+  host.innerHTML = [
+    { offset: 0, label: 'Mon–Tue' },
+    { offset: 2, label: 'Wed–Thu' },
+    { offset: 4, label: 'Fri–Sat' },
+  ].map(({ offset, label }) => {
+    const start = adminBlockAddDays(monday, offset);
+    const end = adminBlockAddDays(start, 1);
+    const key = adminBlockYmd(start);
+    const past = start < today;
+    const selected = key === selectedDate;
+    const block = existing[key];
+    const seats = past
+      ? 'Past'
+      : (block
+        ? `${block.booked || 0}/${block.max_students || 0} booked`
+        : 'Open · no bookings');
+
+    return `<button type="button" class="sched-block-chip${selected ? ' selected' : ''}" ${past ? 'disabled' : ''}
+        onclick="pickTdcBlock('${key}')">
+        <span class="chip-day">${label}</span>
+        <span class="chip-range">${adminBlockShort(start)} – ${adminBlockShort(end)}</span>
+        <span class="chip-seats">${seats}</span>
+      </button>`;
+  }).join('');
+
+  const weekLabel = document.getElementById('schedBlockWeekLabel');
+  if (weekLabel) {
+    weekLabel.textContent = `Week of ${adminBlockShort(monday)} – ${adminBlockShort(adminBlockAddDays(monday, 6))}`;
+  }
+
+  const note = document.getElementById('schedBlockNote');
+  if (note) {
+    const chosen = existing[selectedDate];
+    note.textContent = chosen
+      ? `This block already exists — ${chosen.booked || 0}/${chosen.max_students || 0} booked. Cancel it in All Sessions if you need to replace it, or create a class at a different time.`
+      : '';
+  }
+
+  const prev = document.getElementById('schedBlockPrev');
+  const next = document.getElementById('schedBlockNext');
+  if (prev) prev.disabled = ADMIN_BLOCK_WEEK <= 0;
+  if (next) next.disabled = ADMIN_BLOCK_WEEK >= ADMIN_BLOCK_WEEKS - 1;
+}
+
+function pickTdcBlock(start) {
+  const input = document.getElementById('schedDate');
+  if (input) input.value = start;
+  syncTdcBlockPicker();
+}
+
+function shiftBlockWeek(direction) {
+  const next = Math.max(0, Math.min(ADMIN_BLOCK_WEEKS - 1, ADMIN_BLOCK_WEEK + direction));
+  if (next === ADMIN_BLOCK_WEEK) return;
+  ADMIN_BLOCK_WEEK = next;
+
+  // Select the first block in the new week that has not started yet.
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const monday = adminBlockWeekMonday();
+  const first = [0, 2, 4].map(offset => adminBlockAddDays(monday, offset)).find(day => day >= today)
+    || adminBlockAddDays(monday, 0);
+
+  const input = document.getElementById('schedDate');
+  if (input) input.value = adminBlockYmd(first);
+  renderTdcBlockPicker();
 }
 
 async function loadAdminSchedules() {
   await loadAdminCourses();
-  const instSel = document.getElementById('schedInstructor');
-  if (instSel && (!instSel.options.length || instSel.dataset.loaded !== '1')) {
+  if (!ADMIN_INSTRUCTORS.length) {
     const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/instructors?per_page=100`, { method: 'GET' });
-    const insts = (ok && data && data.instructors) || [];
-    instSel.innerHTML = insts.map(i => `<option value="${i.id}">${escapeHtml(i.name)}</option>`).join('');
+    ADMIN_INSTRUCTORS = (ok && data && data.instructors) || [];
+  }
+  const instSel = document.getElementById('schedInstructor');
+  if (instSel && instSel.dataset.loaded !== '1') {
+    instSel.innerHTML = '<option value="">No instructor (assign later)</option>'
+      + ADMIN_INSTRUCTORS.map(i => `<option value="${i.id}">${escapeHtml(i.name)}</option>`).join('');
     instSel.dataset.loaded = '1';
   }
 
@@ -174,24 +379,50 @@ async function loadAdminSchedules() {
   const tb = document.getElementById('adminSessionsTbody');
   if (!tb) return;
   const sched = (ok && data && data.schedules) || [];
+  ADMIN_SCHEDULES = sched;
+  renderTdcBlockPicker();
   if (!sched.length) {
     tb.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--gray);padding:20px;">No sessions created yet.</td></tr>';
     return;
   }
   tb.innerHTML = sched.map(s => {
     const type = (s.course && s.course.type || '').toUpperCase();
+    const isTdc = type === 'TDC';
     const slots = `${s.booked || 0}/${s.max_students || 0}`;
+    const dateLabel = s.end_date && s.end_date !== s.date
+      ? `${escapeHtml(String(s.date))} – ${escapeHtml(String(s.end_date))}`
+      : escapeHtml(String(s.date || '—'));
+    const hasInstructor = s.instructor && s.instructor.name;
+    const instCell = hasInstructor
+      ? escapeHtml(s.instructor.name)
+      : (isTdc && s.status !== 'cancelled'
+        ? `<select onchange="assignAdminInstructor(${s.id}, this.value)" style="padding:6px 8px;border-radius:8px;border:1.5px solid var(--gray-light);font-size:12.5px;background:var(--cream);">
+             <option value="">Unassigned — assign…</option>
+             ${ADMIN_INSTRUCTORS.map(i => `<option value="${i.id}">${escapeHtml(i.name)}</option>`).join('')}
+           </select>`
+        : 'Unassigned');
     return `<tr data-id="${s.id}">
-      <td><b>${escapeHtml(s.course ? s.course.name : '—')}</b> <span class="type-badge" style="font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px;color:#fff;background:${type === 'PDC' ? 'var(--orange)' : '#6366f1'};">${type}</span></td>
-      <td>${escapeHtml(String(s.date || '—'))}</td>
+      <td><b>${escapeHtml(s.course ? s.course.name : '—')}</b> <span class="type-badge" style="font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px;color:#fff;background:${type === 'PDC' ? 'var(--orange)' : '#6366f1'};">${type}</span>${s.auto_generated ? ' <span style="font-size:10px;color:var(--gray);">auto</span>' : ''}</td>
+      <td>${dateLabel}</td>
       <td>${escapeHtml(String(s.time_start || ''))}–${escapeHtml(String(s.time_end || ''))}</td>
       <td>${escapeHtml(s.venue || '—')}</td>
-      <td>${escapeHtml(s.instructor ? s.instructor.name : 'Unassigned')}</td>
+      <td>${instCell}</td>
       <td>${slots}</td>
       <td>${statusBadge(s.status)}</td>
       <td>${s.status !== 'cancelled' ? `<button class="btn btn-sm btn-danger" onclick="cancelAdminSchedule(${s.id})">Cancel</button>` : ''}</td>
     </tr>`;
   }).join('');
+}
+
+async function assignAdminInstructor(id, instructorId) {
+  if (!instructorId) return;
+  const { ok, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/schedules/${id}/instructor`, {
+    method: 'POST',
+    body: { instructor_id: instructorId }
+  });
+  if (!ok) { RCDA.showToast(error || 'Could not assign instructor.', 'error'); return; }
+  RCDA.showToast('Instructor assigned.', 'success');
+  loadAdminSchedules();
 }
 
 async function createAdminSchedule() {
@@ -203,20 +434,31 @@ async function createAdminSchedule() {
   const venue = (document.getElementById('schedVenue') || {}).value || 'RC Driving Academy — Main Branch';
   const max_students = (document.getElementById('schedCap') || {}).value || 10;
 
-  if (!course_id || !instructor_id || !date || !time_start || !time_end) {
-    RCDA.showToast('Fill course, instructor, date and time.', 'error');
+  const course = ADMIN_COURSES.find(c => String(c.id) === String(course_id));
+  const isTdc = course && String(course.type).toUpperCase() === 'TDC';
+
+  if (!course_id || !date || !time_start || !time_end) {
+    RCDA.showToast('Fill course, date and time.', 'error');
+    return;
+  }
+  if (!isTdc && !instructor_id) {
+    RCDA.showToast('PDC is a 1-on-1 lesson — choose an instructor.', 'error');
     return;
   }
   if (new Date(date + 'T00:00:00').getDay() === 0) {
     RCDA.showToast('The academy is closed on Sundays. Pick a Monday–Saturday date.', 'error');
     return;
   }
+  if (isTdc && ![1, 3, 5].includes(new Date(date + 'T00:00:00').getDay())) {
+    RCDA.showToast('TDC blocks start on Monday, Wednesday or Friday.', 'error');
+    return;
+  }
   const { ok, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/schedules`, {
     method: 'POST',
-    body: { course_id, instructor_id, date, time_start, time_end, venue, max_students }
+    body: { course_id, instructor_id: instructor_id || null, date, time_start, time_end, venue, max_students }
   });
   if (!ok) { RCDA.showToast(error || 'Could not create session.', 'error'); return; }
-  RCDA.showToast('Session created and opened for booking.', 'success');
+  RCDA.showToast(isTdc ? 'TDC class block created and opened for booking.' : 'Session created and opened for booking.', 'success');
   loadAdminSchedules();
 }
 
@@ -230,14 +472,82 @@ async function cancelAdminSchedule(id) {
 async function loadDashboardStats(){
   const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/dashboard`, { method: 'GET' });
   if (!ok || !data) return;
+
   const s = data.stats || {};
-  const cards = document.querySelectorAll('#admin-dashboard .stat-card .value');
-  if (cards.length >= 4) {
-    cards[0].textContent = s.students ?? cards[0].textContent;
-    cards[1].textContent = s.schedules ?? cards[1].textContent;
-    cards[2].textContent = s.activeEnrollments ?? cards[2].textContent;
-    cards[3].textContent = s.pendingPayments ?? cards[3].textContent;
+  const cards = document.querySelectorAll('#admin-dashboard .stat-card');
+  const money = (n) => '₱' + Number(n || 0).toLocaleString('en-PH', { maximumFractionDigits: 0 });
+
+  const revenueSub = (function (now, before) {
+    const a = Number(now || 0), b = Number(before || 0);
+    if (!b) return 'No revenue last month';
+    const pct = Math.round(((a - b) / b) * 100);
+    if (pct === 0) return 'Same as last month';
+    return (pct > 0 ? '↑ ' + pct + '%' : '↓ ' + Math.abs(pct) + '%') + ' vs last month';
+  })(s.revenueMonth, s.revenueLastMonth);
+
+  setStatCard(cards[0], s.students, (s.activeEnrollments || 0) + ' active enrollments', 'up');
+  setStatCard(cards[1], s.schedulesToday, 'Across ' + (s.instructors || 0) + ' instructors', '');
+  setStatCard(cards[2], money(s.revenueMonth), revenueSub, 'up');
+  setStatCard(cards[3], s.pendingActions,
+    (s.pendingPayments || 0) + ' payments · ' + (s.pendingBookings || 0) + ' bookings · ' + (s.pendingIdVerifications || 0) + ' IDs', 'warn');
+
+  renderRecentEnrollments(data.recentEnrollments || []);
+  renderProficiency(data.proficiency || {});
+  renderCourseBreakdown(data.courseBreakdown || {});
+}
+
+function setStatCard(card, value, sub, tone){
+  if (!card) return;
+  const v = card.querySelector('.value');
+  if (v && value !== undefined && value !== null) v.textContent = value;
+  const s = card.querySelector('.sub');
+  if (s && sub) {
+    s.textContent = sub;
+    s.className = 'sub' + (tone ? ' ' + tone : '');
   }
+}
+
+function renderRecentEnrollments(list){
+  const tb = document.getElementById('recentEnrollmentsBody');
+  if (!tb) return;
+  tb.innerHTML = list.length ? list.map(e => {
+    const status = String(e.status || '').toLowerCase();
+    const badge = (status === 'active' || status === 'completed') ? 'enrolled' : 'pending';
+    const label = status ? status.charAt(0).toUpperCase() + status.slice(1) : '—';
+    const date = e.date ? new Date(e.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—';
+    return `<tr>
+      <td><b>${escapeHtml(e.student)}</b></td>
+      <td>${escapeHtml(e.course)}</td>
+      <td>${escapeHtml(date)}</td>
+      <td><span class="badge ${badge}">${escapeHtml(label)}</span></td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--gray);padding:18px;">No enrollments yet.</td></tr>';
+}
+
+function renderProficiency(p){
+  const wrap = document.getElementById('proficiencyBars');
+  if (!wrap) return;
+
+  const total = (p.fast || 0) + (p.average || 0) + (p.needs || 0);
+  const share = (n) => total ? Math.round((n / total) * 100) : 0;
+  const rows = [
+    ['Fast Learners', p.fast || 0, 'fast'],
+    ['Average Learners', p.average || 0, 'avg'],
+    ['Needs Improvement', p.needs || 0, 'needs'],
+  ];
+
+  wrap.innerHTML = rows.map(([label, count, cls]) => {
+    const pct = share(count);
+    return `<div class="prof-bar-item"><label>${label} <span>${pct}% · ${count}</span></label>
+      <div class="prof-bar-track"><div class="prof-bar-fill ${cls}" style="width:${pct}%"></div></div></div>`;
+  }).join('');
+}
+
+function renderCourseBreakdown(c){
+  const tdc = document.getElementById('courseTdcCount');
+  const pdc = document.getElementById('coursePdcCount');
+  if (tdc) tdc.textContent = c.tdc ?? 0;
+  if (pdc) pdc.textContent = c.pdc ?? 0;
 }
 
 async function loadStudents(page){
@@ -254,16 +564,23 @@ function renderStudents(students, pagination){
     const statusBadge = st.is_active ? 'active' : 'pending';
     const payBadge = st.payment_status === 'Paid' ? 'verified' : (st.payment_status === 'Pending' ? 'pending' : 'pending');
     const instructor = st.instructor_name ? escapeHtml(st.instructor_name) : '<span style="color:var(--gray);font-size:12px;">—</span>';
+    const idMeta = {
+      approved: ['verified', 'Verified'],
+      pending: ['pending', 'Pending'],
+      rejected: ['rejected', 'Rejected'],
+      none: ['upcoming', 'Not submitted']
+    }[st.id_status || 'none'] || ['upcoming', 'Not submitted'];
     return `<tr data-status="${status}" data-id="${st.id}">
       <td class="mono" style="color:var(--gray);font-size:12px;">#${st.id}</td>
       <td><b>${escapeHtml(st.name)}</b><br><span style="font-size:11.5px;color:var(--gray);">${maskEmail(st.email)}</span></td>
       <td>${escapeHtml(st.course)}</td>
       <td><span class="badge ${payBadge}">${escapeHtml(st.payment_status)}</span></td>
       <td><span class="badge ${statusBadge}">${status}</span></td>
+      <td><span class="badge ${idMeta[0]}">${idMeta[1]}</span></td>
       <td>${instructor}</td>
       <td><div style="display:flex;gap:6px;"><button class="btn btn-sm btn-ghost" onclick="viewStudent(this)">View</button><button class="btn btn-sm btn-ghost" onclick="openUserProfile(${st.user_id || 0},'${escapeHtml(st.name).replace(/'/g, "\\'")}')">Edit Profile</button><button class="btn btn-sm btn-primary" onclick="openAssignInstructorModal(${st.id})">Assign</button><button class="btn btn-sm btn-ghost" onclick="toggleStudentActive(${st.id})">${st.is_active ? 'Deactivate' : 'Activate'}</button><button class="btn btn-sm btn-danger" onclick="deleteStudent(this)">Delete</button></div></td>
     </tr>`;
-  }).join('') || `<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">No students yet.</td></tr>`;
+  }).join('') || `<tr><td colspan="8" style="text-align:center;color:var(--gray);padding:20px;">No students yet.</td></tr>`;
   filterStudents();
   renderPagination(document.getElementById('studentsTable'), 'studentsPagination', pagination, 'loadStudents');
 }
@@ -1043,10 +1360,184 @@ function exportPaymentsPDF(){
 }
 
 /* ============================================================
-   Certifications — issuing a certificate moves its row from
-   "Ready to Issue" to "Recently Issued", swaps the badge, and
-   generates a Valid ID (RCDA-<COURSE>-2026-####).
+   Valid ID verification queue — the admin opens the private file,
+   then approves or rejects it. Reviewing is status-only: an
+   unverified ID never blocks enrolment, booking or payment.
    ============================================================ */
+let ADMIN_ID_DOC_URL = '';
+
+async function loadIdVerifications(){
+  const status = (document.getElementById('idStatusFilter') || {}).value || 'pending';
+  const search = ((document.getElementById('idSearchInput') || {}).value || '').trim();
+
+  const params = new URLSearchParams({ status });
+  if (search) params.set('search', search);
+
+  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/id-verifications?${params.toString()}`, { method: 'GET' });
+  if (!ok || !data) return;
+
+  renderIdCounts(data.counts || {});
+  renderIdVerifications(data.verifications || []);
+}
+
+function renderIdCounts(counts){
+  const el = document.getElementById('idCounts');
+  if (!el) return;
+
+  const boxes = [
+    ['Pending review', counts.pending || 0],
+    ['Approved', counts.approved || 0],
+    ['Rejected', counts.rejected || 0],
+    ['Not submitted', counts.none || 0],
+  ];
+
+  el.innerHTML = boxes.map(([label, value]) =>
+    `<div style="background:var(--cream);border:1px solid var(--gray-light);border-radius:12px;padding:10px 16px;min-width:120px;">
+      <div style="font-size:11.5px;color:var(--gray);text-transform:uppercase;letter-spacing:.4px;">${label}</div>
+      <div style="font-size:20px;font-weight:800;color:var(--charcoal);">${value}</div>
+    </div>`).join('');
+}
+
+function idStatusText(status){
+  return { approved: 'Approved', pending: 'Pending', rejected: 'Rejected', none: 'Not submitted' }[status] || '—';
+}
+
+function idDate(value){
+  if (!value) return '—';
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function renderIdVerifications(list){
+  const tb = document.querySelector('#idVerificationsTable tbody');
+  if (!tb) return;
+
+  tb.innerHTML = list.length ? list.map(v => {
+    const badge = { approved: 'verified', pending: 'pending', rejected: 'rejected' }[v.status] || 'upcoming';
+    const actions = [];
+
+    if (v.has_document) {
+      actions.push(`<button class="btn btn-sm btn-ghost" onclick="viewIdDocument(${v.student_id})">View ID</button>`);
+    }
+    if (v.has_document && v.status !== 'approved') {
+      actions.push(`<button class="btn btn-sm btn-primary" onclick="approveId(${v.student_id},this)">Approve</button>`);
+    }
+    if (v.has_document && v.status !== 'rejected') {
+      actions.push(`<button class="btn btn-sm btn-danger" onclick="rejectId(${v.student_id},this)">Reject</button>`);
+    }
+
+    const reason = (v.status === 'rejected' && v.rejection_reason)
+      ? `<div style="font-size:11px;color:var(--gray);margin-top:4px;max-width:220px;">${escapeHtml(v.rejection_reason)}</div>`
+      : '';
+
+    return `<tr data-student-id="${v.student_id}">
+      <td><b>${escapeHtml(v.student_name || 'Student')}</b><br><span style="font-size:11.5px;color:var(--gray);">${escapeHtml(maskEmail(v.email || ''))}</span></td>
+      <td>${escapeHtml(v.document_type_label || '—')}<br><span style="font-size:11px;color:var(--gray);">${escapeHtml(v.document_name || '')}</span></td>
+      <td>${escapeHtml(idDate(v.submitted_at))}</td>
+      <td><span class="badge ${badge}">${escapeHtml(idStatusText(v.status))}</span>${reason}</td>
+      <td>${v.reviewed_by ? escapeHtml(v.reviewed_by) : '—'}${v.reviewed_at ? `<br><span style="font-size:11px;color:var(--gray);">${escapeHtml(idDate(v.reviewed_at))}</span>` : ''}</td>
+      <td><div style="display:flex;gap:6px;flex-wrap:wrap;">${actions.join('') || '<span style="font-size:12px;color:var(--gray);">—</span>'}</div></td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">Nothing to review here.</td></tr>';
+}
+
+async function viewIdDocument(studentId){
+  const body = document.getElementById('idDocumentBody');
+  const title = document.getElementById('idDocumentTitle');
+
+  clearIdDocument();
+  if (title) title.textContent = 'Loading valid ID…';
+  if (body) body.innerHTML = '<div style="color:var(--gray);font-size:13px;">Loading document…</div>';
+  openModal('idDocumentModal');
+
+  const res = await fetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/id-verifications/${studentId}/file`, {
+    headers: {
+      'Accept': '*/*',
+      'Authorization': 'Bearer ' + ((window.RCDA_AUTH && RCDA_AUTH.getToken && RCDA_AUTH.getToken()) || localStorage.getItem('rcda_token') || '')
+    }
+  });
+
+  if (!res.ok) {
+    if (body) body.innerHTML = '<div style="color:var(--danger2);font-size:13px;">Could not open this document.</div>';
+    return;
+  }
+
+  const blob = await res.blob();
+  ADMIN_ID_DOC_URL = URL.createObjectURL(blob);
+
+  if (title) title.textContent = 'Valid ID';
+  if (body) {
+    body.innerHTML = blob.type === 'application/pdf'
+      ? `<iframe src="${ADMIN_ID_DOC_URL}" title="Valid ID" style="width:100%;height:65vh;border:0;border-radius:10px;background:#fff;"></iframe>`
+      : `<img src="${ADMIN_ID_DOC_URL}" alt="Valid ID" style="max-width:100%;max-height:70vh;border-radius:10px;">`;
+  }
+}
+
+function clearIdDocument(){
+  if (ADMIN_ID_DOC_URL) {
+    URL.revokeObjectURL(ADMIN_ID_DOC_URL);
+    ADMIN_ID_DOC_URL = '';
+  }
+  const body = document.getElementById('idDocumentBody');
+  if (body) body.innerHTML = '';
+}
+
+function closeIdDocumentModal(){
+  clearIdDocument();
+  closeModal('idDocumentModal');
+}
+
+async function approveId(studentId, btn){
+  if (btn) { btn.disabled = true; btn.textContent = 'Approving…'; }
+
+  const { ok, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/id-verifications/${studentId}/approve`, { method: 'POST' });
+
+  if (!ok) {
+    RCDA.showToast(error || 'Could not approve the ID.', 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Approve'; }
+    return;
+  }
+
+  RCDA.showToast('Valid ID approved.', 'success');
+  loadIdVerifications();
+  loadDashboardStats();
+}
+
+async function rejectId(studentId, btn){
+  const reason = prompt('Why is this ID being rejected? The student will see this message.');
+  if (reason === null) return;
+  if (reason.trim().length < 5) {
+    RCDA.showToast('Write a short reason (at least 5 characters).', 'error');
+    return;
+  }
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Rejecting…'; }
+
+  const { ok, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/id-verifications/${studentId}/reject`, {
+    method: 'POST',
+    body: { reason: reason.trim() },
+  });
+
+  if (!ok) {
+    RCDA.showToast(error || 'Could not reject the ID.', 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Reject'; }
+    return;
+  }
+
+  RCDA.showToast('Valid ID rejected.', 'success');
+  loadIdVerifications();
+  loadDashboardStats();
+}
+
+/* ============================================================
+   Certifications — issuing a certificate moves its row from
+   "Ready to Issue" to "Recently Issued". Every issued certificate
+   can be re-opened, previewed and printed at any time from here.
+   ============================================================ */
+let ADMIN_CERTS = [];
+let CURRENT_CERT = null;
+
 /* Loads the "Ready to Issue" and "Recently Issued" lists from the
    API so certificates actually persist (previously client-only). */
 async function loadCertifications(){
@@ -1056,7 +1547,10 @@ async function loadCertifications(){
     RCDA.safeFetch(base, { method: 'GET' }),
   ]);
   if (ready.ok && ready.data) renderReadyCerts(ready.data.ready || []);
-  if (issued.ok && issued.data) renderIssuedCerts(issued.data.certifications || []);
+  if (issued.ok && issued.data) {
+    ADMIN_CERTS = issued.data.certifications || [];
+    renderIssuedCerts(ADMIN_CERTS);
+  }
 }
 
 function renderReadyCerts(list){
@@ -1084,11 +1578,25 @@ function renderReadyCerts(list){
 function renderIssuedCerts(list){
   const el = document.getElementById('certsIssuedList');
   if (!el) return;
-  el.innerHTML = list.length ? list.map(c => `
-    <div class="cert-row issued">
-      <div class="cert-info"><h4>${escapeHtml(c.student_name)} — ${escapeHtml(c.course.name)}</h4><span>Issued ${new Date(c.issued_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · Valid ID: ${escapeHtml(c.certificate_no)}</span></div>
-      <div><span class="badge verified">Issued</span></div>
-    </div>`).join('')
+  el.innerHTML = list.length ? list.map(c => {
+    const issued = c.issued_at
+      ? new Date(c.issued_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+      : '—';
+    const badge = c.status === 'revoked'
+      ? '<span class="badge needs">Revoked</span>'
+      : '<span class="badge verified">Issued</span>';
+    const courseName = (c.course && c.course.name) || '—';
+    return `<div class="cert-row issued" data-cert-id="${c.id}">
+      <div class="cert-info">
+        <h4>${escapeHtml(c.student_name || 'Student')} — ${escapeHtml(courseName)}</h4>
+        <span>Issued ${escapeHtml(issued)} · ${escapeHtml(c.certificate_no || '—')}${c.issued_by ? ' · by ' + escapeHtml(c.issued_by) : ''}</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">${badge}
+        <button class="btn btn-sm btn-ghost" onclick="viewCertificate(${c.id})">View Certificate</button>
+        <button class="btn btn-sm btn-primary" onclick="viewCertificate(${c.id}, true)">Print</button>
+      </div>
+    </div>`;
+  }).join('')
     : '<div style="font-size:12px;color:var(--gray);padding:14px 0;">No certificates issued yet.</div>';
 }
 
@@ -1100,12 +1608,6 @@ async function issueCertificate(btn, force = false){
   const courseId = row.dataset.courseId;
   if (!studentId || !courseId) { RCDA.showToast('Missing student or course for this certificate.', 'error'); return; }
 
-  const titleEl = row.querySelector('h4');
-  const title = titleEl ? titleEl.textContent.trim() : 'Student — Certificate';
-  const courseMatch = title.match(/(TDC|PDC)/);
-  const courseCode = courseMatch ? courseMatch[1] : 'CERT';
-  const studentName = title.split('—')[0].trim();
-
   const { ok, data, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/certifications`, {
     method: 'POST',
     body: { student_id: Number(studentId), course_id: Number(courseId), force: force ? 1 : 0 },
@@ -1114,158 +1616,140 @@ async function issueCertificate(btn, force = false){
   if (!ok) { RCDA.showToast(error || 'Could not issue certificate.', 'error'); return; }
 
   const cert = data.certification || {};
-  const validId = cert.certificate_no || `RCDA-${courseCode}-${new Date().getFullYear()}`;
-  const issuedDate = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  const issuedDateFull = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const fallbackNo = cert.certificate_no || 'RC-' + new Date().getFullYear();
 
-  const issuedRow = document.createElement('div');
-  issuedRow.className = 'cert-row issued';
-  issuedRow.innerHTML = `<div class="cert-info"><h4>${escapeHtml(title)}</h4><span>Issued ${issuedDate} · Valid ID: ${escapeHtml(validId)}</span></div><div><span class="badge verified">Issued</span></div>`;
+  RCDA.showToast('Certificate issued: ' + fallbackNo, 'success');
 
-  const issuedList = document.getElementById('certsIssuedList');
-  if (issuedList) issuedList.insertBefore(issuedRow, issuedList.firstChild);
+  await loadCertifications();
+  loadDashboardStats();
 
-  row.remove();
-  loadCertifications();
-
-  printCertificate(studentName, courseCode, validId, issuedDateFull, 'RC Driving Academy');
+  if (cert.id) {
+    viewCertificate(cert.id, true);
+  } else {
+    row.remove();
+  }
 }
 
-/* ============================================================
-   Load an image (by URL) as a base64 data URL so it can be
-   embedded into a jsPDF document via doc.addImage().
-   ============================================================ */
-function loadImageAsDataURL(url){
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        canvas.getContext('2d').drawImage(img, 0, 0);
-        resolve(canvas.toDataURL('image/png'));
-      } catch (err) {
-        reject(err);
-      }
-    };
-    img.onerror = reject;
-    img.src = url;
-  });
+/* ---------- Issued-certificate viewer / printer ---------- */
+
+function certDate(value, long){
+  if (!value) return '—';
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('en-US', long
+    ? { year: 'numeric', month: 'long', day: 'numeric' }
+    : { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-/* ============================================================
-   Print Certificate — builds a designed certificate PDF with
-   jsPDF (academy logo, seal, signature line) and opens the
-   browser's print dialog for it.
-   ============================================================ */
-async function printCertificate(studentName, courseCode, validId, issuedDateFull, instructor){
-  if (!window.jspdf) return;
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+const CERT_CSS = `
+.rcda-cert{position:relative;background:#fffdf8;border:2px solid #C0392B;border-radius:8px;padding:34px 42px 30px;text-align:center;color:#1F1F1F;font-family:'Poppins','Segoe UI',sans-serif;box-shadow:0 12px 34px rgba(0,0,0,.10);}
+.rcda-cert.revoked{opacity:.72;}
+.rcda-cert .cert-logo{width:62px;height:62px;object-fit:cover;border-radius:50%;margin:0 auto 10px;display:block;}
+.rcda-cert .cert-brand{font-size:12px;letter-spacing:3px;text-transform:uppercase;color:#C0392B;font-weight:700;}
+.rcda-cert h1{font-size:27px;margin:12px 0 6px;letter-spacing:.5px;}
+.rcda-cert .cert-sub{font-size:12.5px;color:#707070;margin:6px 0;}
+.rcda-cert .cert-name{font-size:31px;font-weight:800;border-bottom:2px solid #E7E5E2;padding:0 10px 10px;margin:6px auto 10px;max-width:560px;}
+.rcda-cert .cert-course{font-size:19px;font-weight:700;color:#C0392B;margin:8px 0 22px;}
+.rcda-cert .cert-meta{display:flex;justify-content:center;gap:34px;flex-wrap:wrap;margin-top:12px;padding-top:18px;border-top:1px solid #E7E5E2;}
+.rcda-cert .cert-meta div{min-width:140px;}
+.rcda-cert .cert-meta span{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:1.4px;color:#707070;margin-bottom:3px;}
+.rcda-cert .cert-meta b{font-size:13.5px;}
+.rcda-cert .cert-foot{font-size:11px;color:#707070;margin-top:22px;}
+.rcda-cert .cert-revoked{position:absolute;top:38%;left:50%;transform:translate(-50%,-50%) rotate(-18deg);font-size:58px;font-weight:800;color:rgba(192,57,43,.16);letter-spacing:8px;border:6px solid rgba(192,57,43,.16);padding:4px 22px;border-radius:12px;pointer-events:none;}
+@media print{body{margin:0;}.rcda-cert{border-radius:0;box-shadow:none;}}
+`;
 
-  const pageW = doc.internal.pageSize.getWidth();
-  const pageH = doc.internal.pageSize.getHeight();
-  const orange = [242, 106, 33];
-  const charcoal = [40, 40, 40];
-  const gray = [120, 120, 120];
+function ensureCertStyles(){
+  if (document.getElementById('rcda-cert-style')) return;
+  const s = document.createElement('style');
+  s.id = 'rcda-cert-style';
+  s.textContent = CERT_CSS;
+  document.head.appendChild(s);
+}
 
-  const courseName = courseCode === 'TDC' ? 'Theoretical Driving Course (TDC)' : 'Practical Driving Course (PDC)';
+function certificateMarkup(cert){
+  const logo = new URL('../images/RCDA logo.jpg', window.location.href).href;
+  const courseName = (cert.course && cert.course.name) || 'Driving Course';
+  const revoked = cert.status === 'revoked';
 
-  // Outer decorative border
-  doc.setDrawColor(...orange);
-  doc.setLineWidth(1.2);
-  doc.rect(10, 10, pageW - 20, pageH - 20);
-  doc.setLineWidth(0.4);
-  doc.rect(14, 14, pageW - 28, pageH - 28);
+  return `<div class="rcda-cert${revoked ? ' revoked' : ''}" id="certSheet">
+    <img src="${logo}" alt="RC Driving Academy" class="cert-logo" onerror="this.style.display='none'">
+    <div class="cert-brand">RC Driving Academy</div>
+    <h1>Certificate of Completion</h1>
+    <div class="cert-sub">This certifies that</div>
+    <div class="cert-name">${escapeHtml(cert.student_name || 'Student')}</div>
+    <div class="cert-sub">has successfully completed</div>
+    <div class="cert-course">${escapeHtml(courseName)}</div>
+    <div class="cert-meta">
+      <div><span>Certificate No.</span><b>${escapeHtml(cert.certificate_no || '—')}</b></div>
+      <div><span>Date Issued</span><b>${escapeHtml(certDate(cert.issued_at, true))}</b></div>
+      <div><span>Issued By</span><b>${escapeHtml(cert.issued_by || 'RC Driving Academy')}</b></div>
+    </div>
+    ${revoked ? '<div class="cert-revoked">REVOKED</div>' : ''}
+    <div class="cert-foot">Verify this certificate with RC Driving Academy using the certificate number above.</div>
+  </div>`;
+}
 
-  // Academy logo (falls back gracefully to text-only header if it can't load)
-  let hasLogo = false;
-  try {
-    const logoDataUrl = await loadImageAsDataURL('../images/RCDA logo.jpg');
-    const logoSize = 20;
-    doc.addImage(logoDataUrl, 'JPEG', pageW / 2 - logoSize / 2, 18, logoSize, logoSize);
-    hasLogo = true;
-  } catch (err) {
-    hasLogo = false;
+async function viewCertificate(id, autoPrint){
+  let cert = ADMIN_CERTS.find(c => Number(c.id) === Number(id)) || null;
+
+  // Always pull a fresh copy so the preview reflects the stored record,
+  // not a cached list row.
+  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/certifications/${id}`, { method: 'GET' });
+  if (ok && data && data.certification) cert = data.certification;
+
+  if (!cert) { RCDA.showToast('Could not load this certificate.', 'error'); return; }
+
+  CURRENT_CERT = cert;
+  ensureCertStyles();
+
+  const body = document.getElementById('certificateModalBody');
+  if (body) body.innerHTML = certificateMarkup(cert);
+
+  const title = document.getElementById('certificateModalTitle');
+  if (title) title.textContent = 'Certificate ' + (cert.certificate_no || '');
+
+  const revoke = document.getElementById('certRevokeBtn');
+  if (revoke) {
+    revoke.style.display = cert.status === 'revoked' ? 'none' : 'inline-flex';
   }
 
-  const headerY = hasLogo ? 44 : 30;
+  openModal('certificateModal');
 
-  // Header
-  doc.setTextColor(...orange);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.text('RC DRIVING ACADEMY', pageW / 2, headerY, { align: 'center' });
+  if (autoPrint) setTimeout(printCertificateSheet, 350);
+}
 
-  doc.setTextColor(...charcoal);
-  doc.setFontSize(28);
-  doc.text('Certificate of Completion', pageW / 2, headerY + 16, { align: 'center' });
+function printCertificateSheet(){
+  const sheet = document.getElementById('certSheet');
+  if (!sheet) return;
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(12);
-  doc.setTextColor(...gray);
-  doc.text('This certifies that', pageW / 2, headerY + 32, { align: 'center' });
+  const win = window.open('', '_blank');
+  if (!win) {
+    RCDA.showToast('Allow pop-ups to print the certificate.', 'error');
+    return;
+  }
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(26);
-  doc.setTextColor(...charcoal);
-  doc.text(studentName, pageW / 2, headerY + 46, { align: 'center' });
+  const docTitle = CURRENT_CERT && CURRENT_CERT.certificate_no ? CURRENT_CERT.certificate_no : 'Certificate';
+  win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + escapeHtml(docTitle) + '</title>'
+    + '<style>@page{size:A4 landscape;margin:14mm;}' + CERT_CSS + '</style></head><body>'
+    + sheet.outerHTML + '</body></html>');
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 400);
+}
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(12);
-  doc.setTextColor(...gray);
-  doc.text('has successfully completed the', pageW / 2, headerY + 58, { align: 'center' });
+async function revokeCertificate(){
+  if (!CURRENT_CERT || !CURRENT_CERT.id) return;
+  if (!confirm('Revoke certificate ' + (CURRENT_CERT.certificate_no || '') + '? It will be marked as no longer valid.')) return;
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.setTextColor(...orange);
-  doc.text(courseName, pageW / 2, headerY + 68, { align: 'center' });
+  const { ok, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/certifications/${CURRENT_CERT.id}/revoke`, { method: 'POST' });
+  if (!ok) { RCDA.showToast(error || 'Could not revoke the certificate.', 'error'); return; }
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(11);
-  doc.setTextColor(...gray);
-  doc.text(`Issued on ${issuedDateFull}`, pageW / 2, headerY + 80, { align: 'center' });
-
-  // Signature line (left of center)
-  const sigY = pageH - 28;
-  const sigX = pageW / 2 - 55;
-  doc.setDrawColor(...gray);
-  doc.setLineWidth(0.3);
-  doc.line(sigX - 35, sigY, sigX + 35, sigY);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(...charcoal);
-  doc.text(instructor, sigX, sigY + 6, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...gray);
-  doc.setFontSize(8.5);
-  doc.text('Instructor / Program Signatory', sigX, sigY + 11, { align: 'center' });
-
-  // Official seal (right of center) — drawn since we have no seal image
-  const sealX = pageW / 2 + 55;
-  const sealY = sigY - 6;
-  doc.setDrawColor(...orange);
-  doc.setLineWidth(1);
-  doc.circle(sealX, sealY, 12);
-  doc.setLineWidth(0.4);
-  doc.circle(sealX, sealY, 9.5);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7);
-  doc.setTextColor(...orange);
-  doc.text('RCDA', sealX, sealY - 1, { align: 'center' });
-  doc.setFontSize(5.5);
-  doc.text('OFFICIAL SEAL', sealX, sealY + 3.5, { align: 'center' });
-
-  // Valid ID footer
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(...gray);
-  doc.text(`Valid ID: ${validId}`, pageW - 20, pageH - 16, { align: 'right' });
-
-  doc.autoPrint();
-  window.open(doc.output('bloburl'), '_blank');
+  RCDA.showToast('Certificate revoked.', 'success');
+  closeModal('certificateModal');
+  CURRENT_CERT = null;
+  loadCertifications();
+  loadDashboardStats();
 }
 
 /* ============================================================
@@ -1322,30 +1806,264 @@ async function loadReports(){
 }
 
 /* ============================================================
-   Notifications — show channel status + recent log from
-   /admin/notifications (works without provider keys; the log
-   records every attempt so delivery can be verified later).
+   Notifications — one tab per category (payments, accounts,
+   requests, chat escalations, certificates) plus the SMS /
+   email / maps delivery log. Feed comes from /admin/notifications.
    ============================================================ */
-async function loadNotifications(){
-  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/notifications`, { method: 'GET' });
-  if (!ok || !data) return;
+let NOTIF_CATEGORY = '';   // '' = all feed entries, 'log' = delivery log
+let NOTIF_PAGE = 1;
 
-  const ch = data.channels || {};
+const NOTIF_FEED_TABS = [
+  { key: '', label: 'All' },
+  { key: 'payment', label: 'Payments' },
+  { key: 'account', label: 'Accounts' },
+  { key: 'request', label: 'Requests' },
+  { key: 'chat', label: 'Chat' },
+  { key: 'certificate', label: 'Certificates' },
+  { key: 'log', label: 'Delivery log' },
+];
+
+const NOTIF_META = {
+  payment: { label: 'Payment', cls: 'payment' },
+  account: { label: 'Account', cls: 'account' },
+  request: { label: 'Request', cls: 'request' },
+  chat: { label: 'Chat escalation', cls: 'chat' },
+  certificate: { label: 'Certificate', cls: 'certificate' },
+};
+
+const NOTIF_ICONS = {
+  payment: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2.5" y="5.5" width="19" height="13" rx="2.5"/><path d="M2.5 10h19"/><path d="M6 15h4"/></svg>',
+  account: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+  request: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg>',
+  chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>',
+  certificate: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>',
+};
+
+function notifTimeAgo(iso) {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (isNaN(date)) return '';
+  const diff = Math.max(0, Math.round((Date.now() - date.getTime()) / 1000));
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+  if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+  return date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+}
+
+function updateNotifNavBadge(counts) {
+  const badge = document.getElementById('notifNavBadge');
+  if (!badge) return;
+  const unread = (counts && counts.unread) || 0;
+  badge.textContent = unread > 99 ? '99+' : String(unread);
+  badge.hidden = unread < 1;
+}
+
+function toggleNotifPanes() {
+  const log = NOTIF_CATEGORY === 'log';
+  const feedPane = document.getElementById('notifFeedPane');
+  const logPane = document.getElementById('notifLogPane');
+  if (feedPane) feedPane.hidden = log;
+  if (logPane) logPane.hidden = !log;
+
+  const markAll = document.getElementById('notifMarkAll');
+  if (markAll) {
+    markAll.disabled = log;
+    markAll.style.opacity = log ? '.45' : '';
+  }
+}
+
+function renderNotifTabs(counts) {
+  const host = document.getElementById('notifTabs');
+  if (!host) return;
+
+  const cats = (counts && counts.categories) || {};
+  const totalUnread = (counts && counts.unread) || 0;
+
+  host.innerHTML = NOTIF_FEED_TABS.map(tab => {
+    const active = tab.key === NOTIF_CATEGORY;
+    const unread = tab.key === 'log'
+      ? 0
+      : (tab.key ? (cats[tab.key] || {}).unread || 0 : totalUnread);
+
+    return `<button type="button" class="notif-tab${active ? ' active' : ''}" role="tab"
+        aria-selected="${active}" onclick="setNotifTab('${tab.key}')">
+        ${tab.label}${unread ? `<span class="notif-count">${unread}</span>` : ''}
+      </button>`;
+  }).join('');
+}
+
+function renderNotifSummary(counts) {
+  const el = document.getElementById('notifUnreadSummary');
+  if (!el) return;
+  const total = (counts && counts.total) || 0;
+  const unread = (counts && counts.unread) || 0;
+  el.textContent = total ? `${unread} unread · ${total} total` : '';
+}
+
+function renderNotifFeed(feed, pagination) {
+  const host = document.getElementById('notifFeed');
+  const pager = document.getElementById('notifPager');
+  if (!host) return;
+
+  if (!Array.isArray(feed)) {
+    host.innerHTML = `<div class="notif-loading">
+      <div class="notif-spin"></div>
+      <span>Loading notifications…</span>
+    </div>`;
+    if (pager) pager.innerHTML = '';
+    return;
+  }
+
+  if (!feed.length) {
+    const tab = NOTIF_FEED_TABS.find(t => t.key === NOTIF_CATEGORY);
+    const label = tab && tab.key ? tab.label.toLowerCase() : '';
+    host.innerHTML = `<div class="notif-empty">
+      <b>You're all caught up.</b>
+      <span>${label ? `No ${escapeHtml(label)} notifications yet.` : 'New payments, accounts, requests, chat escalations and certificates will appear here.'}</span>
+    </div>`;
+    if (pager) pager.innerHTML = '';
+    return;
+  }
+
+  host.innerHTML = feed.map(n => {
+    const meta = NOTIF_META[n.category] || { label: 'Notification', cls: 'system' };
+    const panel = (n.meta && n.meta.panel) || '';
+    const unread = !n.read;
+
+    return `<button type="button" class="notif-item ${meta.cls}${unread ? ' unread' : ''}"
+        onclick="openNotif(${n.id}, '${escapeHtml(panel)}')">
+        <span class="notif-ico">${NOTIF_ICONS[n.category] || ''}</span>
+        <span class="notif-main">
+          <span class="notif-top">
+            <b>${escapeHtml(n.title || meta.label)}</b>
+            <span class="notif-time">${escapeHtml(notifTimeAgo(n.created_at))}</span>
+          </span>
+          ${n.body ? `<span class="notif-body">${escapeHtml(n.body)}</span>` : ''}
+          <span class="notif-foot">
+            <span class="notif-cat">${meta.label}</span>
+            ${n.user_name ? `<span class="notif-user">${escapeHtml(n.user_name)}</span>` : ''}
+            ${panel ? '<span class="notif-open">Open ›</span>' : ''}
+          </span>
+        </span>
+        ${unread ? '<span class="notif-dot" aria-label="Unread"></span>' : ''}
+      </button>`;
+  }).join('');
+
+  if (!pager) return;
+  const page = (pagination && pagination.current_page) || 1;
+  const last = (pagination && pagination.last_page) || 1;
+  pager.innerHTML = last > 1
+    ? `<button type="button" class="btn btn-sm btn-ghost" ${page <= 1 ? 'disabled' : ''} onclick="loadNotifications(${page - 1})">‹ Prev</button>
+       <span>Page ${page} of ${last}</span>
+       <button type="button" class="btn btn-sm btn-ghost" ${page >= last ? 'disabled' : ''} onclick="loadNotifications(${page + 1})">Next ›</button>`
+    : '';
+}
+
+function renderNotifLog(channels, logs) {
+  const ch = channels || {};
   const badge = on => on ? '<span class="badge active">Live</span>' : '<span class="badge pending">Disabled</span>';
-  document.getElementById('notifChannels').innerHTML = `
-    <div style="background:var(--cream);border:1px solid var(--gray-light);border-radius:10px;padding:8px 14px;">SMS ${badge(ch.sms_enabled)}</div>
-    <div style="background:var(--cream);border:1px solid var(--gray-light);border-radius:10px;padding:8px 14px;">Email ${badge(ch.mail_enabled)}</div>
-    <div style="background:var(--cream);border:1px solid var(--gray-light);border-radius:10px;padding:8px 14px;">Maps ${badge(ch.maps_enabled)}</div>`;
+  const channelHost = document.getElementById('notifChannels');
+  if (channelHost) {
+    channelHost.innerHTML = `
+      <div class="notif-channel">SMS ${badge(ch.sms_enabled)}</div>
+      <div class="notif-channel">Email ${badge(ch.mail_enabled)}</div>
+      <div class="notif-channel">Maps ${badge(ch.maps_enabled)}</div>`;
+  }
 
-  const logs = data.logs || [];
-  document.getElementById('notifLog').innerHTML = logs.length ? logs.map(l => {
+  const logHost = document.getElementById('notifLog');
+  if (!logHost) return;
+
+  if (!Array.isArray(logs)) {
+    logHost.innerHTML = `<div class="notif-loading"><div class="notif-spin"></div><span>Loading delivery log…</span></div>`;
+    return;
+  }
+
+  logHost.innerHTML = logs.length ? logs.map(l => {
     const sent = l.sent ? '<span class="badge verified">Sent</span>' : '<span class="badge pending">Logged</span>';
     const when = l.created_at ? new Date(l.created_at).toLocaleString('en-PH') : '';
-    return `<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--gray-light);border-radius:10px;margin-bottom:8px;">
+    return `<div class="notif-log-row">
       <div><b>${escapeHtml((l.channel || '').toUpperCase())} · ${escapeHtml(l.event || '')}</b><br>
       <span style="font-size:12px;color:var(--gray);">${escapeHtml(l.recipient || '')} · ${escapeHtml(when)}</span></div>
       ${sent}</div>`;
-  }).join('') : '<div style="color:var(--gray);padding:14px 0;">No notifications sent yet. They fire on registration, payment, and certificate issuance.</div>';
+  }).join('') : '<div class="notif-empty"><b>No delivery attempts yet.</b><span>They fire on registration, payment verification and certificate issuance.</span></div>';
+}
+
+async function loadNotifications(page) {
+  NOTIF_PAGE = page || 1;
+  toggleNotifPanes();
+
+  const feedHost = document.getElementById('notifFeed');
+  const logHost = document.getElementById('notifLog');
+  if (feedHost && (!Array.isArray(window._notifFeedCache) || page)) {
+    feedHost.innerHTML = `<div class="notif-loading"><div class="notif-spin"></div><span>Loading notifications…</span></div>`;
+  }
+  if (logHost && NOTIF_CATEGORY === 'log') {
+    logHost.innerHTML = `<div class="notif-loading"><div class="notif-spin"></div><span>Loading delivery log…</span></div>`;
+  }
+
+  const params = new URLSearchParams();
+  if (NOTIF_CATEGORY && NOTIF_CATEGORY !== 'log') params.set('category', NOTIF_CATEGORY);
+  if (NOTIF_CATEGORY === 'log') params.set('load_log', '1');
+  params.set('feed_page', NOTIF_PAGE);
+
+  const { ok, data } = await RCDA.safeFetch(
+    `${RCDA_CONFIG.getApiBaseUrl()}/admin/notifications?${params.toString()}`,
+    { method: 'GET' }
+  );
+
+  if (!ok || !data) {
+    const host = document.getElementById('notifFeed');
+    if (host) host.innerHTML = '<div class="notif-empty"><b>Could not load notifications.</b><span>Please try again in a moment.</span></div>';
+    return;
+  }
+
+  renderNotifTabs(data.counts);
+  renderNotifSummary(data.counts);
+  window._notifFeedCache = data.feed || [];
+  renderNotifFeed(window._notifFeedCache, data.feed_pagination || {});
+  if (NOTIF_CATEGORY === 'log') {
+    renderNotifLog(data.channels, data.logs || []);
+  }
+  updateNotifNavBadge(data.counts);
+}
+
+async function loadNotifSummary() {
+  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/notifications/summary`, { method: 'GET' });
+  if (ok && data) updateNotifNavBadge(data.counts);
+}
+
+function setNotifTab(key) {
+  NOTIF_CATEGORY = key || '';
+  NOTIF_PAGE = 1;
+  toggleNotifPanes();
+  loadNotifications(1);
+}
+
+async function markNotificationsRead(payload) {
+  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/notifications/read`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  if (ok && data && data.counts) updateNotifNavBadge(data.counts);
+  return ok ? data : null;
+}
+
+async function openNotif(id, panel) {
+  await markNotificationsRead({ ids: [id] });
+
+  if (panel && ADMIN_TITLES[panel]) {
+    showPanel(panel, typeof navItemForPanel === 'function' ? navItemForPanel(panel) : null);
+    return;
+  }
+
+  loadNotifications(NOTIF_PAGE);
+}
+
+async function markAllNotificationsRead() {
+  if (NOTIF_CATEGORY === 'log') return;
+  await markNotificationsRead(NOTIF_CATEGORY ? { category: NOTIF_CATEGORY } : { all: true });
+  loadNotifications(NOTIF_PAGE);
 }
 
 /* ---- STUDENT REQUESTS (booking + instructor preference + reschedule) ---- */
@@ -1356,6 +2074,14 @@ async function loadAdminRequests(page) {
   const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/requests` + (qs ? (qs + '&page=' + page) : ('?page=' + page)));
   const tb = document.getElementById('requestsTbody');
   if (!tb) return;
+
+  // The override dropdown needs the instructor list; it may not have loaded yet.
+  if (!ADMIN_INSTRUCTORS.length) {
+    try { await loadInstructorList(); } catch (e) { /* keep the page usable */ }
+  }
+  const pdcInstructors = ADMIN_INSTRUCTORS.filter(i => !i.specialization || String(i.specialization).includes('PDC'));
+  const instructorOptions = pdcInstructors.length ? pdcInstructors : ADMIN_INSTRUCTORS;
+
   if (!ok || !data) { tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">Could not load requests.</td></tr>'; return; }
 
   const list = data.requests || [];
@@ -1371,7 +2097,17 @@ async function loadAdminRequests(page) {
       detail = `From: ${r.from_schedule ? escapeHtml((r.from_schedule.course || '') + ' · ' + r.from_schedule.date + ' ' + r.from_schedule.time_start) : '—'}<br>To: ${r.to_schedule ? escapeHtml((r.to_schedule.course || '') + ' · ' + r.to_schedule.date + ' ' + r.to_schedule.time_start) : '—'}`;
     } else if (r.type === 'booking') {
       const inst = r.preferred_instructor ? r.preferred_instructor.name : 'Any available';
-      detail = `Preferred date: <b>${escapeHtml(String(r.preferred_date || '—'))}</b><br>Requested instructor: ${escapeHtml(inst)}`;
+      const pref = r.preferred_instructor_gender ? ` · student prefers ${r.preferred_instructor_gender}` : '';
+      detail = `Preferred date: <b>${escapeHtml(String(r.preferred_date || '—'))}</b><br>Auto-assigned: ${escapeHtml(inst)}${escapeHtml(pref)}`;
+
+      if (r.status === 'pending' && instructorOptions.length) {
+        detail += `<div style="margin-top:6px;display:flex;align-items:center;gap:6px;">
+          <span style="font-size:11.5px;color:var(--gray);white-space:nowrap;">Assign:</span>
+          <select id="reqInst-${r.id}" style="padding:5px 8px;border-radius:8px;border:1.5px solid var(--gray-light);font-size:12px;background:var(--cream);max-width:240px;">
+            ${instructorOptions.map(i => `<option value="${i.id}" ${r.preferred_instructor && i.id === r.preferred_instructor.id ? 'selected' : ''}>${escapeHtml(i.name)}${i.gender ? ' (' + escapeHtml(i.gender) + ')' : ''}${i.specialization ? ' · ' + escapeHtml(i.specialization) : ''}</option>`).join('')}
+          </select>
+        </div>`;
+      }
     } else {
       const pref = r.preferred_gender === 'male' ? 'Male' : (r.preferred_gender === 'female' ? 'Female' : 'No preference');
       detail = `Requested instructor gender: <b>${escapeHtml(pref)}</b>`;
@@ -1400,7 +2136,11 @@ async function loadAdminRequests(page) {
 }
 
 async function acceptRequest(id) {
-  const { ok, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/requests/${id}/accept`, { method: 'POST' });
+  const sel = document.getElementById('reqInst-' + id);
+  const body = {};
+  if (sel && sel.value) body.instructor_id = sel.value;
+
+  const { ok, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/requests/${id}/accept`, { method: 'POST', body });
   if (!ok) { RCDA.showToast(error || 'Could not accept request.'); return; }
   RCDA.showToast('Request accepted. Student notified.', 'success');
   loadAdminRequests();

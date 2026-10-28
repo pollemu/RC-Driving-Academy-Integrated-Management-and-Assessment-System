@@ -50,11 +50,11 @@ class FeedbackController extends Controller
         $data = $request->validate([
             'raw_text' => ['required', 'string', 'min:10'],
             'star_steering' => ['nullable', 'integer', 'between:1,5'],
-            'star_speed' => ['nullable', 'integer', 'between:1,5'],
-            'star_lane' => ['nullable', 'integer', 'between:1,5'],
-            'star_parking' => ['nullable', 'integer', 'between:1,5'],
-            'star_safety' => ['nullable', 'integer', 'between:1,5'],
+            'star_brake' => ['nullable', 'integer', 'between:1,5'],
             'star_mirror' => ['nullable', 'integer', 'between:1,5'],
+            'note_steering' => ['nullable', 'string', 'max:120'],
+            'note_brake' => ['nullable', 'string', 'max:120'],
+            'note_mirror' => ['nullable', 'string', 'max:120'],
         ]);
 
         $feedback = Feedback::updateOrCreate(

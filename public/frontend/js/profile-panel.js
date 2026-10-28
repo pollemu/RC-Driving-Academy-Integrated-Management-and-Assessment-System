@@ -29,6 +29,43 @@
     else alert(message);
   }
 
+  /* Human labels for the valid-ID workflow (matches the server's states). */
+  var ID_LABELS = {
+    none: 'Not submitted',
+    pending: 'Awaiting review',
+    approved: 'Verified',
+    rejected: 'Needs attention'
+  };
+
+  var ID_PILL_CLASS = {
+    none: '',
+    pending: 'warn',
+    approved: 'ok',
+    rejected: 'bad'
+  };
+
+  function idStatusLabel(status) {
+    return ID_LABELS[status] || ID_LABELS.none;
+  }
+
+  /* Laravel returns validation failures as { errors: { field: [msg] } }. */
+  function firstError(data, fallback) {
+    if (data && data.errors) {
+      var keys = Object.keys(data.errors);
+      if (keys.length && data.errors[keys[0]] && data.errors[keys[0]][0]) {
+        return data.errors[keys[0]][0];
+      }
+    }
+    return (data && data.message) || fallback;
+  }
+
+  function fmtDate(value) {
+    if (!value) return '';
+    var d = new Date(value);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
   function field(id, label, value, type, extra) {
     return '<div class="rp-field"><label for="' + id + '">' + label + '</label>' +
       '<input id="' + id + '" type="' + (type || 'text') + '" value="' + esc(value || '') + '"' + (extra || '') + '></div>';
@@ -103,6 +140,7 @@
         row('Address', student.address);
         row('License type', student.license_type);
         row('Gender', student.gender);
+        row('Valid ID', idStatusLabel(student.id_status));
       } else if (user.role === 'instructor') {
         row('Phone', instructor.phone);
         row('Specialization', instructor.specialization);
@@ -150,6 +188,31 @@
         }.bind(this));
     },
 
+    /* The Valid ID card is used in two places: inside the full profile
+       form and stand-alone on the dashboard (via renderIdCard). */
+    idCardHtml: function (p) {
+      var html = '<div class="card rp-id-card">';
+      html += '<div class="card-head"><h3>Valid ID Verification</h3><span class="rp-pill" id="' + p + 'idPill">Checking…</span></div>';
+      html += '<p class="rp-hint">Upload one clear photo or PDF of a government-issued ID so the registrar can verify your identity. The file is stored privately and is only visible to you and the academy admin.</p>';
+      html += '<div class="rp-id-body"><div class="rp-loading">Loading verification status...</div></div>';
+      html += '</div>';
+      return html;
+    },
+
+    /* Stand-alone mount: RCDAProfile.renderIdCard({ container }) */
+    renderIdCard: function (opts) {
+      opts = opts || {};
+      var container = typeof opts.container === 'string' ? document.getElementById(opts.container) : opts.container;
+      if (!container) return;
+
+      var p = nextPrefix();
+      container.dataset.rpRole = 'student';
+      container.dataset.rpPrefix = p;
+      container.innerHTML = this.idCardHtml(p);
+      this.styles();
+      this.mountIdCard(container);
+    },
+
     paint: function (container, data, opts) {
       var mode = opts.mode || 'self';
       var user = data.user || {};
@@ -167,12 +230,12 @@
       html += '<div class="card-head"><h3>' + (isSelf ? 'My Profile' : 'Edit Profile') + '</h3>' +
         '<span class="rp-pill' + (user.email_verified ? ' ok' : '') + '">' + (user.email_verified ? 'Email verified' : 'Email not verified') + '</span></div>';
       html += '<div class="rp-form">';
-      html += field(p + 'name', 'Full Name', user.name, 'text', ' required');
+      html += field(p + 'name', 'Full Name', user.name, 'text', ' required maxlength="60" oninput="sanitizeNameInput(this)"');
       html += field(p + 'email', 'Email', user.email, 'email', ' required');
 
       if (role === 'student') {
-        html += field(p + 'phone', 'Phone', student.phone, 'text');
-        html += field(p + 'address', 'Address', student.address, 'text');
+        html += field(p + 'phone', 'Phone', student.phone, 'text', ' inputmode="numeric" maxlength="11" placeholder="09XXXXXXXXX" oninput="sanitizePhoneInput(this)"');
+        html += field(p + 'address', 'Address', student.address, 'text', ' maxlength="500"');
         html += field(p + 'birthdate', 'Birthdate', student.birthdate, 'date');
         html += select(p + 'license_type', 'License Type', student.license_type, [
           ['', '— Not set —'], ['student-permit', 'Student Permit'], ['non-pro', 'Non-Pro'], ['pro', 'Pro']
@@ -181,7 +244,7 @@
           ['', '— Not set —'], ['male', 'Male'], ['female', 'Female'], ['other', 'Other']
         ]);
       } else if (role === 'instructor') {
-        html += field(p + 'phone', 'Phone', instructor.phone, 'text');
+        html += field(p + 'phone', 'Phone', instructor.phone, 'text', ' inputmode="numeric" maxlength="11" placeholder="09XXXXXXXXX" oninput="sanitizePhoneInput(this)"');
         html += field(p + 'specialization', 'Specialization', instructor.specialization, 'text');
         html += field(p + 'license_no', 'License No.', instructor.license_no, 'text');
         html += select(p + 'gender', 'Gender', instructor.gender, [
@@ -225,6 +288,11 @@
         '</div>';
       html += '</div></div>';
 
+      /* ---------- Valid ID (students, self-service only) ---------- */
+      if (isSelf && role === 'student') {
+        html += this.idCardHtml(p);
+      }
+
       html += '</div>';
 
       container.innerHTML = html;
@@ -233,6 +301,7 @@
       container.dataset.rpRole = role || '';
       container.dataset.rpPrefix = p;
       this.styles();
+      this.mountIdCard(container);
     },
 
     togglePw: function (id, btn) {
@@ -279,6 +348,18 @@
       var mode = host ? host.getAttribute('data-rp-mode') : 'self';
       var userId = host ? host.getAttribute('data-rp-user-id') : '';
       var payload = this._collect(host);
+
+      /* Keep the client in lock-step with the server rules so a bad name or
+         phone never costs a round-trip (and the message is friendlier). */
+      if (typeof isValidPersonName === 'function' && payload.name && !isValidPersonName(payload.name)) {
+        toast('Names may only use letters, spaces, periods, apostrophes and hyphens (2–60 characters).', 'error');
+        return;
+      }
+      if (typeof isValidPhMobile === 'function' && payload.phone && !isValidPhMobile(payload.phone)) {
+        toast('Phone must be an 11-digit mobile number starting with 09.', 'error');
+        return;
+      }
+
       var url = (mode === 'adminEdit' && userId)
         ? apiBase() + '/admin/users/' + userId + '/profile'
         : apiBase() + '/profile';
@@ -371,6 +452,177 @@
       });
     },
 
+    /* ---------- Valid ID verification ---------- */
+
+    _headers: function (json) {
+      var h = { 'Accept': 'application/json' };
+      if (token()) h['Authorization'] = 'Bearer ' + token();
+      if (json) h['Content-Type'] = 'application/json';
+      return h;
+    },
+
+    mountIdCard: function (container) {
+      var card = container ? container.querySelector('.rp-id-card') : null;
+      if (!card) return;
+
+      var p = (container.getAttribute && container.getAttribute('data-rp-prefix')) || '';
+      var self = this;
+
+      fetch(apiBase() + '/student/id-document', { headers: this._headers(false) })
+        .then(function (res) { return res.json().then(function (d) { return { ok: res.ok, data: d }; }); })
+        .then(function (r) {
+          if (!r.ok) throw new Error(firstError(r.data, 'Could not load your verification status.'));
+          self.paintIdCard(card, r.data || {}, p);
+        })
+        .catch(function (e) {
+          var body = card.querySelector('.rp-id-body');
+          if (body) body.innerHTML = '<div class="rp-error">' + esc(e.message) + '</div>';
+        });
+    },
+
+    paintIdCard: function (card, data, p) {
+      if (!card) return;
+
+      var doc = data.id || {};
+      var status = doc.status || 'none';
+      var types = data.types || [];
+      var maxKb = data.max_kb || 5120;
+
+      var pill = card.querySelector('#' + p + 'idPill');
+      if (pill) {
+        pill.textContent = idStatusLabel(status);
+        pill.className = 'rp-pill ' + (ID_PILL_CLASS[status] || '');
+      }
+
+      var html = '';
+
+      if (doc.has_document) {
+        html += '<div class="rp-id-doc">';
+        html += '<div class="rp-id-meta">';
+        html += '<b>' + esc(doc.document_type_label || 'Valid ID') + '</b>';
+        html += '<span>' + esc(doc.document_name || 'Uploaded file') + '</span>';
+        html += '</div>';
+        html += '<button type="button" class="btn btn-sm btn-ghost" onclick="RCDAProfile.viewIdDocument(this)">View file</button>';
+        html += '</div>';
+
+        var meta = [];
+        if (doc.submitted_at) meta.push('Submitted ' + fmtDate(doc.submitted_at));
+        if (doc.reviewed_at) meta.push('Reviewed ' + fmtDate(doc.reviewed_at));
+        if (meta.length) html += '<p class="rp-hint">' + esc(meta.join(' · ')) + '</p>';
+      }
+
+      if (status === 'approved') {
+        html += '<div class="rp-id-note ok">Your ID has been verified by the academy. Nothing else to do.</div>';
+      } else if (status === 'pending') {
+        html += '<div class="rp-id-note warn">Your ID is waiting for admin review. Uploading a new file restarts the review.</div>';
+      } else if (status === 'rejected') {
+        html += '<div class="rp-id-note bad"><b>This ID was not accepted.</b> ' +
+          esc(doc.rejection_reason || 'Please upload a clearer copy of a valid government ID.') + '</div>';
+      } else {
+        html += '<div class="rp-id-note">No ID on file yet. Upload one below to get verified.</div>';
+      }
+
+      var form = '<div class="rp-id-form">';
+      form += '<div class="rp-field"><label for="' + p + 'idType">ID type</label><select id="' + p + 'idType">';
+      types.forEach(function (t) {
+        form += '<option value="' + esc(t.value) + '"' +
+          (doc.document_type === t.value ? ' selected' : '') + '>' + esc(t.label) + '</option>';
+      });
+      form += '</select></div>';
+      form += '<div class="rp-field"><label for="' + p + 'idFile">ID photo or PDF</label>';
+      form += '<input id="' + p + 'idFile" type="file" accept="image/jpeg,image/png,image/webp,application/pdf">';
+      form += '<span class="rp-hint">JPG, PNG, WEBP or PDF — up to ' + Math.round(maxKb / 1024) + ' MB.</span></div>';
+      form += '<label class="rp-id-consent"><input id="' + p + 'idConsent" type="checkbox"> ' +
+        'This ID is mine and I allow RC Driving Academy to review it.</label>';
+      form += '<div class="rp-actions"><button type="button" class="btn btn-primary" onclick="RCDAProfile.uploadId(this)">' +
+        (doc.has_document ? 'Submit replacement' : 'Submit for review') + '</button></div>';
+      form += '</div>';
+
+      if (doc.has_document) {
+        html += '<details class="rp-id-replace"><summary>Replace this ID</summary>' + form + '</details>';
+      } else {
+        html += form;
+      }
+
+      var body = card.querySelector('.rp-id-body');
+      if (body) body.innerHTML = html;
+    },
+
+    uploadId: function (btn) {
+      var card = btn.closest('.rp-id-card');
+      var container = btn.closest('[data-rp-prefix]');
+      var p = (container && container.getAttribute && container.getAttribute('data-rp-prefix')) || '';
+
+      var fileEl = document.getElementById(p + 'idFile');
+      var typeEl = document.getElementById(p + 'idType');
+      var consentEl = document.getElementById(p + 'idConsent');
+
+      var file = fileEl && fileEl.files ? fileEl.files[0] : null;
+      if (!file) { toast('Choose the ID file to upload first.', 'error'); return; }
+
+      var allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+      if (file.type && allowed.indexOf(file.type) === -1) {
+        toast('Upload a JPG, PNG, WEBP or PDF file.', 'error'); return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast('The file must be 5 MB or smaller.', 'error'); return;
+      }
+      if (!consentEl || !consentEl.checked) {
+        toast('Please confirm the ID is yours and may be reviewed.', 'error'); return;
+      }
+
+      var form = new FormData();
+      form.append('document', file);
+      form.append('document_type', typeEl ? typeEl.value : '');
+      form.append('consent', '1');
+
+      var old = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Uploading...';
+
+      fetch(apiBase() + '/student/id-document', {
+        method: 'POST',
+        headers: this._headers(false),
+        body: form
+      })
+        .then(function (res) {
+          return res.json()
+            .then(function (d) { return { ok: res.ok, data: d }; })
+            .catch(function () { return { ok: res.ok, data: null }; });
+        })
+        .then(function (r) {
+          if (!r.ok) throw new Error(firstError(r.data, 'The upload did not go through. Please try again.'));
+          toast((r.data && r.data.message) || 'Valid ID submitted for review.', 'success');
+          if (container) this.mountIdCard(container);
+          document.dispatchEvent(new CustomEvent('rcda:id-updated'));
+        }.bind(this))
+        .catch(function (e) { toast(e.message, 'error'); })
+        .finally(function () { btn.disabled = false; btn.textContent = old; });
+    },
+
+    viewIdDocument: function () {
+      var win = window.open('', '_blank');
+      if (win) {
+        win.document.write('<p style="font-family:sans-serif;padding:24px;color:#555;">Opening your ID…</p>');
+      }
+
+      fetch(apiBase() + '/student/id-document/file', { headers: this._headers(false) })
+        .then(function (res) {
+          if (!res.ok) throw new Error('Could not open the document.');
+          return res.blob();
+        })
+        .then(function (blob) {
+          var url = URL.createObjectURL(blob);
+          if (win) win.location = url;
+          else window.open(url, '_blank');
+          setTimeout(function () { URL.revokeObjectURL(url); }, 600000);
+        })
+        .catch(function (e) {
+          if (win) win.close();
+          toast(e.message, 'error');
+        });
+    },
+
     _send: function (btn, method, url, payload, okMessage, after, quiet) {
       var old = btn.textContent;
       btn.disabled = true;
@@ -424,6 +676,25 @@
         '.rp-summary-card .rp-hint{margin-top:16px;}',
         '.rp-pill{font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:999px;background:var(--gray-light);color:var(--gray);}',
         '.rp-pill.ok{background:var(--success-bg);color:var(--success);}',
+        '.rp-pill.warn{background:var(--warn2-bg);color:var(--warn2);}',
+        '.rp-pill.bad{background:var(--danger2-bg);color:var(--danger2);}',
+        '.rp-id-card{display:flex;flex-direction:column;gap:14px;}',
+        '.rp-id-body{display:flex;flex-direction:column;gap:12px;}',
+        '.rp-id-doc{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--gray-light);border-radius:12px;background:var(--cream);}',
+        '.rp-id-meta{display:flex;flex-direction:column;gap:2px;min-width:0;}',
+        '.rp-id-meta b{font-size:14px;color:var(--charcoal);}',
+        '.rp-id-meta span{font-size:12px;color:var(--gray);word-break:break-all;}',
+        '.rp-id-note{font-size:13px;color:var(--charcoal);padding:11px 14px;border-radius:11px;background:var(--cream);border:1px solid var(--gray-light);}',
+        '.rp-id-note.ok{background:var(--success-bg);border-color:transparent;color:#146237;}',
+        '.rp-id-note.warn{background:var(--warn2-bg);border-color:transparent;color:#7a4d05;}',
+        '.rp-id-note.bad{background:var(--danger2-bg);border-color:transparent;color:#8f1717;}',
+        '.rp-id-form{display:flex;flex-direction:column;gap:12px;}',
+        '.rp-id-form input[type=file]{padding:10px;font-size:13px;}',
+        '.rp-id-consent{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;color:var(--gray);line-height:1.5;}',
+        '.rp-id-consent input{margin-top:2px;}',
+        '.rp-id-replace{margin-top:4px;border-top:1px solid var(--gray-light);padding-top:12px;}',
+        '.rp-id-replace summary{cursor:pointer;font-size:12.5px;font-weight:700;color:var(--orange);margin-bottom:12px;}',
+        '.rp-id-replace[open] summary{margin-bottom:14px;}',
         '.rp-loading,.rp-error{padding:18px;font-size:13.5px;color:var(--gray);}',
         '.rp-error{color:var(--orange);}',
         '@media(max-width:900px){.rp-wrap.two-col{grid-template-columns:1fr;}.rp-rows{grid-template-columns:1fr;}}',

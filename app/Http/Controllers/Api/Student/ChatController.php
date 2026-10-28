@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api\Student;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdminNotification;
 use App\Models\Message;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 /**
  * In-app AI support bot. No external LLM key is required: the bot matches the
@@ -47,11 +49,11 @@ class ChatController extends Controller
         ],
         'instructor' => [
             'keywords' => ['instructor', 'teacher', 'male', 'female', 'prefer', 'gender'],
-            'reply' => "You can request a preferred instructor gender (male/female or no preference) from the Requests tab — open 'Request a Preferred Instructor' and submit. It's a soft preference we'll try to honour; it doesn't restrict which sessions you can book. Instructor gender is no longer set from your profile.",
+            'reply' => "You can save a preferred instructor gender (male, female, or no preference) from the Requests tab — it saves instantly, with no admin approval. It only affects your PDC calendar: green days have a free instructor of that gender, white days are open but only for the other gender, and red days are fully booked.",
         ],
         'requests' => [
             'keywords' => ['request', 'requests', 'my request', 'status', 'pending', 'accepted', 'rejected', 'preferred instructor', 'instructor preference'],
-            'reply' => "The Requests tab is where you ask admin for things: request a preferred instructor gender, request a reschedule, and track the status (pending/accepted/rejected) of each. Open the Requests tab from the sidebar to get started.",
+            'reply' => "The Requests tab is where you save your instructor preference, request a reschedule, and track your reschedule requests. The instructor preference needs no approval — it is stored on your profile and used by the PDC calendar right away.",
         ],
         'certificate' => [
             'keywords' => ['certificate', 'cert', 'license', 'valid id'],
@@ -112,6 +114,30 @@ class ChatController extends Controller
             'body' => $reply,
         ]);
 
+        // "Talk to human" escalations land in the admin Chat tab. Collapse
+        // repeated asks from the same student while one is still unread.
+        if ($this->wantsHuman($data['body'])) {
+            try {
+                $alreadyOpen = AdminNotification::where('category', AdminNotification::CATEGORY_CHAT)
+                    ->whereNull('read_at')
+                    ->where('user_id', $student->user_id)
+                    ->where('created_at', '>=', now()->subMinutes(30))
+                    ->exists();
+
+                if (! $alreadyOpen) {
+                    AdminNotification::push(
+                        AdminNotification::CATEGORY_CHAT,
+                        'Student wants to talk to a human',
+                        ($student->user?->name ?? 'A student') . ': “' . Str::limit(trim($data['body']), 240) . '”',
+                        ['student_id' => $student->id, 'message_id' => $userMessage->id],
+                        $student->user_id
+                    );
+                }
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
         return response()->json([
             'messages' => [
                 ['id' => $userMessage->id, 'sender' => $userMessage->sender, 'body' => $userMessage->body, 'created_at' => $userMessage->created_at],
@@ -120,11 +146,20 @@ class ChatController extends Controller
         ]);
     }
 
+    protected function wantsHuman(string $text): bool
+    {
+        $lower = strtolower($text);
+
+        return str_contains($lower, 'talk to human')
+            || str_contains($lower, 'speak to human')
+            || str_contains($lower, 'real person');
+    }
+
     protected function respond(string $text): string
     {
         $lower = strtolower($text);
 
-        if (str_contains($lower, 'talk to human') || str_contains($lower, 'speak to human') || str_contains($lower, 'real person')) {
+        if ($this->wantsHuman($text)) {
             return "Sure — I've flagged this for our admin team. They'll follow up via your registered email/SMS. In the meantime, feel free to keep asking me about enrollments, payments, or schedules.";
         }
 

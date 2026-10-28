@@ -6,11 +6,11 @@
 <title>Create Account - RC Driving Academy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/base.css?v=44">
-<link rel="stylesheet" href="css/login.css?v=44">
-<link rel="stylesheet" href="css/signup.css?v=44">
-<link rel="stylesheet" href="css/legal.css?v=44">
-<link rel="stylesheet" href="css/responsive.css?v=44">
+<link rel="stylesheet" href="css/base.css?v=65">
+<link rel="stylesheet" href="css/login.css?v=65">
+<link rel="stylesheet" href="css/signup.css?v=65">
+<link rel="stylesheet" href="css/legal.css?v=65">
+<link rel="stylesheet" href="css/responsive.css?v=65">
 <style>
   /* Back / Home button (login + signup) */
   .home-back {
@@ -84,14 +84,14 @@
             <label>First Name</label>
             <div class="input-wrap">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-              <input type="text" placeholder="Your first name" id="regFirst">
+              <input type="text" placeholder="Your first name" id="regFirst" maxlength="40" autocomplete="given-name" oninput="sanitizeNameInput(this)">
             </div>
           </div>
           <div class="login-field" style="margin-bottom:0">
             <label>Last Name</label>
             <div class="input-wrap">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-              <input type="text" placeholder="Your last name" id="regLast">
+              <input type="text" placeholder="Your last name" id="regLast" maxlength="40" autocomplete="family-name" oninput="sanitizeNameInput(this)">
             </div>
           </div>
         </div>
@@ -108,8 +108,9 @@
           <label>Contact Number</label>
           <div class="input-wrap">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2A19.79 19.79 0 013.09 4.18 2 2 0 015.09 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L9.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
-            <input type="tel" placeholder="09XX-XXX-XXXX" id="regPhone">
+            <input type="tel" placeholder="09XXXXXXXXX" id="regPhone" inputmode="numeric" maxlength="11" autocomplete="tel-national" oninput="sanitizePhoneInput(this)">
           </div>
+          <div style="font-size:11.5px;color:var(--gray);margin-top:5px;">Numbers only — 11 digits, starting with 09.</div>
         </div>
 
         <div class="su-row">
@@ -288,10 +289,10 @@
   </div>
 </div>
 
-<script src="js/config.js?v=44"></script>
-<script src="js/error-handler.js?v=44"></script>
-<script src="js/autosave.js?v=44"></script>
-<script src="js/shared.js?v=44"></script>
-<script src="js/signup.js?v=44"></script>
+<script src="js/config.js?v=65"></script>
+<script src="js/error-handler.js?v=65"></script>
+<script src="js/autosave.js?v=65"></script>
+<script src="js/shared.js?v=65"></script>
+<script src="js/signup.js?v=65"></script>
 </body>
 </html>

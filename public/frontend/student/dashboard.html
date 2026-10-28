@@ -6,10 +6,16 @@
 <title>Student Dashboard - RC Driving Academy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/base.css?v=44">
-<link rel="stylesheet" href="../css/student.css?v=44">
+<link rel="stylesheet" href="../css/base.css?v=65">
+<link rel="stylesheet" href="../css/student.css?v=65">
 </head>
 <body>
+
+<!-- Opaque splash: covers the dashboard until its data has loaded -->
+<div id="rcdaPageLoading" class="show" role="status" aria-live="polite">
+  <div class="rcda-pl-card"><div class="rcda-pl-spin"></div><div class="rcda-pl-label">Loading…</div></div>
+</div>
+<noscript><style>#rcdaPageLoading{display:none!important;}</style></noscript>
 
 <div class="dash-shell">
 
@@ -91,7 +97,15 @@
 
        <!-- PROFILE PANEL -->
        <div class="panel active" id="stud-profile">
+          <div class="id-reminder" id="idReminderBanner" style="display:none;">
+            <div class="id-reminder-text">
+              <b id="idReminderTitle">Verify your identity</b>
+              <span id="idReminderText">Upload a valid ID so the academy can verify your account. This does not block your lessons — you can enrol and book while it is being reviewed.</span>
+            </div>
+            <button type="button" class="btn btn-primary btn-sm" onclick="goToIdUpload()" id="idReminderBtn">Upload valid ID</button>
+          </div>
           <div class="two-col" id="studProfileBody"></div>
+          <div id="studIdPanel" style="margin-top:20px;"></div>
         </div>
 
        <!-- ACCOUNT SETTINGS PANEL -->
@@ -353,11 +367,26 @@
   </div>
 </div>
 
-<script src="../js/config.js?v=44"></script>
-<script src="../js/error-handler.js?v=44"></script>
-<script src="../js/shared.js?v=44"></script>
-<script src="../js/profile-panel.js?v=44"></script>
-<script src="../js/profile.js?v=44"></script>
-<script src="../js/student.js?v=44"></script>
+<!-- ===== CERTIFICATE PREVIEW MODAL ===== -->
+<div class="modal-overlay" id="studentCertModal">
+  <div class="modal-box" style="max-width:820px;">
+    <div class="modal-head">
+      <h3 id="studentCertTitle">My Certificate</h3>
+      <button class="modal-close" onclick="closeModal('studentCertModal')" aria-label="Close">✕</button>
+    </div>
+    <div id="studentCertBody" style="padding:4px 0 12px;"></div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;">
+      <button class="btn btn-sm btn-ghost" onclick="closeModal('studentCertModal')">Close</button>
+      <button class="btn btn-sm btn-primary" onclick="printStudentCertificate()">Print / Save as PDF</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/config.js?v=65"></script>
+<script src="../js/error-handler.js?v=65"></script>
+<script src="../js/shared.js?v=65"></script>
+<script src="../js/profile-panel.js?v=65"></script>
+<script src="../js/profile.js?v=65"></script>
+<script src="../js/student.js?v=65"></script>
 </body>
 </html>

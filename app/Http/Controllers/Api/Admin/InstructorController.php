@@ -22,6 +22,7 @@ class InstructorController extends Controller
                 'email' => $instructor->user->email,
                 'phone' => $instructor->phone,
                 'specialization' => $instructor->specialization,
+                'gender' => $instructor->gender,
                 'license_no' => $instructor->license_no,
                 'is_active' => $instructor->user->is_active,
             ];

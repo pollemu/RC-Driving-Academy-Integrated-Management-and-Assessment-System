@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdminNotification;
 use App\Models\Course;
 use App\Models\Request as StudentRequest;
 use App\Models\Schedule;
 use App\Models\StudentSchedule;
 use App\Notifications\NotificationService;
+use App\Services\PdcAssignment;
 use Illuminate\Http\Request;
 
 class RequestController extends Controller
@@ -30,6 +32,7 @@ class RequestController extends Controller
                 'student_name' => $r->student?->user?->name,
                 'student_id' => $r->student_id,
                 'preferred_gender' => $r->preferred_gender,
+                'preferred_instructor_gender' => $r->student?->preferred_instructor_gender,
                 'preferred_date' => $r->preferred_date?->format('Y-m-d'),
                 'preferred_instructor' => $r->preferredInstructor ? [
                     'id' => $r->preferredInstructor->id,
@@ -73,6 +76,7 @@ class RequestController extends Controller
 
         $data = $request->validate([
             'admin_note' => ['nullable', 'string', 'max:500'],
+            'instructor_id' => ['nullable', 'exists:instructors,id'],
         ]);
 
         if ($studentRequest->type === StudentRequest::TYPE_RESCHEDULE) {
@@ -122,16 +126,46 @@ class RequestController extends Controller
                 return response()->json(['message' => 'The student has no active PDC enrollment to book into.'], 422);
             }
 
+            // The student's request already carries an auto-assigned
+            // instructor. The admin may swap it right here, and we re-check
+            // that whoever is chosen is still free in the 09:00–11:00 slot.
+            $instructorId = $data['instructor_id'] ?? $studentRequest->preferred_instructor_id;
+
+            if (! $instructorId) {
+                $instructorId = (new PdcAssignment())->pick($studentRequest->preferred_date)?->id;
+            }
+
+            if (! $instructorId) {
+                return response()->json([
+                    'message' => 'No PDC instructor is free on that day. Pick another instructor or reject the request.',
+                ], 422);
+            }
+
+            $busy = Schedule::where('instructor_id', $instructorId)
+                ->where('status', '!=', 'cancelled')
+                ->whereDate('date', $studentRequest->preferred_date->toDateString())
+                ->where('time_start', '<', Schedule::PDC_SLOT_END)
+                ->where('time_end', '>', Schedule::PDC_SLOT_START)
+                ->exists();
+
+            if ($busy) {
+                return response()->json([
+                    'message' => 'That instructor is no longer free at 9–11 AM on that day. Pick another instructor.',
+                ], 422);
+            }
+
             $schedule = Schedule::create([
                 'course_id' => $course->id,
-                'instructor_id' => $studentRequest->preferred_instructor_id,
+                'instructor_id' => $instructorId,
                 'date' => $studentRequest->preferred_date->format('Y-m-d'),
-                'time_start' => '09:00',
-                'time_end' => '11:00',
+                'time_start' => Schedule::PDC_SLOT_START,
+                'time_end' => Schedule::PDC_SLOT_END,
                 'venue' => 'RC Driving Academy — Driving Range',
                 'max_students' => 1,
                 'status' => 'open',
             ]);
+
+            $studentRequest->update(['preferred_instructor_id' => $instructorId]);
 
             StudentSchedule::create([
                 'student_id' => $studentRequest->student_id,
@@ -150,6 +184,7 @@ class RequestController extends Controller
         ]);
 
         $this->notify($studentRequest, 'accepted');
+        $this->resolveNotifications($studentRequest);
 
         return response()->json(['request' => $studentRequest]);
     }
@@ -171,6 +206,7 @@ class RequestController extends Controller
         ]);
 
         $this->notify($studentRequest, 'rejected');
+        $this->resolveNotifications($studentRequest);
 
         return response()->json(['request' => $studentRequest]);
     }
@@ -187,6 +223,21 @@ class RequestController extends Controller
                         : "Your instructor preference request was $decision.");
                 (new NotificationService())->requestReceived($student, $summary);
             }
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
+    /* The request has been handled, so clear its unread feed entry. */
+    protected function resolveNotifications(StudentRequest $req): void
+    {
+        try {
+            $reqId = (int) $req->id;
+            AdminNotification::where('category', AdminNotification::CATEGORY_REQUEST)
+                ->whereNull('read_at')
+                ->get()
+                ->filter(fn (AdminNotification $n) => (int) ($n->meta['request_id'] ?? 0) === $reqId)
+                ->each(fn (AdminNotification $n) => $n->markRead());
         } catch (\Throwable $e) {
             report($e);
         }

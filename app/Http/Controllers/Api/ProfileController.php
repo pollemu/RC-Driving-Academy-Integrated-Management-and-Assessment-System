@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Instructor;
 use App\Models\Student;
 use App\Models\User;
+use App\Support\Phone;
+use App\Support\ValidationRules;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -24,8 +26,10 @@ class ProfileController extends Controller
     {
         $user = $request->user();
 
+        $request->merge(['phone' => Phone::normalize($request->input('phone'))]);
+
         $rules = [
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ValidationRules::NAME,
             'email' => ['required', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
         ];
         $rules += $this->detailRules($user->role);
@@ -157,8 +161,10 @@ class ProfileController extends Controller
 
     public function adminUpdate(Request $request, User $user)
     {
+        $request->merge(['phone' => Phone::normalize($request->input('phone'))]);
+
         $rules = [
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ValidationRules::NAME,
             'email' => ['required', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
         ];
         $rules += $this->detailRules($user->role);
@@ -194,9 +200,9 @@ class ProfileController extends Controller
     {
         if ($role === 'student') {
             return [
-                'phone' => ['nullable', 'string', 'max:50'],
+                'phone' => ValidationRules::PHONE,
                 'address' => ['nullable', 'string', 'max:500'],
-                'birthdate' => ['nullable', 'date'],
+                'birthdate' => ['nullable', 'date', 'before:today'],
                 'license_type' => ['nullable', 'in:non-pro,pro,student-permit'],
                 'gender' => ['nullable', 'in:male,female,other'],
             ];
@@ -204,7 +210,7 @@ class ProfileController extends Controller
 
         if ($role === 'instructor') {
             return [
-                'phone' => ['nullable', 'string', 'max:50'],
+                'phone' => ValidationRules::PHONE,
                 'specialization' => ['nullable', 'string', 'max:255'],
                 'license_no' => ['nullable', 'string', 'max:255'],
                 'gender' => ['nullable', 'in:male,female,other'],
@@ -246,6 +252,12 @@ class ProfileController extends Controller
                 'birthdate' => $user->student->birthdate?->format('Y-m-d'),
                 'license_type' => $user->student->license_type,
                 'gender' => $user->student->gender,
+                'id_status' => $user->student->id_status ?: Student::ID_NONE,
+                'id_document_type' => $user->student->id_document_type,
+                'id_submitted_at' => $user->student->id_submitted_at?->toIso8601String(),
+                'id_reviewed_at' => $user->student->id_reviewed_at?->toIso8601String(),
+                'id_rejection_reason' => $user->student->id_rejection_reason,
+                'has_document' => (bool) $user->student->document_path,
             ] : null,
             'instructor' => $user->instructor ? [
                 'phone' => $user->instructor->phone,

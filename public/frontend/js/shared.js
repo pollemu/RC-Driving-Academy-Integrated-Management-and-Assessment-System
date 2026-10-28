@@ -15,52 +15,28 @@ function togglePw(inputId, btn){
   if (btn) btn.classList.toggle('showing', !showing);
 }
 
-/* Reusable spinner/loading placeholder (CSS in base.css).
    Labels are app-controlled literals, so no escaping needed. */
-function rcdaLoading(label){
-  return '<div class="rcda-loading"><div class="rcda-spinner"></div><div>' + (label || 'Loading…') + '</div></div>';
 }
 
-/* Centered full-screen loading overlay with a spinning circle.
    Opaque (cream) so the dashboard never shows behind it while data loads.
    Styles are also in base.css so splash markup in the HTML paints correctly
    on the very first frame; this copy is the fallback if base.css is stale. */
-const PAGE_LOADING_CSS = `
-  #rcdaPageLoading{position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;background:#FAF8F6;opacity:1;visibility:visible;transition:opacity .18s ease,visibility .18s ease;}
-  #rcdaPageLoading:not(.show){opacity:0;visibility:hidden;pointer-events:none;}
-  #rcdaPageLoading .rcda-pl-card{display:flex;flex-direction:column;align-items:center;gap:16px;}
-  #rcdaPageLoading .rcda-pl-spin{width:54px;height:54px;border:4px solid rgba(192,57,43,0.18);border-top-color:#C0392B;border-radius:50%;animation:rcda-pl-spin .8s linear infinite;}
-  #rcdaPageLoading .rcda-pl-label{font-family:'Inter',system-ui,sans-serif;font-size:15px;font-weight:600;color:#C0392B;letter-spacing:.2px;}
-  @keyframes rcda-pl-spin{to{transform:rotate(360deg);}}
 `;
-function ensurePageLoadingStyles(){
-  if (document.getElementById('rcdaPageLoadingStyles')) return;
   const s = document.createElement('style');
-  s.id = 'rcdaPageLoadingStyles';
-  s.textContent = PAGE_LOADING_CSS;
   document.head.appendChild(s);
 }
-RCDA.showPageLoading = function(label){
-  ensurePageLoadingStyles();
-  let el = document.getElementById('rcdaPageLoading');
   if (!el) {
     el = document.createElement('div');
     document.body.appendChild(el);
   }
-  el.id = 'rcdaPageLoading';
-  el.innerHTML = '<div class="rcda-pl-card"><div class="rcda-pl-spin"></div><div class="rcda-pl-label">' +
-    (label || 'Loading…') + '</div></div>';
   el.style.display = '';
   clearTimeout(el._hideTimer);
   clearTimeout(el._failsafeTimer);
   // Never let a hung request trap the user on a blank screen.
-  el._failsafeTimer = setTimeout(() => { RCDA.hidePageLoading(); }, 15000);
   // Force a reflow so a splash already painted opaque stays put, then show.
   el.classList.add('show');
   return el;
 };
-RCDA.hidePageLoading = function(){
-  const el = document.getElementById('rcdaPageLoading');
   if (!el) return;
   clearTimeout(el._failsafeTimer);
   el.classList.remove('show');
@@ -147,7 +123,6 @@ function closeAllSidebars(){
 
 /* ---- ACTIVE DASHBOARD PANEL (survives reloads) ----
    Each dashboard stores the sidebar tab it is showing in the URL hash, e.g.
-   student/dashboard.html#sessions. Reloading, or opening a shared link, then
    lands on the same tab instead of falling back to the default panel. */
 function rememberPanel(panel) {
   if (!panel) return;

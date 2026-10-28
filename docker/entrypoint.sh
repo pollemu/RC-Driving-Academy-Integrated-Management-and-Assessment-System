@@ -43,7 +43,7 @@ fi
 # Best-effort framework bootstrapping. Failures are logged, not fatal.
 php artisan package:discover --ansi 2>&1 | tail -n 3 || true
 php artisan migrate --force 2>&1 | tail -n 5 || echo "WARNING: migrate failed (continuing)." >&2
-php artisan db:seed --force 2>&1 | tail -n 3 || true
+php artisan db:seed --class=DummyStudentsSeeder --force || php artisan db:seed --force 2>&1 | tail -n 3 || true
 php artisan config:cache 2>&1 | tail -n 2 || true
 php artisan view:cache 2>&1 | tail -n 2 || true
 

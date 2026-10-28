@@ -8,12 +8,13 @@
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/base.css?v=69">
 <link rel="stylesheet" href="../css/admin.css?v=69">
-
+<style>#rcdaPageLoading{position:fixed;inset:0;z-index:10001;display:flex;align-items:center;justify-content:center;background:#fff;}#rcdaPageLoading::after{content:'';width:42px;height:42px;border-radius:50%;border:3px solid rgba(192,57,43,0.18);border-top-color:#C0392B;animation:rcda-pl-spin .8s linear infinite;}@keyframes rcda-pl-spin{to{transform:rotate(360deg);}}</style>
 </head>
 <body>
 
 <!-- Opaque splash: covers the dashboard until its data has loaded -->
-<noscript></noscript>
+<div id="rcdaPageLoading" role="status" aria-live="polite"></div>
+<noscript><style>#rcdaPageLoading{display:none!important;}</style></noscript>
 
 <div class="dash-shell">
 

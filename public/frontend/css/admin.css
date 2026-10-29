@@ -282,3 +282,33 @@ tr.row-new{animation:rowIn 1.4s ease;}
 .token-chip{padding:5px 10px;border-radius:999px;font-size:12px;font-weight:600;background:var(--cream);color:var(--gray);border:1px solid var(--gray-light);}
 .token-chip.pos{background:var(--success-bg);color:var(--success);border-color:transparent;}
 .token-chip.neg{background:var(--danger2-bg);color:var(--danger2);border-color:transparent;}
+
+/* ========== SESSIONS CARD GRID ========== */
+.sessions-grid{
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:14px;
+}
+@media (max-width:1280px){ .sessions-grid{grid-template-columns:repeat(4,1fr);} }
+@media (max-width:1024px){ .sessions-grid{grid-template-columns:repeat(3,1fr);} }
+@media (max-width:768px){ .sessions-grid{grid-template-columns:repeat(2,1fr);} }
+@media (max-width:480px){ .sessions-grid{grid-template-columns:1fr;} }
+.session-card{
+  background:var(--cream);
+  border:1.5px solid var(--gray-light);
+  border-radius:14px;
+  padding:14px 14px 12px;
+  cursor:pointer;
+  transition:.18s;
+  display:flex;
+  flex-direction:column;
+  gap:7px;
+}
+.session-card:hover{border-color:var(--orange);box-shadow:0 6px 18px rgba(192,57,43,.10);transform:translateY(-2px);}
+.session-card-date{font-family:'Poppins',system-ui,sans-serif;font-size:14.5px;font-weight:700;color:var(--charcoal);}
+.session-card-badges{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.session-card-row{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--charcoal);min-width:0;}
+.session-card-row .ico{font-size:12px;flex-shrink:0;}
+.session-card-row span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.session-full-count{color:#dc2626;font-weight:700;}
+.session-modal-value{font-size:13.5px;color:var(--charcoal);font-weight:600;}

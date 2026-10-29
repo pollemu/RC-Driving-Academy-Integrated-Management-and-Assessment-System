@@ -126,10 +126,10 @@
       <!-- DASHBOARD PANEL -->
       <div class="panel active" id="admin-dashboard">
         <div class="stat-cards">
-          <div class="stat-card"><div class="ico-wrap"><img src="../images/icon.png" alt="RC Driving Academy"></div><div class="stat-text"><div class="label">Total Students</div><div class="value">142</div><div class="sub up">↑ 12 this month</div></div></div>
-          <div class="stat-card"><div class="ico-wrap"><img src="../images/calendar.png" alt="RC Driving Academy"></div><div class="stat-text"><div class="label">Sessions Today</div><div class="value">8</div><div class="sub">Across 5 instructors</div></div></div>
-          <div class="stat-card"><div class="ico-wrap"><img src="../images/increased-revenue.png" alt="RC Driving Academy"></div><div class="stat-text"><div class="label">Revenue (Month)</div><div class="value">₱84k</div><div class="sub up">↑ 18% vs last month</div></div></div>
-          <div class="stat-card"><div class="ico-wrap"><img src="../images/pending-task-orange.png" alt="RC Driving Academy"></div><div class="stat-text"><div class="label">Pending Actions</div><div class="value">5</div><div class="sub warn">Enrollments to approve</div></div></div>
+          <div class="stat-card" onclick="showPanel('students', this)" style="cursor:pointer"><div class="ico-wrap"><img src="../images/icon.png" alt="RC Driving Academy"></div><div class="stat-text"><div class="label">Total Students</div><div class="value" id="statTotalStudents">142</div><div class="sub up" id="statStudentsSub">↑ 12 this month</div></div></div>
+          <div class="stat-card" onclick="showPanel('schedule', this)" style="cursor:pointer"><div class="ico-wrap"><img src="../images/calendar.png" alt="RC Driving Academy"></div><div class="stat-text"><div class="label">Sessions Today</div><div class="value" id="statSessionsToday">8</div><div class="sub" id="statSessionsSub">Across 5 instructors</div></div></div>
+          <div class="stat-card" onclick="showPanel('payments', this)" style="cursor:pointer"><div class="ico-wrap"><img src="../images/increased-revenue.png" alt="RC Driving Academy"></div><div class="stat-text"><div class="label">Revenue (Month)</div><div class="value" id="statRevenue">₱84k</div><div class="sub up" id="statRevenueSub">↑ 18% vs last month</div></div></div>
+          <div class="stat-card" onclick="showPanel('requests', this)" style="cursor:pointer"><div class="ico-wrap"><img src="../images/pending-task-orange.png" alt="RC Driving Academy"></div><div class="stat-text"><div class="label">Pending Actions</div><div class="value" id="statPending">5</div><div class="sub warn" id="statPendingSub">Enrollments to approve</div></div></div>
         </div>
 
         <div class="two-col">
@@ -231,14 +231,9 @@
           <button class="btn btn-primary" style="margin-top:14px;width:100%;justify-content:center;" onclick="createAdminSchedule()">Create Session</button>
         </div>
         <div class="card" style="margin-top:18px;">
-          <div class="card-head"><h3>All Sessions</h3></div>
-          <div style="overflow-x:auto;">
-            <table id="adminSessionsTable">
-              <thead><tr><th>Course</th><th>Date</th><th>Time</th><th>Venue</th><th>Instructor</th><th>Slots</th><th>Status</th><th></th></tr></thead>
-              <tbody id="adminSessionsTbody">
-                <tr><td colspan="8" style="text-align:center;color:var(--gray);padding:20px;">Loading sessions…</td></tr>
-              </tbody>
-            </table>
+          <div class="card-head"><h3>All Sessions</h3><button class="btn btn-sm btn-ghost" onclick="loadAdminSchedules()">Refresh</button></div>
+          <div id="adminSessionsGrid" class="sessions-grid">
+            <div style="grid-column:1/-1;text-align:center;color:var(--gray);padding:20px;">Loading sessions…</div>
           </div>
         </div>
       </div>
@@ -830,6 +825,40 @@
       <button class="modal-close" onclick="closeIdDocumentModal()">✕</button>
     </div>
     <div id="idDocumentBody" style="min-height:240px;display:flex;align-items:center;justify-content:center;background:var(--cream);border-radius:12px;overflow:auto;padding:10px;"></div>
+  </div>
+</div>
+
+<!-- SESSION DETAILS MODAL -->
+<div class="modal-overlay" id="sessionDetailsModal">
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-head">
+      <h3>Session Details</h3>
+      <button class="modal-close" onclick="closeModal('sessionDetailsModal')">✕</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div style="display:flex;justify-content:space-between;gap:10px;"><span style="font-size:12.5px;color:var(--gray);">Date</span><span class="session-modal-value" id="sesDetailsDate">—</span></div>
+      <div style="display:flex;justify-content:space-between;gap:10px;"><span style="font-size:12.5px;color:var(--gray);">Course</span><span class="session-modal-value" id="sesDetailsCourse">—</span></div>
+      <div style="display:flex;justify-content:space-between;gap:10px;"><span style="font-size:12.5px;color:var(--gray);">Instructor</span><span class="session-modal-value" id="sesDetailsInstructor">—</span></div>
+      <div style="display:flex;justify-content:space-between;gap:10px;"><span style="font-size:12.5px;color:var(--gray);">Time</span><span class="session-modal-value" id="sesDetailsTime">—</span></div>
+      <div style="display:flex;justify-content:space-between;gap:10px;"><span style="font-size:12.5px;color:var(--gray);">Venue</span><span class="session-modal-value" id="sesDetailsVenue">—</span></div>
+      <div style="display:flex;justify-content:space-between;gap:10px;"><span style="font-size:12.5px;color:var(--gray);">Slots</span><span class="session-modal-value" id="sesDetailsSlots">—</span></div>
+      <div style="display:flex;justify-content:space-between;gap:10px;"><span style="font-size:12.5px;color:var(--gray);">Status</span><span class="session-modal-value" id="sesDetailsStatus">—</span></div>
+    </div>
+    <div class="modal-footer">
+      <button id="sesDetailsCancelBtn" class="btn btn-sm btn-danger" style="margin-right:auto;display:none;">Cancel Session</button>
+      <button id="sesDetailsViewStudents" class="btn btn-sm btn-primary">View Student List</button>
+    </div>
+  </div>
+</div>
+
+<!-- NESTED STUDENT LIST MODAL -->
+<div class="modal-overlay" id="sessionStudentsModal" style="z-index:10010;">
+  <div class="modal-box" style="max-width:560px;">
+    <div class="modal-head">
+      <h3>Students in Session</h3>
+      <button class="modal-close" onclick="closeModal('sessionStudentsModal')">✕</button>
+    </div>
+    <div id="sessionStudentsBody" style="max-height:400px;overflow:auto;"></div>
   </div>
 </div>
 

@@ -376,42 +376,104 @@ async function loadAdminSchedules() {
   }
 
   const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/schedules`, { method: 'GET' });
-  const tb = document.getElementById('adminSessionsTbody');
-  if (!tb) return;
+  const grid = document.getElementById('adminSessionsGrid');
+  if (!grid && !document.getElementById('adminSessionsTbody')) return;
   const sched = (ok && data && data.schedules) || [];
   ADMIN_SCHEDULES = sched;
   renderTdcBlockPicker();
+  if (!grid) return;
   if (!sched.length) {
-    tb.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--gray);padding:20px;">No sessions created yet.</td></tr>';
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--gray);padding:20px;">No sessions created yet.</div>';
     return;
   }
-  tb.innerHTML = sched.map(s => {
+  const statusCls = st => ({
+    open: 'confirmed', done: 'done', full: 'pending',
+    cancelled: 'rejected', pending: 'pending', completed: 'done', active: 'enrolled'
+  }[st] || 'pending');
+  const statusLabel = st => {
+    if (st === 'open') return 'Open'; if (st === 'done' || st === 'completed') return 'Completed';
+    if (st === 'full') return 'Full'; if (st === 'cancelled') return 'Cancelled';
+    if (st === 'active') return 'Ongoing';
+    return (st || 'Pending').charAt(0).toUpperCase() + (st || 'pending').slice(1);
+  };
+  const fmtDate = d => {
+    if (!d) return '—';
+    const dt = new Date(String(d) + 'T00:00:00');
+    if (isNaN(dt)) return escapeHtml(String(d));
+    return dt.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+  };
+  grid.innerHTML = sched.map(s => {
     const type = (s.course && s.course.type || '').toUpperCase();
-    const isTdc = type === 'TDC';
     const slots = `${s.booked || 0}/${s.max_students || 0}`;
+    const full = s.booked >= s.max_students;
     const dateLabel = s.end_date && s.end_date !== s.date
-      ? `${escapeHtml(String(s.date))} – ${escapeHtml(String(s.end_date))}`
-      : escapeHtml(String(s.date || '—'));
-    const hasInstructor = s.instructor && s.instructor.name;
-    const instCell = hasInstructor
-      ? escapeHtml(s.instructor.name)
-      : (isTdc && s.status !== 'cancelled'
-        ? `<select onchange="assignAdminInstructor(${s.id}, this.value)" style="padding:6px 8px;border-radius:8px;border:1.5px solid var(--gray-light);font-size:12.5px;background:var(--cream);">
-             <option value="">Unassigned — assign…</option>
-             ${ADMIN_INSTRUCTORS.map(i => `<option value="${i.id}">${escapeHtml(i.name)}</option>`).join('')}
-           </select>`
-        : 'Unassigned');
-    return `<tr data-id="${s.id}">
-      <td><b>${escapeHtml(s.course ? s.course.name : '—')}</b> <span class="type-badge" style="font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px;color:#fff;background:${type === 'PDC' ? 'var(--orange)' : '#6366f1'};">${type}</span>${s.auto_generated ? ' <span style="font-size:10px;color:var(--gray);">auto</span>' : ''}</td>
-      <td>${dateLabel}</td>
-      <td>${escapeHtml(String(s.time_start || ''))}–${escapeHtml(String(s.time_end || ''))}</td>
-      <td>${escapeHtml(s.venue || '—')}</td>
-      <td>${instCell}</td>
-      <td>${slots}</td>
-      <td>${statusBadge(s.status)}</td>
-      <td>${s.status !== 'cancelled' ? `<button class="btn btn-sm btn-danger" onclick="cancelAdminSchedule(${s.id})">Cancel</button>` : ''}</td>
-    </tr>`;
+      ? `${fmtDate(s.date)} – ${fmtDate(s.end_date)}`
+      : fmtDate(s.date);
+    const instName = s.instructor && s.instructor.name ? escapeHtml(s.instructor.name) : 'Unassigned';
+    const instColor = s.instructor && s.instructor.name ? 'var(--charcoal)' : 'var(--gray)';
+    return `<div class="session-card" data-id="${s.id}" onclick="openSessionDetails(${s.id})">
+      <div class="session-card-date">${dateLabel}</div>
+      <div class="session-card-badges">
+        <span class="type-badge" style="font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px;color:#fff;background:${type === 'PDC' ? 'var(--orange)' : '#6366f1'};">${type}</span>
+        <span class="badge ${statusCls(s.status)}">${statusLabel(s.status)}</span>
+      </div>
+      <div class="session-card-row"><span class="ico">👥</span><span class="${full ? 'session-full-count' : ''}">${slots}</span></div>
+      <div class="session-card-row" style="color:${instColor};"><span class="ico">🎓</span><span>${instName}</span></div>
+      <div class="session-card-row"><span class="ico">🕐</span><span>${escapeHtml(String(s.time_start || ''))}–${escapeHtml(String(s.time_end || ''))}</span></div>
+    </div>`;
   }).join('');
+}
+
+/* Session Details Modal + nested Student List Modal */
+function getSessionById(id){
+  return (ADMIN_SCHEDULES || []).find(s => Number(s.id) === Number(id));
+}
+
+function openSessionDetails(id){
+  const s = getSessionById(id);
+  if (!s) { RCDA.showToast('Session data unavailable.', 'error'); return; }
+  const type = (s.course && s.course.type || '').toUpperCase();
+  const stLabel = s.status === 'open' ? 'Open' : (s.status === 'done' || s.status === 'completed') ? 'Completed'
+    : s.status === 'full' ? 'Full' : s.status === 'cancelled' ? 'Cancelled' : (s.status || 'Pending');
+  const set = (id_, v) => { const el = document.getElementById(id_); if (el) el.textContent = v; };
+  set('sesDetailsDate', s.end_date && s.end_date !== s.date ? `${s.date} – ${s.end_date}` : String(s.date || '—'));
+  set('sesDetailsCourse', (s.course ? s.course.name : '—') + ' (' + type + ')');
+  set('sesDetailsInstructor', s.instructor && s.instructor.name ? s.instructor.name : 'Unassigned');
+  set('sesDetailsTime', `${s.time_start || ''}–${s.time_end || ''}`);
+  set('sesDetailsVenue', s.venue || '—');
+  set('sesDetailsSlots', `${s.booked || 0} / ${s.max_students || 0} slots`);
+  set('sesDetailsStatus', stLabel);
+  const btn = document.getElementById('sesDetailsViewStudents');
+  if (btn) btn.onclick = () => openSessionStudentsModal(s.id);
+  const cancelBtn = document.getElementById('sesDetailsCancelBtn');
+  if (cancelBtn) { cancelBtn.style.display = s.status && s.status !== 'cancelled' ? '' : 'none'; cancelBtn.onclick = () => cancelAdminSchedule(s.id); }
+  openModal('sessionDetailsModal');
+}
+
+async function openSessionStudentsModal(scheduleId){
+  openModal('sessionStudentsModal');
+  const body = document.getElementById('sessionStudentsBody');
+  if (body) body.innerHTML = '<div style="text-align:center;color:var(--gray);padding:18px;">Loading students…</div>';
+  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/schedules/${scheduleId}/students`, { method: 'GET' });
+  if (!ok) {
+    if (body) body.innerHTML = '<div style="text-align:center;color:var(--gray);padding:18px;">Could not load student list.</div>';
+    return;
+  }
+  const students = (data && data.students) || [];
+  if (!body) return;
+  if (!students.length) {
+    body.innerHTML = '<div style="text-align:center;color:var(--gray);padding:18px;">No students booked in this session yet.</div>';
+    return;
+  }
+  const rows = students.map(st => `<tr>
+    <td><b>${escapeHtml(st.name || '—')}</b></td>
+    <td>${escapeHtml(st.course || '—')}</td>
+    <td>${escapeHtml(st.contact_number || st.contact || '—')}</td>
+    <td>${escapeHtml(st.status || 'Booked')}</td>
+  </tr>`).join('');
+  body.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>Name</th><th>Course</th><th>Contact</th><th>Status</th></tr></thead>
+    <tbody>${rows}</tbody></table></div>`;
 }
 
 async function assignAdminInstructor(id, instructorId) {

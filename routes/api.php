@@ -60,6 +60,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('instructors', AdminInstructorController::class)->except(['create', 'edit', 'show', 'update']);
         Route::post('/instructors/{instructor}/toggle-active', [AdminInstructorController::class, 'toggleActive'])->name('api.admin.instructors.toggle');
         Route::get('/schedules', [AdminScheduleController::class, 'index'])->name('api.admin.schedules.index');
+        Route::get('/schedules/{schedule}/students', [AdminScheduleController::class, 'students'])->name('api.admin.schedules.students');
         Route::get('/courses', [AdminScheduleController::class, 'courses'])->name('api.admin.courses');
         Route::post('/schedules', [AdminScheduleController::class, 'store'])->name('api.admin.schedules.store');
         Route::post('/schedules/{schedule}/cancel', [AdminScheduleController::class, 'cancel'])->name('api.admin.schedules.cancel');

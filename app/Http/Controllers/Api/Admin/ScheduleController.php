@@ -47,6 +47,33 @@ class ScheduleController extends Controller
         return response()->json(['schedules' => $data]);
     }
 
+    public function students(Schedule $schedule)
+    {
+        $bookings = StudentSchedule::with(['student.user'])
+            ->where('schedule_id', $schedule->id)
+            ->get()
+            ->map(function (StudentSchedule $booking) {
+                $student = $booking->student;
+                $courseName = '—';
+                if ($student) {
+                    $enrollment = \App\Models\Enrollment::with('course')
+                        ->where('student_id', $student->id)
+                        ->whereIn('status', ['active', 'completed'])
+                        ->first();
+                    if ($enrollment && $enrollment->course) $courseName = $enrollment->course->name;
+                }
+                return [
+                    'student_id' => $booking->student_id,
+                    'name' => $student && $student->user ? $student->user->name : '—',
+                    'course' => $courseName,
+                    'contact_number' => $student && $student->user ? ($student->phone ?: '—') : '—',
+                    'status' => $booking->status ?: 'Booked',
+                ];
+            });
+
+        return response()->json(['students' => $bookings]);
+    }
+
     public function courses()
     {
         $courses = Course::where('is_active', true)->get()->map(function (Course $course) {

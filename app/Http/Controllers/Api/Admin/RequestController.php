@@ -14,14 +14,15 @@ use Illuminate\Http\Request;
 
 class RequestController extends Controller
 {
-    /* All student requests (reschedule / instructor preference), most recent first. */
+    /* All student requests (reschedule / instructor preference),
+       ordered from the first request to the last. */
     public function index(Request $request)
     {
         $status = $request->input('status');
 
         $items = StudentRequest::with(['student.user', 'schedule.course', 'fromSchedule.course', 'preferredInstructor.user', 'handledBy'])
             ->when(in_array($status, ['pending', 'accepted', 'rejected']), fn ($q) => $q->where('status', $status))
-            ->latest()
+            ->oldest()
             ->paginate(15);
 
         $data = $items->getCollection()->map(function (StudentRequest $r) {

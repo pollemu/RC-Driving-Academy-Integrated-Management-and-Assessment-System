@@ -190,8 +190,8 @@ class PaymentController extends Controller
         $total = collect($payments)->sum('amount');
 
         $origin = $request->getSchemeAndHttpHost();
-        $success = $origin . '/student/dashboard.html';
-        $cancel  = $origin . '/student/dashboard.html';
+        $success = $origin . '/frontend/student/dashboard.html';
+        $cancel  = $origin . '/frontend/student/dashboard.html';
         $reference = 'RC-' . $student->id . '-' . time();
 
         $session = (new PayMongoService())->createCheckoutSession(

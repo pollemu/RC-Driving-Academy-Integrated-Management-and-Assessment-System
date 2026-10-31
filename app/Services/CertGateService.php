@@ -64,14 +64,14 @@ class CertGateService
         ];
 
         if ($course->type === 'TDC') {
-            $passed = Assessment::whereHas('feedback', function ($q) use ($student) {
+            $passed = $student->tdc_verified || Assessment::whereHas('feedback', function ($q) use ($student) {
                 $q->where('student_id', $student->id)
                   ->whereHas('schedule.course', fn ($q) => $q->where('type', 'TDC'));
             })->where('passed', true)->exists();
 
             $requirements[] = [
-                'label' => 'TDC assessment passed',
-                'met' => $passed,
+                'label' => $student->tdc_verified ? 'TDC verified (External)' : 'TDC assessment passed',
+                'met' => (bool) $passed,
             ];
 
             return $requirements;
@@ -81,8 +81,8 @@ class CertGateService
         $required = $this->pdcRequiredSessions();
         $completed = StudentSchedule::where('student_id', $student->id)
             ->whereHas('schedule.course', fn ($q) => $q->where('type', 'PDC'))
-            ->whereHas('schedule', fn ($q) => $q->where('status', 'done'))
-            ->where('status', 'confirmed')
+            ->whereHas('schedule', fn ($q) => $q->whereIn('status', ['done', 'completed']))
+            ->whereIn('status', ['confirmed', 'done'])
             ->count();
 
         $requirements[] = [

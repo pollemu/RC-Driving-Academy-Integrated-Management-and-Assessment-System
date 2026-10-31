@@ -7,6 +7,7 @@ use App\Models\Course;
 use App\Models\Schedule;
 use App\Models\StudentSchedule;
 use App\Services\TdcScheduler;
+use App\Services\SessionCleanup;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -17,6 +18,10 @@ class ScheduleController extends Controller
         // Keep the rolling TDC class calendar populated so admins always see
         // the upcoming blocks (even before an instructor is assigned).
         (new TdcScheduler())->ensureUpcoming();
+
+        // Prune finished sessions: delete yesterday-and-older sessions with
+        // no students, auto-complete fully-assessed past sessions.
+        (new SessionCleanup())->run();
 
         $schedules = Schedule::with(['course', 'instructor.user'])->latest('date')->get();
 

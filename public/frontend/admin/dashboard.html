@@ -232,8 +232,40 @@
         </div>
         <div class="card" style="margin-top:18px;">
           <div class="card-head"><h3>All Sessions</h3><button class="btn btn-sm btn-ghost" onclick="loadAdminSchedules()">Refresh</button></div>
+          <div class="sessions-tabs" role="tablist">
+            <button type="button" id="sessionsTabAll" class="sessions-tab active" onclick="setSessionGridTab('ALL')">All</button>
+            <button type="button" id="sessionsTabTDC" class="sessions-tab" onclick="setSessionGridTab('TDC')">TDC Sessions</button>
+            <button type="button" id="sessionsTabPDC" class="sessions-tab" onclick="setSessionGridTab('PDC')">PDC Sessions</button>
+          </div>
+          <div class="sessions-toolbar">
+            <input id="sessionsSearch" type="text" placeholder="Search instructor, course, venue, date…" class="sessions-search" oninput="onSessionsSearch(this.value)">
+            <div class="sessions-filter-wrap">
+              <button type="button" id="sessionsDateFilterBtn" class="sessions-filter-btn" onclick="toggleSessionsCalendar()">📅 Filter by date</button>
+              <div id="sessionsCalendar" class="sessions-cal" style="display:none;"></div>
+            </div>
+            <div id="sessionsActiveFilters" class="sessions-chips"></div>
+          </div>
           <div id="adminSessionsGrid" class="sessions-grid">
             <div style="grid-column:1/-1;text-align:center;color:var(--gray);padding:20px;">Loading sessions…</div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:18px;">
+          <div class="card-head"><h3>Completed Sessions</h3><button class="btn btn-sm btn-ghost" onclick="loadAdminSchedules()">Refresh</button></div>
+          <div class="sessions-tabs" role="tablist">
+            <button type="button" id="doneTabAll" class="sessions-tab" onclick="setSessionViewTab('completed', 'ALL')">All</button>
+            <button type="button" id="doneTabTDC" class="sessions-tab active" onclick="setSessionViewTab('completed', 'TDC')">TDC Sessions</button>
+            <button type="button" id="doneTabPDC" class="sessions-tab" onclick="setSessionViewTab('completed', 'PDC')">PDC Sessions</button>
+          </div>
+          <div class="sessions-toolbar">
+            <input id="completedSearch" type="text" placeholder="Search instructor, course, venue, date…" class="sessions-search" oninput="onSessionViewSearch('completed', this.value)">
+            <div class="sessions-filter-wrap">
+              <button type="button" id="completedDateFilterBtn" class="sessions-filter-btn" onclick="toggleSessionViewCalendar('completed')">📅 Filter by date</button>
+              <div id="completedCalendar" class="sessions-cal" style="display:none;"></div>
+            </div>
+            <div id="completedActiveFilters" class="sessions-chips"></div>
+          </div>
+          <div id="adminCompletedGrid" class="sessions-grid">
+            <div style="grid-column:1/-1;text-align:center;color:var(--gray);padding:20px;">Loading completed sessions…</div>
           </div>
         </div>
       </div>
@@ -868,8 +900,8 @@
 <script src="../js/config.js?v=65"></script>
 <script src="../js/error-handler.js?v=65"></script>
 <script src="../js/shared.js?v=65"></script>
-<script src="../js/profile-panel.js?v=65"></script>
+<script src="../js/profile-panel.js?v=68"></script>
 <script src="../js/profile.js?v=65"></script>
-<script src="../js/admin.js?v=65"></script>
+<script src="../js/admin.js?v=73"></script>
 </body>
 </html>

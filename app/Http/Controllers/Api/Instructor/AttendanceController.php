@@ -6,12 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\Schedule;
 use App\Models\StudentSchedule;
+use App\Services\SessionCleanup;
 use Illuminate\Http\Request;
 
 class AttendanceController extends Controller
 {
     public function index(Request $request)
     {
+        // Keep the list tidy: drop empty finished sessions and auto-complete
+        // past ones whose students have all been assessed.
+        (new SessionCleanup())->run();
+
         $instructor = $request->user()->instructor;
 
         $schedules = Schedule::with('course')
@@ -89,6 +94,10 @@ class AttendanceController extends Controller
         if ($request->boolean('mark_done')) {
             $schedule->update(['status' => 'done']);
         }
+
+        // If this session is already over and every student got assessed,
+        // finish it off right away instead of waiting for the next sweep.
+        (new SessionCleanup())->run();
 
         return response()->json(['ok' => true]);
     }

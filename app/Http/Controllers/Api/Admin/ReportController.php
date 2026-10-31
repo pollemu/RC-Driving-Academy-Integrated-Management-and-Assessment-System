@@ -73,7 +73,7 @@ class ReportController extends Controller
             'present' => Attendance::where('status', 'present')->count(),
             'late' => Attendance::where('status', 'late')->count(),
             'absent' => Attendance::where('status', 'absent')->count(),
-            'sessions_done' => Schedule::where('status', 'done')->count(),
+            'sessions_done' => Schedule::whereIn('status', ['done', 'completed'])->count(),
         ];
 
         $assessments = Assessment::query();

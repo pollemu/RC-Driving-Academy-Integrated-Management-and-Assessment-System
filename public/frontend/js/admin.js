@@ -377,7 +377,7 @@ async function loadAdminSchedules() {
 
   const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/schedules`, { method: 'GET' });
   const grid = document.getElementById('adminSessionsGrid');
-  if (!grid && !document.getElementById('adminSessionsTbody')) return;
+  if (!grid && !document.getElementById('adminCompletedGrid') && !document.getElementById('adminSessionsTbody')) return;
   const sched = (ok && data && data.schedules) || [];
   ADMIN_SCHEDULES = sched;
   renderTdcBlockPicker();
@@ -386,42 +386,268 @@ async function loadAdminSchedules() {
     grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--gray);padding:20px;">No sessions created yet.</div>';
     return;
   }
-  const statusCls = st => ({
+  renderSessionsGrid();
+  renderCompletedGrid();
+}
+
+/* Session filter engine — shared by the upcoming grid ("upcoming") and the
+   Completed Sessions grid ("completed"). Each context has its own tabs
+   (ALL / TDC / PDC), type-to-search, and a date-filter calendar popup. */
+
+const SESSION_VIEWS = {
+  upcoming: {
+    tab: 'TDC', search: '', date: null, calMonth: null,
+    scope: s => !['completed', 'done', 'cancelled'].includes(s.status),
+    el: {
+      tabs: [['sessionsTabAll', 'ALL'], ['sessionsTabTDC', 'TDC'], ['sessionsTabPDC', 'PDC']],
+      grid: 'adminSessionsGrid', search: 'sessionsSearch', chip: 'sessionsActiveFilters',
+      cal: 'sessionsCalendar', btn: 'sessionsDateFilterBtn'
+    }
+  },
+  completed: {
+    tab: 'TDC', search: '', date: null, calMonth: null,
+    scope: s => ['completed', 'done'].includes(s.status),
+    el: {
+      tabs: [['doneTabAll', 'ALL'], ['doneTabTDC', 'TDC'], ['doneTabPDC', 'PDC']],
+      grid: 'adminCompletedGrid', search: 'completedSearch', chip: 'completedActiveFilters',
+      cal: 'completedCalendar', btn: 'completedDateFilterBtn'
+    }
+  }
+};
+
+/* Keep the old names working for the upcoming grid's inline handlers. */
+function setSessionGridTab(tab){ setSessionViewTab('upcoming', tab); }
+function onSessionsSearch(value){ onSessionViewSearch('upcoming', value); }
+function toggleSessionsCalendar(){ toggleSessionViewCalendar('upcoming'); }
+function sessionsCalNav(dir){ sessionViewCalNav('upcoming', dir); }
+function pickCalendarDay(el, ymd){ pickSessionViewDay('upcoming', ymd); }
+function clearSessionDateFilter(){ clearSessionViewDate('upcoming'); }
+
+function setSessionViewTab(ctx, tab){ SESSION_VIEWS[ctx].tab = tab; renderSessionsView(ctx); }
+function onSessionViewSearch(ctx, value){ SESSION_VIEWS[ctx].search = (value || '').trim().toLowerCase(); renderSessionsView(ctx); }
+
+/* Type-to-search text: instructor, course, venue, status or date. */
+function sessionSearchable(s){
+  return [
+    s.instructor && s.instructor.name ? s.instructor.name : 'unassigned',
+    s.course && s.course.name ? s.course.name : '',
+    s.venue || '',
+    s.status || '',
+    s.date || '',
+    s.end_date || ''
+  ].join(' ').toLowerCase();
+}
+
+/* ---------- Calendar popup ---------- */
+function toggleSessionViewCalendar(ctx){
+  const cal = document.getElementById(SESSION_VIEWS[ctx].el.cal);
+  if (!cal) return;
+  if (cal.style.display === 'none') {
+    if (!SESSION_VIEWS[ctx].calMonth) {
+      SESSION_VIEWS[ctx].calMonth = (SESSION_VIEWS[ctx].date || new Date().toISOString().slice(0, 10)).slice(0, 7);
+    }
+    renderSessionViewCalendar(ctx);
+    cal.style.display = 'block';
+  } else {
+    cal.style.display = 'none';
+  }
+}
+
+function closeSessionViewCalendars(){
+  Object.keys(SESSION_VIEWS).forEach(ctx => {
+    const cal = document.getElementById(SESSION_VIEWS[ctx].el.cal);
+    if (cal) cal.style.display = 'none';
+  });
+}
+
+document.addEventListener('click', function(e){
+  if (!e.target.closest('.sessions-filter-wrap')) closeSessionViewCalendars();
+});
+
+function sessionViewCalNav(ctx, dir){
+  const view = SESSION_VIEWS[ctx];
+  if (!view.calMonth) return;
+  const [y, m] = view.calMonth.split('-').map(Number);
+  const d = new Date(y, m - 1 + dir, 1);
+  view.calMonth = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  renderSessionViewCalendar(ctx);
+}
+
+function pickSessionViewDay(ctx, ymd){
+  const view = SESSION_VIEWS[ctx];
+  view.date = (view.date === ymd) ? null : ymd; // click again to clear
+  const btn = document.getElementById(view.el.btn);
+  if (btn) btn.classList.toggle('active', !!view.date);
+  closeSessionViewCalendars();
+  renderSessionsView(ctx);
+}
+
+function clearSessionViewDate(ctx){
+  const view = SESSION_VIEWS[ctx];
+  view.date = null;
+  const btn = document.getElementById(view.el.btn);
+  if (btn) btn.classList.remove('active');
+  renderSessionsView(ctx);
+}
+
+function renderSessionViewCalendar(ctx){
+  const view = SESSION_VIEWS[ctx];
+  const cal = document.getElementById(view.el.cal);
+  if (!cal) return;
+
+  /* Build the persistent skeleton once: the nav buttons must stay attached.
+     Rebuilding them mid-click detaches the clicked button and the bubbling
+     click is then treated as an outside click, closing the calendar. */
+  if (!cal.querySelector('.sessions-cal-head')) {
+    cal.innerHTML = '<div class="sessions-cal-head">'
+      + '<button type="button" class="sessions-cal-nav" onclick="sessionViewCalNav(\'' + ctx + '\', -1)">‹</button>'
+      + '<span class="sessions-cal-title"></span>'
+      + '<button type="button" class="sessions-cal-nav" onclick="sessionViewCalNav(\'' + ctx + '\', 1)">›</button>'
+      + '</div><div class="sessions-cal-grid"></div>';
+  }
+
+  const byDate = {};
+  (ADMIN_SCHEDULES || []).forEach(s => {
+    if (view.scope(s) && s.date) byDate[String(s.date).slice(0, 10)] = (byDate[String(s.date).slice(0, 10)] || 0) + 1;
+  });
+
+  const [y, m] = view.calMonth.split('-').map(Number);
+  const first = new Date(y, m - 1, 1);
+  const monthLabel = first.toLocaleDateString('en-PH', { month: 'long', year: 'numeric' });
+  const today = new Date().toISOString().slice(0, 10);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const leading = first.getDay(); // 0 = Sunday
+
+  const titleEl = cal.querySelector('.sessions-cal-title');
+  if (titleEl) titleEl.textContent = monthLabel;
+
+  const gridEl = cal.querySelector('.sessions-cal-grid');
+  if (!gridEl) return;
+  let html = '';
+  ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(d => { html += '<span class="sessions-cal-dow">' + d + '</span>'; });
+  for (let i = 0; i < leading; i++) html += '<span></span>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ymd = view.calMonth + '-' + String(d).padStart(2, '0');
+    const n = byDate[ymd] || 0;
+    html += '<button type="button" class="sessions-cal-day' + (view.date === ymd ? ' selected' : '') + (ymd === today ? ' today' : '') + '" '
+      + 'onclick="pickSessionViewDay(\'' + ctx + '\', ' + "'" + ymd + "'" + ')" title="' + (n ? n + ' session(s)' : 'No sessions') + '">'
+      + d + (n ? '<span class="dot"></span>' : '') + '</button>';
+  }
+  gridEl.innerHTML = html;
+}
+
+/* ---------- Grid rendering ---------- */
+function sessionViewStatusLabel(st){
+  if (st === 'open') return 'Open';
+  if (st === 'done' || st === 'completed') return 'Completed';
+  if (st === 'full') return 'Full';
+  if (st === 'cancelled') return 'Cancelled';
+  if (st === 'active') return 'Ongoing';
+  return (st || 'Pending').charAt(0).toUpperCase() + (st || 'pending').slice(1);
+}
+
+function sessionViewStatusCls(st){
+  return ({
     open: 'confirmed', done: 'done', full: 'pending',
     cancelled: 'rejected', pending: 'pending', completed: 'done', active: 'enrolled'
   }[st] || 'pending');
-  const statusLabel = st => {
-    if (st === 'open') return 'Open'; if (st === 'done' || st === 'completed') return 'Completed';
-    if (st === 'full') return 'Full'; if (st === 'cancelled') return 'Cancelled';
-    if (st === 'active') return 'Ongoing';
-    return (st || 'Pending').charAt(0).toUpperCase() + (st || 'pending').slice(1);
-  };
-  const fmtDate = d => {
-    if (!d) return '—';
-    const dt = new Date(String(d) + 'T00:00:00');
-    if (isNaN(dt)) return escapeHtml(String(d));
-    return dt.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
-  };
-  grid.innerHTML = sched.map(s => {
+}
+
+function sessionViewFmtDate(d){
+  if (!d) return '—';
+  const dt = new Date(String(d) + 'T00:00:00');
+  if (isNaN(dt)) return escapeHtml(String(d));
+  return dt.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+}
+
+function renderSessionsView(ctx){
+  const view = SESSION_VIEWS[ctx];
+  const grid = document.getElementById(view.el.grid);
+  if (!grid) return;
+  const sched = ADMIN_SCHEDULES || [];
+  const scoped = sched.filter(view.scope);
+  const count = type => scoped.filter(s => ((s.course && s.course.type) || '').toUpperCase() === type).length;
+
+  /* Tab highlight + counts */
+  view.el.tabs.forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.toggle('active', view.tab === key);
+    if (key === 'TDC') el.innerHTML = 'TDC Sessions <span class="tab-count">(' + count('TDC') + ')</span>';
+    if (key === 'PDC') el.innerHTML = 'PDC Sessions <span class="tab-count">(' + count('PDC') + ')</span>';
+  });
+
+  /* Active date filter chip */
+  const chips = document.getElementById(view.el.chip);
+  if (chips) {
+    chips.innerHTML = view.date
+      ? '<span class="sessions-chip">📅 ' + escapeHtml(fmtYmdLong(view.date))
+        + '<button title="Clear date filter" onclick="clearSessionViewDate(\'' + ctx + '\')">✕</button></span>'
+      : '';
+  }
+
+  /* Filters: tab → date → search; ordered first (earliest) → last */
+  const base = scoped
+    .filter(s => view.tab === 'ALL' || ((s.course && s.course.type) || '').toUpperCase() === view.tab)
+    .filter(s => !view.date || String(s.date).slice(0, 10) === view.date);
+  const items = base
+    .filter(s => !view.search || sessionSearchable(s).includes(view.search))
+    .sort((x, y) => String(x.date || '').localeCompare(String(y.date || '')));
+
+  if (!items.length) {
+    const filtering = view.search || view.date;
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--gray);padding:20px;">'
+      + (filtering ? 'No sessions match your search or filters.' : (ctx === 'completed' ? 'No completed sessions yet.' : 'No sessions in this category.')) + '</div>';
+    return;
+  }
+
+  const beforeSearch = base.length;
+  let html = '';
+  if (view.search && beforeSearch !== items.length) {
+    html += '<div style="grid-column:1/-1;font-size:12px;color:var(--gray);">Showing ' + items.length + ' of ' + beforeSearch + ' session(s)</div>';
+  }
+  html += items.map(s => {
     const type = (s.course && s.course.type || '').toUpperCase();
     const slots = `${s.booked || 0}/${s.max_students || 0}`;
     const full = s.booked >= s.max_students;
     const dateLabel = s.end_date && s.end_date !== s.date
-      ? `${fmtDate(s.date)} – ${fmtDate(s.end_date)}`
-      : fmtDate(s.date);
+      ? `${sessionViewFmtDate(s.date)} – ${sessionViewFmtDate(s.end_date)}`
+      : sessionViewFmtDate(s.date);
     const instName = s.instructor && s.instructor.name ? escapeHtml(s.instructor.name) : 'Unassigned';
     const instColor = s.instructor && s.instructor.name ? 'var(--charcoal)' : 'var(--gray)';
+    if (ctx === 'completed') {
+      return `<div class="session-card session-card-done" data-id="${s.id}" onclick="openSessionDetails(${s.id})">
+        <div class="session-card-date">${dateLabel}</div>
+        <div class="session-card-badges">
+          <span class="type-badge" style="font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px;color:#fff;background:${type === 'PDC' ? 'var(--orange)' : '#6366f1'};">${type}</span>
+          <span class="badge done">✓ Completed</span>
+        </div>
+        <div class="session-card-row"><span class="ico">👥</span><span>${slots} attended</span></div>
+        <div class="session-card-row" style="color:${instColor};"><span class="ico">🎓</span><span>${instName}</span></div>
+        <div class="session-card-row" style="color:var(--gray);"><span class="ico">🔒</span><span>Booking closed</span></div>
+      </div>`;
+    }
     return `<div class="session-card" data-id="${s.id}" onclick="openSessionDetails(${s.id})">
       <div class="session-card-date">${dateLabel}</div>
       <div class="session-card-badges">
         <span class="type-badge" style="font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px;color:#fff;background:${type === 'PDC' ? 'var(--orange)' : '#6366f1'};">${type}</span>
-        <span class="badge ${statusCls(s.status)}">${statusLabel(s.status)}</span>
+        <span class="badge ${sessionViewStatusCls(s.status)}">${sessionViewStatusLabel(s.status)}</span>
       </div>
       <div class="session-card-row"><span class="ico">👥</span><span class="${full ? 'session-full-count' : ''}">${slots}</span></div>
       <div class="session-card-row" style="color:${instColor};"><span class="ico">🎓</span><span>${instName}</span></div>
       <div class="session-card-row"><span class="ico">🕐</span><span>${escapeHtml(String(s.time_start || ''))}–${escapeHtml(String(s.time_end || ''))}</span></div>
     </div>`;
   }).join('');
+  grid.innerHTML = html;
+}
+
+function renderCompletedGrid(){ renderSessionsView('completed'); }
+function renderSessionsGrid(){ renderSessionsView('upcoming'); }
+
+function fmtYmdLong(ymd){
+  const d = new Date(String(ymd) + 'T00:00:00');
+  if (isNaN(d)) return String(ymd);
+  return d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 /* Session Details Modal + nested Student List Modal */
@@ -446,7 +672,9 @@ function openSessionDetails(id){
   const btn = document.getElementById('sesDetailsViewStudents');
   if (btn) btn.onclick = () => openSessionStudentsModal(s.id);
   const cancelBtn = document.getElementById('sesDetailsCancelBtn');
-  if (cancelBtn) { cancelBtn.style.display = s.status && s.status !== 'cancelled' ? '' : 'none'; cancelBtn.onclick = () => cancelAdminSchedule(s.id); }
+  // Completed sessions are closed for good — nothing to cancel.
+  const finished = ['completed', 'done', 'cancelled'].includes(s.status);
+  if (cancelBtn) { cancelBtn.style.display = s.status && !finished ? '' : 'none'; cancelBtn.onclick = () => cancelAdminSchedule(s.id); }
   openModal('sessionDetailsModal');
 }
 
@@ -900,16 +1128,34 @@ async function loadInstructorAttendance(){
     list.innerHTML = '<div style="color:var(--gray);padding:14px;">No sessions yet.</div>';
     return;
   }
-  list.innerHTML = data.schedules.map(s => {
-    const a = s.attendance || {};
-    return `<div class="cert-row" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border:1px solid var(--gray-light);border-radius:12px;background:var(--cream);">
-      <div>
-        <b>${escapeHtml(s.course?.name || '')}</b> · ${escapeHtml(s.instructor?.name || '')}<br>
-        <span style="font-size:12px;color:var(--gray);">${escapeHtml(String(s.date || ''))} · ${a.present || 0}P / ${a.late || 0}L / ${a.absent || 0}A</span>
-      </div>
-      <button class="btn btn-sm btn-primary" onclick="viewScheduleAttendance(${s.id})">View</button>
-    </div>`;
-  }).join('');
+  // Categorize TDC vs PDC, each sorted first (earliest) → last (latest)
+  const groups = [
+    { type: 'TDC', label: 'TDC Sessions', color: '#6366f1' },
+    { type: 'PDC', label: 'PDC Sessions', color: 'var(--orange)' },
+  ];
+  let html = '';
+  groups.forEach(g => {
+    const items = data.schedules
+      .filter(s => ((s.course && s.course.type) || '').toUpperCase() === g.type)
+      .sort((x, y) => String(x.date).localeCompare(String(y.date)));
+    if (!items.length) return;
+    html += `<div style="margin:14px 0 6px;font-size:12px;font-weight:800;letter-spacing:.5px;color:${g.color};text-transform:uppercase;">${g.label} <span style="color:var(--gray);font-weight:600;">· first → last</span></div>`;
+    html += items.map(s => {
+      const a = s.attendance || {};
+      return `<div class="cert-row" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border:1px solid var(--gray-light);border-radius:12px;background:var(--cream);">
+        <div>
+          <b>${escapeHtml(s.course?.name || '')}</b> · ${escapeHtml(s.instructor?.name || '')}<br>
+          <span style="font-size:12px;color:var(--gray);">${escapeHtml(String(s.date || ''))}${s.end_date && s.end_date !== s.date ? ' – ' + escapeHtml(String(s.end_date)) : ''} · ${a.present || 0}P / ${a.late || 0}L / ${a.absent || 0}A</span>
+        </div>
+        <button class="btn btn-sm btn-primary" onclick="viewScheduleAttendance(${s.id})">View</button>
+      </div>`;
+    }).join('');
+  });
+  if (!html) {
+    list.innerHTML = '<div style="color:var(--gray);padding:14px;">No sessions yet.</div>';
+  } else {
+    list.innerHTML = html;
+  }
 }
 
 async function viewScheduleAttendance(id){

@@ -20,7 +20,7 @@ class ReportController extends Controller
             'totalEnrollments' => Enrollment::count(),
             'verifiedPayments' => Payment::where('status', 'verified')->count(),
             'totalRevenue' => Payment::where('status', 'verified')->sum('amount'),
-            'completedSessions' => Schedule::where('status', 'done')->count(),
+            'completedSessions' => Schedule::whereIn('status', ['done', 'completed'])->count(),
         ]);
     }
 

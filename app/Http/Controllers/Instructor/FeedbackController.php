@@ -19,7 +19,7 @@ class FeedbackController extends Controller
 
         $schedules = Schedule::with(['course'])
             ->where('instructor_id', $instructor->id)
-            ->whereIn('status', ['done', 'open'])
+            ->whereIn('status', ['done', 'completed', 'open'])
             ->orderBy('date')
             ->get();
 

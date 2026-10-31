@@ -21,6 +21,9 @@ use App\Http\Controllers\Student\ScheduleController as StudentBookingController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect('/frontend/index.html'));
+Route::get('/student/dashboard.html', fn () => redirect('/frontend/student/dashboard.html'));
+Route::get('/admin/dashboard.html', fn () => redirect('/frontend/admin/dashboard.html'));
+Route::get('/instructor/dashboard.html', fn () => redirect('/frontend/instructor/dashboard.html'));
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
@@ -42,14 +45,14 @@ Route::middleware('auth')->group(function () {
         Route::resource('instructors', InstructorController::class)->except(['show', 'update', 'destroy']);
         Route::post('/instructors/{instructor}/toggle', [InstructorController::class, 'toggleActive'])->name('instructors.toggle');
 
-        Route::resource('schedules', ScheduleController::class)->except(['show', 'update', 'edit']);
+        Route::resource('schedules', ScheduleController::class)->except(['show', 'update', 'edit', 'destroy']);
         Route::post('/schedules/{schedule}/cancel', [ScheduleController::class, 'cancel'])->name('schedules.cancel');
 
         Route::get('/payments', [AdminPayment::class, 'index'])->name('payments.index');
         Route::post('/payments/{payment}/verify', [AdminPayment::class, 'verify'])->name('payments.verify');
         Route::post('/payments/{payment}/reject', [AdminPayment::class, 'reject'])->name('payments.reject');
 
-        Route::resource('certifications', CertificationController::class)->except(['show', 'update', 'edit']);
+        Route::resource('certifications', CertificationController::class)->except(['show', 'update', 'edit', 'destroy']);
         Route::post('/certifications/{certification}/revoke', [CertificationController::class, 'revoke'])->name('certifications.revoke');
         Route::get('/certifications/courses/{student}', [CertificationController::class, 'coursesFor'])->name('certifications.courses');
 

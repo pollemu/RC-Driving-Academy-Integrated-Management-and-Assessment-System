@@ -153,6 +153,18 @@ class ScheduleController extends Controller
                 );
             }
 
+            // Fully-assessed past sessions end up here as "completed" — and
+            // nothing that already started can be booked either.
+            if ($schedule->status === 'completed'
+                || $schedule->status === 'done'
+                || $schedule->date->lt(Carbon::today())
+                || $schedule->status === 'active') {
+                return response()->json(
+                    ['message' => 'Completed or ongoing sessions can no longer be booked.'],
+                    422
+                );
+            }
+
             $schedule->load('course');
 
             $enrollment = Enrollment::where('student_id', $student->id)

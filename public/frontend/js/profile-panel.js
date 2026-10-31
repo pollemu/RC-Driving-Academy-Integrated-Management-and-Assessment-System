@@ -153,7 +153,9 @@
         '<span class="rp-pill' + (user.email_verified ? ' ok' : '') + '">' +
         (user.email_verified ? 'Email verified' : 'Email not verified') + '</span></div>';
       html += '<div class="rp-identity">';
-      html += '<div class="rp-avatar">' + esc(initials) + '</div>';
+      html += user.avatar_url
+        ? '<div class="rp-avatar"><img src="' + esc(user.avatar_url) + '" alt="Profile picture"></div>'
+        : '<div class="rp-avatar">' + esc(initials) + '</div>';
       html += '<div><h4>' + esc(name) + '</h4><span>' + esc(user.email) + '</span></div>';
       html += '</div>';
       html += '<div class="rp-rows">' + rows.join('') + '</div>';
@@ -188,9 +190,85 @@
         }.bind(this));
     },
 
-    /* The Valid ID card is used in two places: inside the full profile
-       form and stand-alone on the dashboard (via renderIdCard). */
+    /* Profile picture card: preview + upload/remove, shown for every
+       role (admin, instructor, student) on the self profile form. */
+    avatarCardHtml: function (p, user) {
+      var initials = (user.name || 'User').split(' ').filter(Boolean).map(function (w) { return w[0]; }).slice(0, 2).join('').toUpperCase();
+      var html = '<div class="card rp-avatar-card">';
+      html += '<div class="card-head"><h3>Profile Picture</h3></div>';
+      html += '<div class="rp-avatar-box">';
+      html += '<div class="rp-avatar rp-avatar-lg">';
+      if (user.avatar_url) html += '<img src="' + esc(user.avatar_url) + '" alt="Profile picture">';
+      else html += esc(initials);
+      html += '</div>';
+      html += '<div class="rp-avatar-actions">';
+      html += '<input type="file" id="' + p + 'avatarFile" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="RCDAProfile.uploadAvatar(this)">';
+      html += '<button class="btn btn-primary btn-sm" onclick="document.getElementById(\'' + p + 'avatarFile\').click()">Change Photo</button>';
+      if (user.avatar_url) {
+        html += '<button class="btn btn-ghost btn-sm" onclick="RCDAProfile.removeAvatar(this)">Remove</button>';
+      }
+      html += '</div>';
+      html += '<p class="rp-hint">JPG, PNG or WebP up to 2&nbsp;MB. Shown on your profile and dashboard.</p>';
+      html += '</div></div>';
+      return html;
+    },
+
+    /* Upload/replace the current user's profile picture, then repaint. */
+    uploadAvatar: function (input) {
+      if (!input || !input.files || !input.files.length) return;
+      var file = input.files[0];
+      var host = input.closest('[data-rp-mode]');
+      var fd = new FormData();
+      fd.append('avatar', file);
+
+      toast('Uploading photo…');
+      fetch(apiBase() + '/profile/avatar', {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Authorization': token() ? 'Bearer ' + token() : '' },
+        body: fd
+      }).then(function (res) {
+        return res.json().then(function (d) { return { ok: res.ok, status: res.status, data: d }; });
+      }).then(function (r) {
+        if (r.ok) {
+          toast('Profile picture updated.', 'success');
+          if (window.RCDA_AUTH && RCDA_AUTH.setUser && r.data.user) RCDA_AUTH.setUser(r.data.user);
+          if (host) this.render({ container: host, mode: 'self' });
+        } else {
+          var msg = (r.data && r.data.message) ? r.data.message : 'Upload failed.';
+          if (r.status === 422 && r.data && r.data.errors) {
+            var first = Object.values(r.data.errors)[0];
+            if (first && first[0]) msg = first[0];
+          }
+          toast(msg, 'error');
+        }
+        if (input) input.value = '';
+      }.bind(this)).catch(function () {
+        toast('Upload failed.', 'error');
+        if (input) input.value = '';
+      });
+    },
+
+    /* Delete the current user's profile picture. */
+    removeAvatar: function (btn) {
+      var host = btn.closest('[data-rp-mode]');
+      fetch(apiBase() + '/profile/avatar', {
+        method: 'DELETE',
+        headers: { 'Accept': 'application/json', 'Authorization': token() ? 'Bearer ' + token() : '' }
+      }).then(function (res) {
+        return res.json().then(function (d) { return { ok: res.ok, data: d }; });
+      }).then(function (r) {
+        if (r.ok) {
+          toast('Profile picture removed.', 'success');
+          if (window.RCDA_AUTH && RCDA_AUTH.setUser && r.data.user) RCDA_AUTH.setUser(r.data.user);
+          if (host) this.render({ container: host, mode: 'self' });
+        } else {
+          toast('Could not remove photo.', 'error');
+        }
+      }.bind(this)).catch(function () { toast('Could not remove photo.', 'error'); });
+    },
+
     idCardHtml: function (p) {
+      /* Used inside the full profile form and stand-alone (renderIdCard). */
       var html = '<div class="card rp-id-card">';
       html += '<div class="card-head"><h3>Valid ID Verification</h3><span class="rp-pill" id="' + p + 'idPill">Checking…</span></div>';
       html += '<p class="rp-hint">Upload one clear photo or PDF of a government-issued ID so the registrar can verify your identity. The file is stored privately and is only visible to you and the academy admin.</p>';
@@ -224,6 +302,11 @@
       var p = nextPrefix();
 
       var html = '<div class="two-col rp-wrap">';
+
+      /* ---------- Profile picture (self, all roles) ---------- */
+      if (isSelf) {
+        html += this.avatarCardHtml(p, user);
+      }
 
       /* ---------- Profile details ---------- */
       html += '<div class="card">';
@@ -666,7 +749,11 @@
         '.rp-hint{font-size:12px;color:var(--gray);margin:0;}',
         '.rp-summary-card{max-width:760px;}',
         '.rp-identity{display:flex;align-items:center;gap:14px;margin-bottom:18px;}',
-        '.rp-avatar{width:56px;height:56px;border-radius:50%;background:var(--orange);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;flex:0 0 auto;letter-spacing:.5px;}',
+        '.rp-avatar{width:56px;height:56px;border-radius:50%;background:var(--orange);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;flex:0 0 auto;letter-spacing:.5px;overflow:hidden;}',
+        '.rp-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;}',
+        '.rp-avatar-card .rp-avatar-box{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}',
+        '.rp-avatar-lg{width:84px;height:84px;font-size:26px;border-radius:50%;}',
+        '.rp-avatar-actions{display:flex;gap:8px;flex-wrap:wrap;}',
         '.rp-identity h4{margin:0 0 3px;font-size:18px;color:var(--charcoal);}',
         '.rp-identity span{font-size:13px;color:var(--gray);word-break:break-all;}',
         '.rp-rows{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 18px;}',

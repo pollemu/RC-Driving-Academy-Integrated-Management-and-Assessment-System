@@ -10,6 +10,7 @@ use App\Support\Phone;
 use App\Support\ValidationRules;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class ProfileController extends Controller
@@ -276,6 +277,47 @@ class ProfileController extends Controller
             'email' => $user->email,
             'role' => $user->role,
             'email_verified' => $user->email_verified_at !== null,
+            'avatar_path' => $user->avatar_path,
+            'avatar_url' => $user->avatar_path ? asset('storage/' . $user->avatar_path) : null,
         ];
+    }
+
+    /* Upload (or replace) the authenticated user's profile picture.
+       Stored locally on the public disk: storage/app/public/avatars. */
+    public function uploadAvatar(Request $request)
+    {
+        $user = $request->user();
+
+        $data = $request->validate([
+            'avatar' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+        ]);
+
+        // Remove the previous picture so storage does not fill with orphans.
+        if ($user->avatar_path && Storage::disk('public')->exists($user->avatar_path)) {
+            Storage::disk('public')->delete($user->avatar_path);
+        }
+
+        $path = $data['avatar']->store('avatars', 'public');
+        $user->update(['avatar_path' => $path]);
+
+        return response()->json([
+            'ok' => true,
+            'avatar_path' => $path,
+            'avatar_url' => asset('storage/' . $path),
+            'user' => $this->userArray($user->fresh()),
+        ]);
+    }
+
+    /* Remove the authenticated user's profile picture. */
+    public function deleteAvatar(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->avatar_path && Storage::disk('public')->exists($user->avatar_path)) {
+            Storage::disk('public')->delete($user->avatar_path);
+        }
+        $user->update(['avatar_path' => null]);
+
+        return response()->json(['ok' => true, 'user' => $this->userArray($user->fresh())]);
     }
 }

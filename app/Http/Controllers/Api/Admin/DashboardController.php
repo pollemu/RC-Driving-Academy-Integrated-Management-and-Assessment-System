@@ -30,7 +30,7 @@ class DashboardController extends Controller
 
         $pendingPayments = Payment::where('status', 'pending')->count();
         $pendingBookings = StudentSchedule::where('status', 'pending')->count();
-        $pendingIds = Student::where('id_status', Student::ID_PENDING)->count();
+        $pendingIds = User::where('role', 'student')->where('kyc_status', User::KYC_PENDING)->count();
 
         // Classification is normally fast/average/needs, but older TDC rows used
         // "avg". Normalise before counting so the chart never splits a bucket.

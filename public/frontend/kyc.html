@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/png" href="images/icon.png">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Identity Verification - RC Driving Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css?v=66">
+  <link rel="stylesheet" href="css/login.css?v=65">
+  <link rel="stylesheet" href="css/responsive.css?v=65">
+  <style>
+    /* KYC-specific pieces on top of the login-page shell */
+    .kyc-uploads{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+    @media (max-width:560px){ .kyc-uploads{grid-template-columns:1fr;} }
+    .kyc-drop{
+      position:relative;border:2px dashed var(--gray-light);border-radius:16px;
+      background:#FAF8F6;padding:18px 14px;text-align:center;cursor:pointer;
+      transition:.18s;display:flex;flex-direction:column;align-items:center;gap:8px;min-height:150px;justify-content:center;
+    }
+    .kyc-drop:hover{border-color:var(--orange);background:#fff;}
+    .kyc-drop.has-file{border-style:solid;border-color:var(--success);}
+    .kyc-drop svg{color:var(--orange);}
+    .kyc-drop .kyc-title{font-family:'Poppins';font-weight:600;font-size:13.5px;color:var(--charcoal);}
+    .kyc-drop .kyc-hint{font-size:11.5px;color:var(--gray);line-height:1.5;padding:0 10px;}
+    .kyc-drop input[type=file]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;}
+    .kyc-preview{
+      max-width:100%;max-height:110px;border-radius:10px;display:none;
+      box-shadow:0 6px 18px rgba(0,0,0,.14);
+    }
+    .kyc-drop.has-file .kyc-preview{display:block;}
+    .kyc-drop.has-file svg{display:none;}
+    .kyc-consent{
+      display:flex;gap:10px;align-items:flex-start;margin:16px 0 4px;
+      font-size:12.5px;color:var(--gray);line-height:1.55;background:var(--cream);
+      border:1px solid var(--gray-light);border-radius:12px;padding:12px 14px;
+    }
+    .kyc-consent input{margin-top:2px;accent-color:var(--orange);}
+    .kyc-error{display:none;color:#dc2626;font-size:13px;margin:10px 0 0;}
+    .kyc-status-card{text-align:center;padding:6px 0 2px;}
+    .kyc-status-card .big-emoji{font-size:42px;line-height:1;margin-bottom:10px;}
+    .kyc-status-card h1{font-size:22px;margin:0 0 8px;}
+    .kyc-status-card p{font-size:13.5px;color:var(--gray);margin:0 auto 16px;max-width:380px;line-height:1.6;}
+    .kyc-reason{
+      text-align:left;background:var(--danger2-bg,#fdecec);color:#B42318;
+      border:1px solid #f5c2c0;border-radius:12px;padding:12px 14px;margin:0 0 16px;font-size:13px;line-height:1.5;
+    }
+    .kyc-orange{color:var(--orange);font-weight:700;}
+  </style>
+</head>
+<body>
+
+  <a href="student/dashboard.html" class="home-back" aria-label="Back to dashboard">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+    Dashboard
+  </a>
+
+  <div class="login-wrap">
+
+    <div class="login-art">
+      <div class="brand"><span class="brand-dot"></span>RC DRIVING ACADEMY</div>
+      <div class="login-art-mid">
+        <h2>Identity verification keeps every student — and the academy — safe.</h2>
+        <p>PDC lessons are taught on real roads. As required by LTO-accredited driving schools, we verify every student's identity before behind-the-wheel training begins.</p>
+      </div>
+      <div class="login-art-foot">
+        <div class="odo-eyebrow"><span class="odo-dot"></span>How it works</div>
+        <div class="odo-strip">
+          <div class="odo-cell"><b class="accent">1</b><span>Upload your ID</span></div>
+          <div class="odo-cell"><b>2</b><span>Take a selfie</span></div>
+          <div class="odo-cell"><b>3</b><span>Admin verifies</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="login-side">
+      <div class="login-box" id="kycRoot">
+        <!-- filled by kyc.js -->
+        <p style="color:var(--gray);font-size:13px;">Loading…</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/config.js?v=66"></script>
+  <script src="js/error-handler.js?v=66"></script>
+  <script src="js/shared.js?v=78"></script>
+  <script src="js/kyc.js?v=69"></script>
+</body>
+</html>

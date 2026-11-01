@@ -62,13 +62,15 @@ class DummyStudentsSeeder extends Seeder
 
     private const ID_TYPES = [
         'philippine_passport' => 'Philippine Passport',
-        'drivers_license' => "Driver's License",
-        'student_permit' => 'Student Permit',
         'philsys_id' => 'PhilSys / National ID',
         'umid' => 'UMID',
         'voters_id' => "Voter's ID",
         'postal_id' => 'Postal ID',
     ];
+    /* 'drivers_license' (and 'student_permit') were removed on purpose — a
+       license/permit is only issued by LTO AFTER the training this academy
+       gives, so no student legitimately has one at signup. Kept in the
+       legacy labels of the KYC controllers so old submissions still show. */
 
     private const REJECT_REASONS = [
         'The uploaded ID was blurry and the expiry date could not be read. Please upload a clearer photo.',

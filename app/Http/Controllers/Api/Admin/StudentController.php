@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Assessment;
 use App\Models\Enrollment;
 use App\Models\Student;
 use App\Models\StudentSchedule;
 use App\Models\User;
+use App\Services\AssessmentSuggestion;
 use App\Support\Phone;
 use App\Support\ValidationRules;
 use Illuminate\Http\Request;
@@ -14,11 +16,27 @@ use Illuminate\Support\Facades\Hash;
 
 class StudentController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $students = Student::with(['user', 'enrollments.course', 'payments'])->latest()->paginate(10);
+        /* Server-side search: applies across ALL pages of the list, unlike
+           the old client-only filter that hid rows on the current page. */
+        $search = trim((string) $request->query('search', ''));
 
-        $data = $students->getCollection()->map(function (Student $student) {
+        $query = Student::with(['user', 'enrollments.course', 'payments'])
+            ->when($search !== '', function ($q) use ($search) {
+                $like = str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $search);
+                $q->where(function ($q) use ($like) {
+                    $q->whereHas('user', fn ($u) => $u->where('name', 'like', "%{$like}%")
+                            ->orWhere('email', 'like', "%{$like}%"))
+                        ->orWhere('phone', 'like', "%{$like}%")
+                        ->orWhereHas('enrollments.course', fn ($c) => $c->where('name', 'like', "%{$like}%")
+                                ->orWhere('type', 'like', "%{$like}%"));
+                });
+            })
+            ->latest()
+            ->paginate(10);
+
+        $data = $query->getCollection()->map(function (Student $student) {
             $types = $student->enrollments
                 ->map(fn ($e) => optional($e->course)->type)
                 ->filter()
@@ -32,42 +50,147 @@ class StudentController extends Controller
                 default => '—',
             };
 
-            $hasVerified = $student->payments->contains(fn ($p) => $p->status === 'verified');
-            $hasPending  = $student->payments->isNotEmpty();
-            $paymentStatus = $hasVerified ? 'Paid' : ($hasPending ? 'Pending' : '—');
-
             return [
                 'id' => $student->id,
                 'user_id' => $student->user_id,
                 'name' => $student->user->name,
                 'email' => $student->user->email,
-                'phone' => $student->phone,
-                'license_type' => $student->license_type,
                 'course' => $courseLabel,
-                'payment_status' => $paymentStatus,
-                'id_status' => $student->id_status ?: Student::ID_NONE,
+                'joined_at' => $student->user->created_at?->toIso8601String(),
                 'is_active' => $student->user->is_active,
-                'instructor_name' => optional($student->instructor)->user->name ?? null,
-                'created_at' => $student->user->created_at,
             ];
         });
 
         return response()->json([
             'students' => $data->values(),
             'pagination' => [
-                'current_page' => $students->currentPage(),
-                'last_page' => $students->lastPage(),
-                'per_page' => $students->perPage(),
-                'total' => $students->total(),
+                'current_page' => $query->currentPage(),
+                'last_page' => $query->lastPage(),
+                'per_page' => $query->perPage(),
+                'total' => $query->total(),
             ],
         ]);
     }
 
+    /* Everything the admin's "View" modal can show: contact details,
+       payment, age, preferred/assigned instructor, TDC + PDC progress
+       and the full assessment history (scores readable when assessed). */
     public function show(Student $student)
     {
-        $student->load(['user', 'enrollments.course', 'certifications.course']);
+        $student->load(['user', 'instructor.user']);
 
-        return response()->json(['student' => $student]);
+        $user = $student->user;
+
+        $enrollments = $student->enrollments()->with('course')->latest()->get();
+
+        $types = $enrollments->map(fn ($e) => optional($e->course)->type)->filter()->unique()->values();
+        $courseLabel = match (true) {
+            $types->contains('TDC') && $types->contains('PDC') => 'TDC+PDC',
+            $types->contains('TDC') => 'TDC',
+            $types->contains('PDC') => 'PDC',
+            default => '—',
+        };
+
+        // Payments: totals and simple status for badges.
+        $payments = $student->payments()->orderByDesc('id')->get(['id', 'amount', 'method', 'status', 'paid_at', 'verified_at']);
+        $paidTotal = (float) $student->payments->where('status', 'verified')->sum('amount');
+        $hasVerified = $student->payments->contains(fn ($p) => $p->status === 'verified');
+        $paymentStatus = $hasVerified ? 'Paid' : ($student->payments->isNotEmpty() ? 'Pending' : '—');
+
+        // Assessments (works for both TDC exam grading and PDC star grading).
+        $assessments = Assessment::whereHas('feedback', fn ($q) => $q->where('student_id', $student->id))
+            ->with('feedback.schedule.course')
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->get()
+            ->map(function (Assessment $a) {
+                $f = $a->feedback;
+                $categories = collect(AssessmentSuggestion::CATEGORIES)
+                    ->map(fn ($def, $key) => [
+                        'key' => $key,
+                        'label' => $def[0],
+                        'score' => $f->{"star_{$key}"},
+                        'note' => $f->{"note_{$key}"},
+                    ])
+                    ->values()
+                    ->all();
+
+                return [
+                    'course_name' => $f->schedule->course->name ?? '—',
+                    'course_type' => $f->schedule->course->type ?? '—',
+                    'date' => $f->schedule->date?->format('Y-m-d'),
+                    'classification' => $a->classification,
+                    'score' => $a->score,
+                    'exam_score' => $a->exam_score,
+                    'passed' => $a->passed,
+                    'confidence_score' => $a->confidence_score,
+                    'recommendation' => $a->recommendation,
+                    'feedback' => $f->raw_text,
+                    'categories' => $categories,
+                ];
+            });
+
+        // TDC progress: one 2-day class block + a passing assessment (75+),
+        // or an externally verified TDC.
+        $tdcBooked = $student->studentSchedules()
+            ->whereHas('schedule.course', fn ($q) => $q->where('type', 'TDC'))
+            ->whereIn('status', ['pending', 'confirmed'])
+            ->count();
+        $tdcAssessment = $assessments->firstWhere('course_type', 'TDC');
+
+        // PDC progress: booked 1-on-1 sessions + assessment history.
+        $pdcBooked = $student->studentSchedules()
+            ->whereHas('schedule.course', fn ($q) => $q->where('type', 'PDC'))
+            ->whereIn('status', ['pending', 'confirmed', 'done'])
+            ->count();
+        $pdcAssessments = $assessments->where('course_type', 'PDC')->values();
+
+        return response()->json([
+            'student' => $student,
+            'profile' => [
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $student->phone,
+                'address' => $student->address,
+                'gender' => $student->gender,
+                'birthdate' => $student->birthdate?->format('Y-m-d'),
+                'age' => $student->birthdate?->age,
+                'license_type' => $student->license_type,
+                'joined_at' => $user->created_at?->toIso8601String(),
+                'is_active' => $user->is_active,
+                'course' => $courseLabel,
+                'preferred_instructor_gender' => $student->preferred_instructor_gender,
+                'instructor_name' => optional($student->instructor)->user->name,
+                'kyc_status' => $user->kyc_status,
+                'payment_status' => $paymentStatus,
+                'payment_paid_total' => $paidTotal,
+                'tdc_verified' => (bool) $student->tdc_verified,
+                'tdc' => [
+                    'enrolled' => $types->contains('TDC'),
+                    'booked_blocks' => $tdcBooked,
+                    'assessment' => $tdcAssessment ? [
+                        'exam_score' => $tdcAssessment['exam_score'],
+                        'passed' => $tdcAssessment['passed'],
+                        'date' => $tdcAssessment['date'],
+                    ] : null,
+                ],
+                'pdc' => [
+                    'enrolled' => $types->contains('PDC'),
+                    'booked_sessions' => $pdcBooked,
+                    'assessed_sessions' => $pdcAssessments->count(),
+                    'latest_classification' => $pdcAssessments->first()['classification'] ?? null,
+                    'latest_score' => $pdcAssessments->first()['score'] ?? null,
+                ],
+            ],
+            'assessments' => $assessments,
+            'payments' => $payments->map(fn ($p) => [
+                'id' => $p->id,
+                'amount' => (float) $p->amount,
+                'method' => $p->method,
+                'status' => $p->status,
+                'date' => ($p->paid_at ?? $p->verified_at ?? $p->created_at)?->toIso8601String(),
+            ])->all(),
+        ]);
     }
 
     public function store(Request $request)

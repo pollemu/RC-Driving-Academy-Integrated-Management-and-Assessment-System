@@ -1,13 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="icon" type="image/png" href="images/icon.png">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RC Driving Academy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/base.css?v=65">
-<link rel="stylesheet" href="css/landing.css?v=65">
+<link rel="stylesheet" href="css/base.css?v=66">
+<link rel="stylesheet" href="css/landing.css?v=66">
 <link rel="stylesheet" href="css/legal.css?v=65">
 <link rel="stylesheet" href="css/responsive.css?v=65">
 </head>
@@ -168,9 +169,10 @@
           <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C0392B" stroke-width="2.4"><path d="M5 12l5 5L20 7"/></svg> Certificate of completion</li>
         </ul>
         <div class="price-row">
-          <div class="price"><b>₱1,500</b><span> /course</span></div>
+          <div class="price"><b id="tdcPrice">From ₱799</b><span> /course</span></div>
           <button class="btn btn-ghost" onclick="location.href='signup.html'">Enroll Now</button>
         </div>
+        <div class="price-variants" id="tdcVariants">Face-to-Face ₱799 · Online ₱999</div>
       </div>
       <div class="course-card pdc">
         <span class="tag">PRACTICAL</span>
@@ -187,9 +189,10 @@
           <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C0392B" stroke-width="2.4"><path d="M5 12l5 5L20 7"/></svg> Practical exam readiness report</li>
         </ul>
         <div class="price-row">
-          <div class="price"><b>₱4,500</b><span> /course</span></div>
+          <div class="price"><b id="pdcPrice">From ₱1,499</b><span> /course</span></div>
           <button class="btn btn-primary" onclick="location.href='signup.html'">Enroll Now</button>
         </div>
+        <div class="price-variants" id="pdcVariants">2 Wheels ₱1,499 · 4 Wheels ₱4,000</div>
       </div>
     </div>
   </section>
@@ -424,6 +427,33 @@
     });
   })();
 </script>
-<script src="js/shared.js?v=65"></script>
+<script>
+  /* Live course pricing for the landing cards — always matches what
+     enrollment actually charges (public /api/courses). Static values above
+     are the current correct fees and stay as the no-API fallback. */
+  (async () => {
+    try {
+      const r = await fetch(RCDA_CONFIG.getApiBaseUrl() + '/courses', { headers: { 'Accept': 'application/json' } });
+      if (!r.ok) return;
+      const d = await r.json();
+      const courses = (d && d.courses) || [];
+      const fmt = n => '₱' + Number(n).toLocaleString('en-PH', { maximumFractionDigits: 0 });
+      const strip = (name, type) => name.replace(new RegExp('^' + type + '\\s*-?\\s*'), '');
+      const tdc = courses.filter(c => c.type === 'TDC');
+      const pdc = courses.filter(c => c.type === 'PDC');
+      if (tdc.length && document.getElementById('tdcPrice')) {
+        document.getElementById('tdcPrice').textContent = 'From ' + fmt(Math.min(...tdc.map(c => +c.fee)));
+        document.getElementById('tdcVariants').textContent = tdc.map(c => strip(c.name, 'TDC') + ' ' + fmt(c.fee)).join(' · ');
+      }
+      if (pdc.length && document.getElementById('pdcPrice')) {
+        document.getElementById('pdcPrice').textContent = 'From ' + fmt(Math.min(...pdc.map(c => +c.fee)));
+        document.getElementById('pdcVariants').textContent = pdc.map(c => strip(c.name, 'PDC') + ' ' + fmt(c.fee)).join(' · ');
+      }
+    } catch (e) { /* landing gracefully keeps its static fees */ }
+  })();
+</script>
+<script src="js/config.js?v=66"></script>
+<script src="js/error-handler.js?v=66"></script>
+<script src="js/shared.js?v=78"></script>
 </body>
 </html>

@@ -63,12 +63,60 @@ RCDA.hidePageLoading = function(){
   const el = document.getElementById('rcdaPageLoading');
   if (!el) return;
   clearTimeout(el._failsafeTimer);
+  el.style.transition = '';
   el.classList.remove('show');
-  clearTimeout(el._hideTimer);
-  el._hideTimer = setTimeout(() => {
-    if (el.parentNode) el.parentNode.removeChild(el);
-  }, 220);
+  /* The element is deliberately NOT removed — a reload's outgoing frame must
+     have a splash node available to re-show instantly (see the pagehide
+     handler below); with nothing in the DOM the last frame shows the bare
+     dashboard and the user sees a flash before the next spinner appears. */
 };
+
+/* Unload cover: on reload / navigation away, the outgoing page's last painted
+   frame stays on screen until the new document paints. Re-show the splash at
+   the earliest hook (beforeunload runs BEFORE the navigation request starts;
+   pagehide is the guaranteed-when-unloading fallback) so the teardown frames
+   are spinner-covered, not dashboard. */
+function coverWithSplashOnUnload(){
+  ensurePageLoadingStyles();
+  const el = document.getElementById('rcdaPageLoading');
+  if (el) {
+    /* Instant, opaque — no fade, or the covering frame is translucent. */
+    el.style.transition = 'none';
+    el.style.opacity = '1';
+    el.style.visibility = 'visible';
+    el.classList.add('show');
+  }
+}
+window.addEventListener('beforeunload', coverWithSplashOnUnload);
+window.addEventListener('pagehide', coverWithSplashOnUnload);
+
+/* Keyboard reloads: swallow the native reload event, cover the screen with
+   the splash, let it composite for a couple of frames, and only then start
+   the actual reload. The delay is imperceptible but guarantees the last
+   painted frame of the outgoing page is the spinner — not the dashboard. */
+window.addEventListener('keydown', function (e) {
+  const isReloadKey = e.key === 'F5'
+    || ((e.ctrlKey || e.metaKey) && (e.key === 'r' || e.key === 'R'));
+  if (!isReloadKey) return;
+  e.preventDefault();
+  RCDA.showPageLoading();
+  /* Force a synchronous style/flush so the covered state is real. */
+  void document.documentElement.offsetHeight;
+  setTimeout(function () { window.location.reload(); }, 140);
+});
+
+/* A back/forward cache restore shows the page as it was — with the splash we
+   just re-showed on unload. Uncover it so the loaded page isn't stuck. */
+window.addEventListener('pageshow', function (e) {
+  if (!e.persisted) return;
+  const el = document.getElementById('rcdaPageLoading');
+  if (el) {
+    el.style.transition = '';
+    el.style.opacity = '';
+    el.style.visibility = '';
+    el.classList.remove('show');
+  }
+});
 
 /* ---- AUTH GUARD (dashboards) ----
    Verifies the stored token against /api/me, redirecting to login
@@ -94,7 +142,9 @@ async function requireAuth(role){
   return true;
 }
 
-/* Fills the sidebar / topbar with the logged-in user's name + initials. */
+/* Fills the sidebar / topbar with the logged-in user's name + initials,
+   and shows the profile picture every place an avatar is rendered when the
+   user has uploaded one (falls back to initials otherwise). */
 function applyUserInfo(){
   const u = RCDA_AUTH.getUser();
   if (!u) return;
@@ -104,10 +154,22 @@ function applyUserInfo(){
   if (nameEl) nameEl.textContent = name;
   const roleEl = document.querySelector('.sidebar-user-info span');
   if (roleEl) roleEl.textContent = (u.role || '').charAt(0).toUpperCase() + (u.role || '').slice(1) + ' · RCDA';
-  const av = document.querySelector('.sidebar-avatar');
-  if (av) av.textContent = initials;
-  const tb = document.getElementById('topbarAvatar');
-  if (tb) tb.textContent = initials;
+  const paintAvatar = (el) => {
+    if (!el) return;
+    if (!u.avatar_url) { el.textContent = initials; return; }
+    el.textContent = '';
+    const img = document.createElement('img');
+    img.src = u.avatar_url;
+    img.alt = '';
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;position:absolute;inset:0;';
+    img.addEventListener('error', () => { img.remove(); el.textContent = initials; });
+    if (!getComputedStyle(el).position || getComputedStyle(el).position === 'static') {
+      el.style.position = 'relative';
+    }
+    el.appendChild(img);
+  };
+  paintAvatar(document.querySelector('.sidebar-avatar'));
+  paintAvatar(document.getElementById('topbarAvatar'));
 }
 
 async function logout(){
@@ -259,7 +321,7 @@ function rateStar(star){
 /* ---- NLP DATA ---- */
 const nlpData = {
   fast: {
-    text: "Student shows excellent steering control, smooth braking and accurate side-mirror checks. Braking distance was outstanding on every stop, and mirror observation was mastered throughout the session.",
+    text: "Magaling siya mag-drive: sobrang smooth ang clutch at braking, one-take lagi ang parking, walang stall kahit traffic, at laging tama ang speed limit buong session.",
     tokens: [{t:'excellent',c:'pos'},{t:'outstanding',c:'pos'},{t:'mastered',c:'pos'},{t:'accurate',c:'pos'},{t:'smooth',c:'pos'}],
     badge: '⚡ Fast Learner', cls: 'fast', score: 91,
     msg: 'Excellent performance. Continue at current pace.'
@@ -271,7 +333,7 @@ const nlpData = {
     msg: 'Steady progress. Focus on braking consistency and mirror checks.'
   },
   needs: {
-    text: "Student has difficulty with steering control and unsafe braking on turns. Side-mirror checks were incorrect multiple times. Braking shows poor control and struggle with basic maneuvers.",
+    text: "Grabe ang kamalian sa pag-shift ng gear, madalas mamatay ang makina, delikado ang pagpreno at pumapasok sa kabilang linya ang pagliko sa kanan.",
     tokens: [{t:'difficulty',c:'neg'},{t:'unsafe',c:'neg'},{t:'incorrect',c:'neg'},{t:'poor',c:'neg'},{t:'struggle',c:'neg'}],
     badge: '⚠ Needs Improvement', cls: 'needs', score: 38,
     msg: 'Instructor intervention recommended. Additional sessions advised.'
@@ -284,3 +346,108 @@ function classifyNLP(text){
   if (txt.includes('poor') || txt.includes('unsafe') || txt.includes('difficulty') || txt.includes('struggle')) return 'needs';
   return 'avg';
 }
+
+/* ============================================================
+   OFFLINE QUEUE — saved on device, flushed automatically
+   Field instructors lose signal mid-session (rural venues,
+    basements, dead zones). Submissions made while offline go
+   into a localStorage queue and are replayed as soon as the
+   connection returns. The instructor sees a badge.
+   ============================================================ */
+RCDA.offlineQueue = (function () {
+  const KEY = 'rcda_offline_queue';
+  const badgeId = 'rcdaOfflineBadge';
+
+  function read(){
+    try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) { return []; }
+  }
+  function write(items){
+    try { localStorage.setItem(KEY, JSON.stringify(items)); } catch (e) { /* storage full — drop */ }
+  }
+
+  const listeners = [];
+  function emit(){
+    updateBadge();
+    listeners.forEach(fn => { try { fn(count(), read()); } catch (e) {} });
+  }
+
+  /** Queue a submission. `item` is a descriptor for the badge tooltip. */
+  function push(url, options, item){
+    const items = read();
+    items.push(Object.assign({
+      id: Date.now() + Math.random().toString(36).slice(2, 7),
+      url: url,
+      options: options,
+      queued_at: new Date().toISOString(),
+      label: (item && item.label) || 'Submission'
+    }, item || {}));
+    write(items);
+    emit();
+  }
+
+  function count(){ return read().length; }
+
+  /* Replay every queued submission. A real server response (any status
+     code) means the request arrived: success = done, a 4xx means the
+     payload itself was wrong so keep-or-drop is decided by removeAfter.
+     A network failure (safeFetch status 0) keeps the item for later. */
+  let flushing = false;
+  async function flush(){
+    if (flushing) return 0;
+    flushing = true;
+    let synced = 0;
+    let items = read();
+    try {
+      while (items.length && navigator.onLine) {
+        const next = items[0];
+        const res = await RCDA.safeFetch(next.url, next.options);
+        if (res.status === 0) break;                   // still no connection — stop
+        items = items.filter(i => i.id !== next.id);   // reached the server
+        if (res.ok) synced++;
+        else if (next.onFail) { try { next.onFail(res); } catch (e) {} }
+        write(items);
+        emit();
+      }
+    } catch (e) { /* flush continues next time */ }
+    flushing = false;
+    if (synced) window.dispatchEvent(new CustomEvent('rcda:offlinesync', { detail: { synced } }));
+    updateBadge();
+    return synced;
+  }
+
+  /* ---- Badge in the dashboard topbar ---- */
+  function setBadgeText(text, color){
+    const b = document.getElementById(badgeId);
+    if (!b) return;
+    if (!text) { b.style.display = 'none'; return; }
+    b.style.display = 'inline-flex';
+    b.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:' + color + ';margin-right:7px;"></span>' + text;
+  }
+
+  function updateBadge(){
+    const n = count();
+    if (!navigator.onLine) {
+      setBadgeText('Offline — saving on device', '#d97706');
+    } else if (n > 0) {
+      setBadgeText(n + (n === 1 ? ' entry' : ' entries') + ' waiting to sync', '#7d5bb5');
+    } else {
+      setBadgeText(null);
+    }
+  }
+
+  function initBadge(){
+    if (document.getElementById(badgeId)) return;
+    const bar = document.querySelector('.dash-topbar .topbar-left') || document.body;
+    const b = document.createElement('div');
+    b.id = badgeId;
+    b.style.cssText = 'display:none;margin-left:12px;align-items:center;font-size:12.5px;font-weight:700;padding:7px 13px;border-radius:99px;background:rgba(255,255,255,0.9);box-shadow:0 2px 10px rgba(0,0,0,0.12);color:var(--charcoal);';
+    bar.appendChild(b);
+    updateBadge();
+
+    window.addEventListener('online', () => { updateBadge(); flush(); });
+    window.addEventListener('offline', updateBadge);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && navigator.onLine) flush(); });
+  }
+
+  return { push, flush, count, read, onUpdated: fn => listeners.push(fn), initBadge, updateBadge };
+})();

@@ -1,18 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="icon" type="image/png" href="../images/icon.png">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Student Dashboard - RC Driving Academy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/base.css?v=65">
+<link rel="stylesheet" href="../css/base.css?v=66">
 <link rel="stylesheet" href="../css/student.css?v=65">
 </head>
 <body>
 
 <!-- Opaque splash: covers the dashboard until its data has loaded -->
-<div id="rcdaPageLoading" class="show" role="status" aria-live="polite">
+<div id="rcdaPageLoading" class="show" role="status" aria-live="polite"
+     style="position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;background:#FAF8F6;">
   <div class="rcda-pl-card"><div class="rcda-pl-spin"></div><div class="rcda-pl-label">Loading…</div></div>
 </div>
 <noscript><style>#rcdaPageLoading{display:none!important;}</style></noscript>
@@ -85,6 +87,7 @@
             <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
           </svg>
         </button>
+        <div class="topbar-logo"><img src="../images/RCDA%20logo.jpg" alt="RCDA"></div>
         <div class="topbar-title" id="studTitle">My Profile</div>
       </div>
       <div class="topbar-right">
@@ -99,8 +102,8 @@
        <div class="panel active" id="stud-profile">
           <div class="id-reminder" id="idReminderBanner" style="display:none;">
             <div class="id-reminder-text">
-              <b id="idReminderTitle">Verify your identity</b>
-              <span id="idReminderText">Upload a valid ID so the academy can verify your account. This does not block your lessons — you can enrol and book while it is being reviewed.</span>
+              <b id="idReminderTitle">Verify your identity to start booking</b>
+              <span id="idReminderText">Upload a valid government ID and a selfie so the academy can verify who you are. Booking lessons and payments stay locked until an administrator approves your documents.</span>
             </div>
             <button type="button" class="btn btn-primary btn-sm" onclick="goToIdUpload()" id="idReminderBtn">Upload valid ID</button>
           </div>
@@ -293,7 +296,7 @@
             </div>
 
             <div class="hb-turn">
-              <button class="btn btn-ghost btn-sm" id="hbPrevBtn" onclick="hbTurn(-1)">← Previous</button>
+              <button class="btn btn-ghost btn-sm" id="hbPrevBtn" onclick="hbTurn(-1)">â† Previous</button>
               <button class="btn btn-primary btn-sm" id="hbNextBtn" onclick="hbTurn(1)">Next →</button>
             </div>
           </div>
@@ -382,11 +385,11 @@
   </div>
 </div>
 
-<script src="../js/config.js?v=65"></script>
-<script src="../js/error-handler.js?v=65"></script>
-<script src="../js/shared.js?v=65"></script>
-<script src="../js/profile-panel.js?v=68"></script>
+<script src="../js/config.js?v=66"></script>
+<script src="../js/error-handler.js?v=66"></script>
+<script src="../js/shared.js?v=78"></script>
+<script src="../js/profile-panel.js?v=70"></script>
 <script src="../js/profile.js?v=65"></script>
-<script src="../js/student.js?v=65"></script>
+<script src="../js/student.js?v=66"></script>
 </body>
 </html>

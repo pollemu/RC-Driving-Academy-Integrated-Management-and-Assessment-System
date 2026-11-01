@@ -383,3 +383,17 @@ tr.row-new{animation:rowIn 1.4s ease;}
   font-size:13px;padding:0;line-height:1;
 }
 .sessions-chip button:hover{color:var(--charcoal);}
+
+/* Students panel — browse cards, 2 per row (name · course · joined · View). */
+.stud-card{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  background:#fff;border:1.5px solid var(--gray-light);border-radius:14px;
+  padding:14px 16px;min-width:0;
+  transition:box-shadow .18s,border-color .18s;
+}
+.stud-card:hover{border-color:var(--orange);box-shadow:0 4px 14px rgba(0,0,0,.06);}
+#studentsGrid{margin-bottom:16px;}
+@media (max-width:720px){
+  #studentsGrid{grid-template-columns:1fr;}
+  .stud-card{flex-wrap:wrap;}
+}

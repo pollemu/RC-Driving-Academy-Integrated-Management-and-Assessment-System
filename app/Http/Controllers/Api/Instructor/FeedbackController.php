@@ -60,17 +60,21 @@ class FeedbackController extends Controller
 
         $isTdc = $schedule->course->type === 'TDC';
 
-        // PDC always rates the three practical skills. TDC is exam-only, so
-        // those fields are simply absent and stay nullable.
+        // PDC always rates the five practical behind-the-wheel categories.
+        // TDC is exam-only, so those fields are simply absent and stay nullable.
         $starRule = $isTdc ? 'nullable' : 'required';
         $rules = [
             'raw_text' => ['required', 'string', 'min:10'],
-            'star_steering' => [$starRule, 'integer', 'between:1,5'],
+            'star_engine' => [$starRule, 'integer', 'between:1,5'],
             'star_brake' => [$starRule, 'integer', 'between:1,5'],
-            'star_mirror' => [$starRule, 'integer', 'between:1,5'],
-            'note_steering' => ['nullable', 'string', 'max:120'],
+            'star_turning' => [$starRule, 'integer', 'between:1,5'],
+            'star_parking' => [$starRule, 'integer', 'between:1,5'],
+            'star_traffic' => [$starRule, 'integer', 'between:1,5'],
+            'note_engine' => ['nullable', 'string', 'max:120'],
             'note_brake' => ['nullable', 'string', 'max:120'],
-            'note_mirror' => ['nullable', 'string', 'max:120'],
+            'note_turning' => ['nullable', 'string', 'max:120'],
+            'note_parking' => ['nullable', 'string', 'max:120'],
+            'note_traffic' => ['nullable', 'string', 'max:120'],
             'exam_score' => $isTdc ? ['required', 'numeric', 'between:0,100'] : ['nullable', 'numeric', 'between:0,100'],
         ];
         $data = $request->validate($rules);
@@ -84,8 +88,9 @@ class FeedbackController extends Controller
         $exam = $data['exam_score'] ?? null;
 
         // TDC is classroom theory — graded by EXAM score only (no driving stars).
-        // PDC is behind-the-wheel — graded by steering / braking / side mirror
-        // star ratings plus the instructor's written feedback.
+        // PDC is behind-the-wheel — graded by the five practical categories
+        // (engine & gears, braking, turning & lane, parking, traffic rules)
+        // plus the instructor's written feedback.
         if ($isTdc) {
             $stars = [];
             $notes = [];
@@ -95,14 +100,18 @@ class FeedbackController extends Controller
             $built = ['failed' => [], 'suggestions' => []];
         } else {
             $stars = [
-                'steering' => $feedback->star_steering,
-                'brake'    => $feedback->star_brake,
-                'mirror'   => $feedback->star_mirror,
+                'engine'  => $feedback->star_engine,
+                'brake'   => $feedback->star_brake,
+                'turning' => $feedback->star_turning,
+                'parking' => $feedback->star_parking,
+                'traffic' => $feedback->star_traffic,
             ];
             $notes = [
-                'steering' => $feedback->note_steering,
-                'brake'    => $feedback->note_brake,
-                'mirror'   => $feedback->note_mirror,
+                'engine'  => $feedback->note_engine,
+                'brake'   => $feedback->note_brake,
+                'turning' => $feedback->note_turning,
+                'parking' => $feedback->note_parking,
+                'traffic' => $feedback->note_traffic,
             ];
 
             $built = AssessmentSuggestion::build($stars, $notes);

@@ -8,12 +8,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable(['instructor_id', 'student_id', 'schedule_id', 'raw_text',
-    // PDC (practical driving) — the three skills the instructor rates today.
-    'star_steering', 'star_brake', 'star_mirror',
-    'note_steering', 'note_brake', 'note_mirror',
-    // Legacy six-skill columns, kept so old records still load/save safely.
-    'star_speed', 'star_lane', 'star_parking', 'star_safety',
-    'note_speed', 'note_lane', 'note_parking', 'note_safety'])]
+    // PDC (practical driving) — the five behind-the-wheel categories.
+    'star_engine', 'star_brake', 'star_turning', 'star_parking', 'star_traffic',
+    'note_engine', 'note_brake', 'note_turning', 'note_parking', 'note_traffic',
+    // Legacy three-skill and six-skill columns, kept so old records load/save safely.
+    'star_steering', 'star_mirror', 'note_steering', 'note_mirror',
+    'star_speed', 'star_lane', 'star_safety',
+    'note_speed', 'note_lane', 'note_safety'])]
 class Feedback extends Model
 {
     public function instructor(): BelongsTo

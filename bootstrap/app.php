@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
             'api.role' => \App\Http\Middleware\ApiRoleMiddleware::class,
+            'api.kyc' => \App\Http\Middleware\EnsureKycVerified::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

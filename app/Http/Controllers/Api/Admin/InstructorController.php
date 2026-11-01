@@ -10,9 +10,25 @@ use Illuminate\Support\Facades\Hash;
 
 class InstructorController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $instructors = Instructor::with('user')->latest()->paginate(10);
+        /* Server-side search: matches every page of the instructor list,
+           not just the ten rows currently rendered. */
+        $search = trim((string) $request->query('search', ''));
+
+        $instructors = Instructor::with('user')
+            ->when($search !== '', function ($q) use ($search) {
+                $like = str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $search);
+                $q->where(function ($q) use ($like) {
+                    $q->whereHas('user', fn ($u) => $u->where('name', 'like', "%{$like}%")
+                            ->orWhere('email', 'like', "%{$like}%"))
+                        ->orWhere('phone', 'like', "%{$like}%")
+                        ->orWhere('specialization', 'like', "%{$like}%")
+                        ->orWhere('license_no', 'like', "%{$like}%");
+                });
+            })
+            ->latest()
+            ->paginate(10);
 
         $data = $instructors->getCollection()->map(function (Instructor $instructor) {
             return [

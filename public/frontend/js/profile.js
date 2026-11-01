@@ -177,9 +177,8 @@
     RCDA.showToast('Password updated.', 'success');
   };
 
-  window.requestForgotPassword = async function () {
-    var email = (document.getElementById('pf_email') || {}).value || (RCDA_AUTH.getUser() || {}).email || '';
-    var res = await RCDA.safeFetch(API() + '/password/forgot', { method: 'POST', body: { email: email } });
-    RCDA.showToast((res.data && res.data.message) || 'Password reset delivery is not available yet.', 'info');
+  /* Forgot password now lives on the login page (Gmail / SMS picker). */
+  window.requestForgotPassword = function () {
+    window.location.href = '../login.html?forgot=1';
   };
 })();

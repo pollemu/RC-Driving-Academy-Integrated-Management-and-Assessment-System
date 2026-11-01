@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Assessment;
 use App\Models\Certification;
 use App\Models\StudentSchedule;
+use App\Services\AssessmentSuggestion;
 use Illuminate\Http\Request;
 
 class ProgressController extends Controller
@@ -54,20 +55,17 @@ class ProgressController extends Controller
             ->get()
             ->map(function (Assessment $a) {
                 $f = $a->feedback;
-                $cats = [
-                    'steering' => ['Steering Control', $f->star_steering, $f->note_steering],
-                    'brake'    => ['Braking', $f->star_brake, $f->note_brake],
-                    'mirror'   => ['Side Mirror & Observation', $f->star_mirror, $f->note_mirror],
-                ];
-                $categories = [];
-                foreach ($cats as $key => [$label, $score, $note]) {
-                    $categories[] = [
+                // Use AssessmentSuggestion's five PDC categories so the
+                // student's results always mirror what the instructor rated.
+                $categories = collect(AssessmentSuggestion::CATEGORIES)
+                    ->map(fn ($def, $key) => [
                         'key'   => $key,
-                        'label' => $label,
-                        'score' => $score,
-                        'note'  => $note,
-                    ];
-                }
+                        'label' => $def[0],
+                        'score' => $f->{"star_{$key}"},
+                        'note'  => $f->{"note_{$key}"},
+                    ])
+                    ->values()
+                    ->all();
 
                 return [
                     'feedback_id'    => $a->feedback_id,

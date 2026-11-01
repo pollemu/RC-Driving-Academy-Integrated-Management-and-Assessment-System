@@ -37,15 +37,26 @@
     rejected: 'Needs attention'
   };
 
+  /* KYC status → pill classes + labels (users.kyc_status). */
   var ID_PILL_CLASS = {
-    none: '',
+    unverified: '',
     pending: 'warn',
+    verified: 'ok',
     approved: 'ok',
     rejected: 'bad'
   };
 
+  var ID_LABELS = {
+    unverified: 'Not verified',
+    none: 'Not verified',
+    pending: 'Under review',
+    verified: 'Identity verified',
+    approved: 'Identity verified',
+    rejected: 'Rejected — resubmit'
+  };
+
   function idStatusLabel(status) {
-    return ID_LABELS[status] || ID_LABELS.none;
+    return ID_LABELS[status] || ID_LABELS.unverified;
   }
 
   /* Laravel returns validation failures as { errors: { field: [msg] } }. */
@@ -140,7 +151,7 @@
         row('Address', student.address);
         row('License type', student.license_type);
         row('Gender', student.gender);
-        row('Valid ID', idStatusLabel(student.id_status));
+        row('Identity (KYC)', idStatusLabel(user.kyc_status));
       } else if (user.role === 'instructor') {
         row('Phone', instructor.phone);
         row('Specialization', instructor.specialization);
@@ -232,6 +243,7 @@
         if (r.ok) {
           toast('Profile picture updated.', 'success');
           if (window.RCDA_AUTH && RCDA_AUTH.setUser && r.data.user) RCDA_AUTH.setUser(r.data.user);
+          if (typeof applyUserInfo === 'function') applyUserInfo(); // refresh sidebar + topbar avatar
           if (host) this.render({ container: host, mode: 'self' });
         } else {
           var msg = (r.data && r.data.message) ? r.data.message : 'Upload failed.';
@@ -260,6 +272,7 @@
         if (r.ok) {
           toast('Profile picture removed.', 'success');
           if (window.RCDA_AUTH && RCDA_AUTH.setUser && r.data.user) RCDA_AUTH.setUser(r.data.user);
+          if (typeof applyUserInfo === 'function') applyUserInfo(); // back to initials in sidebar + topbar
           if (host) this.render({ container: host, mode: 'self' });
         } else {
           toast('Could not remove photo.', 'error');
@@ -268,10 +281,12 @@
     },
 
     idCardHtml: function (p) {
-      /* Used inside the full profile form and stand-alone (renderIdCard). */
+      /* KYC status card on the profile page. Submission happens on the
+         dedicated KYC page (kyc.html), not inline — one place for the
+         two-document flow (ID + selfie). */
       var html = '<div class="card rp-id-card">';
-      html += '<div class="card-head"><h3>Valid ID Verification</h3><span class="rp-pill" id="' + p + 'idPill">Checking…</span></div>';
-      html += '<p class="rp-hint">Upload one clear photo or PDF of a government-issued ID so the registrar can verify your identity. The file is stored privately and is only visible to you and the academy admin.</p>';
+      html += '<div class="card-head"><h3>Identity Verification</h3><span class="rp-pill" id="' + p + 'idPill">Checking…</span></div>';
+      html += '<p class="rp-hint">Your ID + selfie verify who you are before you book lessons or pay. Documents are stored privately and reviewed manually by an administrator.</p>';
       html += '<div class="rp-id-body"><div class="rp-loading">Loading verification status...</div></div>';
       html += '</div>';
       return html;
@@ -371,7 +386,7 @@
         '</div>';
       html += '</div></div>';
 
-      /* ---------- Valid ID (students, self-service only) ---------- */
+      /* ---------- KYC / Identity (students, self-service only) ---------- */
       if (isSelf && role === 'student') {
         html += this.idCardHtml(p);
       }
@@ -504,23 +519,10 @@
       this._send(btn, 'POST', apiBase() + '/profile/verify-email', {}, 'Verification code sent.', null, true);
     },
 
+    /* Forgot password now lives on the login page (Gmail / SMS picker). */
     requestForgotPassword: function (e) {
       if (e && e.preventDefault) e.preventDefault();
-      var host = e && e.target ? e.target.closest('[data-rp-mode]') : null;
-      var scope = host || document;
-      var p = (scope.getAttribute && scope.getAttribute('data-rp-prefix')) || '';
-      var el = scope.querySelector('#' + p + 'email');
-      var email = el ? el.value : '';
-      fetch(apiBase() + '/password/forgot', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ email: email })
-      })
-        .then(function (res) { return res.json().then(function (d) { return { ok: res.ok, data: d }; }); })
-        .then(function (r) {
-          toast((r.data && r.data.message) || 'Password reset delivery is not available yet.', r.ok ? 'info' : 'error');
-        })
-        .catch(function (err) { toast(err.message, 'error'); });
+      window.location.href = '../login.html?forgot=1';
     },
 
     confirmVerifyCode: function (btn) {
@@ -548,14 +550,13 @@
       var card = container ? container.querySelector('.rp-id-card') : null;
       if (!card) return;
 
-      var p = (container.getAttribute && container.getAttribute('data-rp-prefix')) || '';
       var self = this;
 
-      fetch(apiBase() + '/student/id-document', { headers: this._headers(false) })
+      fetch(apiBase() + '/student/kyc', { headers: this._headers(false) })
         .then(function (res) { return res.json().then(function (d) { return { ok: res.ok, data: d }; }); })
         .then(function (r) {
           if (!r.ok) throw new Error(firstError(r.data, 'Could not load your verification status.'));
-          self.paintIdCard(card, r.data || {}, p);
+          self.paintIdCard(card, r.data || {});
         })
         .catch(function (e) {
           var body = card.querySelector('.rp-id-body');
@@ -563,133 +564,78 @@
         });
     },
 
-    paintIdCard: function (card, data, p) {
+    paintIdCard: function (card, data) {
       if (!card) return;
 
-      var doc = data.id || {};
-      var status = doc.status || 'none';
-      var types = data.types || [];
-      var maxKb = data.max_kb || 5120;
+      var kyc = data.kyc || {};
+      var status = kyc.status || 'unverified';
 
-      var pill = card.querySelector('#' + p + 'idPill');
+      var pill = card.querySelector('.card-head .rp-pill');
       if (pill) {
         pill.textContent = idStatusLabel(status);
         pill.className = 'rp-pill ' + (ID_PILL_CLASS[status] || '');
       }
 
       var html = '';
+      var meta = [];
+      if (kyc.id_type_label) meta.push(kyc.id_type_label);
+      if (kyc.submitted_at) meta.push('Submitted ' + fmtDate(kyc.submitted_at));
+      if (kyc.verified_at) meta.push('Verified ' + fmtDate(kyc.verified_at));
 
-      if (doc.has_document) {
-        html += '<div class="rp-id-doc">';
-        html += '<div class="rp-id-meta">';
-        html += '<b>' + esc(doc.document_type_label || 'Valid ID') + '</b>';
-        html += '<span>' + esc(doc.document_name || 'Uploaded file') + '</span>';
-        html += '</div>';
-        html += '<button type="button" class="btn btn-sm btn-ghost" onclick="RCDAProfile.viewIdDocument(this)">View file</button>';
-        html += '</div>';
+      if (meta.length) html += '<p class="rp-hint">' + esc(meta.join(' · ')) + '</p>';
 
-        var meta = [];
-        if (doc.submitted_at) meta.push('Submitted ' + fmtDate(doc.submitted_at));
-        if (doc.reviewed_at) meta.push('Reviewed ' + fmtDate(doc.reviewed_at));
-        if (meta.length) html += '<p class="rp-hint">' + esc(meta.join(' · ')) + '</p>';
-      }
-
-      if (status === 'approved') {
-        html += '<div class="rp-id-note ok">Your ID has been verified by the academy. Nothing else to do.</div>';
+      if (status === 'verified' || status === 'approved') {
+        html += '<div class="rp-id-note ok">Your identity is verified. Booking and payments are fully unlocked.</div>';
       } else if (status === 'pending') {
-        html += '<div class="rp-id-note warn">Your ID is waiting for admin review. Uploading a new file restarts the review.</div>';
+        html += '<div class="rp-id-note warn">Your documents are waiting for admin review. Booking and payments unlock once you are verified.</div>';
       } else if (status === 'rejected') {
-        html += '<div class="rp-id-note bad"><b>This ID was not accepted.</b> ' +
-          esc(doc.rejection_reason || 'Please upload a clearer copy of a valid government ID.') + '</div>';
+        html += '<div class="rp-id-note bad"><b>Your last submission was not accepted.</b> ' +
+          esc(kyc.rejection_reason || '') + '</div>';
       } else {
-        html += '<div class="rp-id-note">No ID on file yet. Upload one below to get verified.</div>';
+        html += '<div class="rp-id-note">Not verified yet. Upload your ID + selfie to unlock booking and payments.</div>';
       }
 
-      var form = '<div class="rp-id-form">';
-      form += '<div class="rp-field"><label for="' + p + 'idType">ID type</label><select id="' + p + 'idType">';
-      types.forEach(function (t) {
-        form += '<option value="' + esc(t.value) + '"' +
-          (doc.document_type === t.value ? ' selected' : '') + '>' + esc(t.label) + '</option>';
-      });
-      form += '</select></div>';
-      form += '<div class="rp-field"><label for="' + p + 'idFile">ID photo or PDF</label>';
-      form += '<input id="' + p + 'idFile" type="file" accept="image/jpeg,image/png,image/webp,application/pdf">';
-      form += '<span class="rp-hint">JPG, PNG, WEBP or PDF — up to ' + Math.round(maxKb / 1024) + ' MB.</span></div>';
-      form += '<label class="rp-id-consent"><input id="' + p + 'idConsent" type="checkbox"> ' +
-        'This ID is mine and I allow RC Driving Academy to review it.</label>';
-      form += '<div class="rp-actions"><button type="button" class="btn btn-primary" onclick="RCDAProfile.uploadId(this)">' +
-        (doc.has_document ? 'Submit replacement' : 'Submit for review') + '</button></div>';
-      form += '</div>';
+      /* View your own uploaded documents (only readable through the API). */
+      if (kyc.has_id || kyc.has_selfie) {
+        html += '<div class="rp-id-doc">';
+        html += '<div class="rp-id-meta"><b>Your documents</b><span>' +
+          [kyc.has_id ? 'ID' : null, kyc.has_selfie ? 'Selfie' : null].filter(Boolean).join(' + ') +
+          ' on file</span></div>';
+        if (kyc.has_id) {
+          html += '<button type="button" class="btn btn-sm btn-ghost" onclick="RCDAProfile.viewIdDocument(\'id\',this)">View ID</button>';
+        }
+        if (kyc.has_selfie) {
+          html += '<button type="button" class="btn btn-sm btn-ghost" onclick="RCDAProfile.viewIdDocument(\'selfie\',this)">View selfie</button>';
+        }
+        html += '</div>';
+      }
 
-      if (doc.has_document) {
-        html += '<details class="rp-id-replace"><summary>Replace this ID</summary>' + form + '</details>';
-      } else {
-        html += form;
+      /* Submission always happens on the dedicated KYC page. */
+      if (status !== 'verified' && status !== 'approved') {
+        html += '<div class="rp-actions"><button type="button" class="btn btn-primary" onclick="RCDAProfile.openKycPage()">' +
+          (status === 'rejected' ? 'Resubmit Documents'
+            : (kyc.submitted_at ? 'Review Status on KYC Page' : 'Complete Verification')) +
+          '</button></div>';
       }
 
       var body = card.querySelector('.rp-id-body');
       if (body) body.innerHTML = html;
     },
 
-    uploadId: function (btn) {
-      var card = btn.closest('.rp-id-card');
-      var container = btn.closest('[data-rp-prefix]');
-      var p = (container && container.getAttribute && container.getAttribute('data-rp-prefix')) || '';
-
-      var fileEl = document.getElementById(p + 'idFile');
-      var typeEl = document.getElementById(p + 'idType');
-      var consentEl = document.getElementById(p + 'idConsent');
-
-      var file = fileEl && fileEl.files ? fileEl.files[0] : null;
-      if (!file) { toast('Choose the ID file to upload first.', 'error'); return; }
-
-      var allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
-      if (file.type && allowed.indexOf(file.type) === -1) {
-        toast('Upload a JPG, PNG, WEBP or PDF file.', 'error'); return;
-      }
-      if (file.size > 5 * 1024 * 1024) {
-        toast('The file must be 5 MB or smaller.', 'error'); return;
-      }
-      if (!consentEl || !consentEl.checked) {
-        toast('Please confirm the ID is yours and may be reviewed.', 'error'); return;
-      }
-
-      var form = new FormData();
-      form.append('document', file);
-      form.append('document_type', typeEl ? typeEl.value : '');
-      form.append('consent', '1');
-
-      var old = btn.textContent;
-      btn.disabled = true;
-      btn.textContent = 'Uploading...';
-
-      fetch(apiBase() + '/student/id-document', {
-        method: 'POST',
-        headers: this._headers(false),
-        body: form
-      })
-        .then(function (res) {
-          return res.json()
-            .then(function (d) { return { ok: res.ok, data: d }; })
-            .catch(function () { return { ok: res.ok, data: null }; });
-        })
-        .then(function (r) {
-          if (!r.ok) throw new Error(firstError(r.data, 'The upload did not go through. Please try again.'));
-          toast((r.data && r.data.message) || 'Valid ID submitted for review.', 'success');
-          if (container) this.mountIdCard(container);
-          document.dispatchEvent(new CustomEvent('rcda:id-updated'));
-        }.bind(this))
-        .catch(function (e) { toast(e.message, 'error'); })
-        .finally(function () { btn.disabled = false; btn.textContent = old; });
+    openKycPage: function () {
+      var here = window.location.pathname;
+      window.location.href = /\/student\//.test(here) ? '../kyc.html' : 'kyc.html';
+      return false;
     },
 
-    viewIdDocument: function () {
+    viewIdDocument: function (which) {
       var win = window.open('', '_blank');
       if (win) {
-        win.document.write('<p style="font-family:sans-serif;padding:24px;color:#555;">Opening your ID…</p>');
+        win.document.write('<p style="font-family:sans-serif;padding:24px;color:#555;">Opening your document…</p>');
       }
 
-      fetch(apiBase() + '/student/id-document/file', { headers: this._headers(false) })
+      var whichFile = (which === 'selfie') ? 'selfie' : 'id';
+      fetch(apiBase() + '/student/kyc/file/' + whichFile, { headers: this._headers(false) })
         .then(function (res) {
           if (!res.ok) throw new Error('Could not open the document.');
           return res.blob();

@@ -12,9 +12,21 @@ class PaymentController extends Controller
     public function index(Request $request)
     {
         $status = $request->input('status');
+        /* Server-side search: reaches every page of the payment list. */
+        $search = trim((string) $request->query('search', ''));
 
         $payments = Payment::with(['student.user', 'course'])
             ->when(in_array($status, ['pending', 'verified', 'rejected']), fn ($q) => $q->where('status', $status))
+            ->when($search !== '', function ($q) use ($search) {
+                $like = str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $search);
+                $q->where(function ($q) use ($like) {
+                    $q->where('reference_no', 'like', "%{$like}%")
+                        ->orWhere('method', 'like', "%{$like}%")
+                        ->orWhereHas('student.user', fn ($u) => $u->where('name', 'like', "%{$like}%")
+                                ->orWhere('email', 'like', "%{$like}%"))
+                        ->orWhereHas('course', fn ($c) => $c->where('name', 'like', "%{$like}%"));
+                });
+            })
             ->latest()
             ->paginate(10);
 

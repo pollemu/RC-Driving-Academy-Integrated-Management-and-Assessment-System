@@ -1,18 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="icon" type="image/png" href="../images/icon.png">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="../manifest.webmanifest">
+<meta name="theme-color" content="#C0392B">
+<meta name="description" content="Instructor dashboard — record attendance and assessments, even offline.">
 <title>Instructor Dashboard - RC Driving Academy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/base.css?v=65">
-<link rel="stylesheet" href="../css/instructor.css?v=65">
+<link rel="stylesheet" href="../css/base.css?v=66">
+<link rel="stylesheet" href="../css/instructor.css?v=67">
 </head>
 <body>
 
-<!-- Opaque splash: covers the dashboard until its data has loaded -->
-<div id="rcdaPageLoading" class="show" role="status" aria-live="polite">
+<!-- Opaque splash: covers the dashboard until its data has loaded. Inline
+     styles, so it still covers during the first frame even if base.css is
+     still being revalidated by a reload. -->
+<div id="rcdaPageLoading" class="show" role="status" aria-live="polite"
+     style="position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;background:#FAF8F6;">
   <div class="rcda-pl-card"><div class="rcda-pl-spin"></div><div class="rcda-pl-label">Loading…</div></div>
 </div>
 <noscript><style>#rcdaPageLoading{display:none!important;}</style></noscript>
@@ -79,6 +86,7 @@
             <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
           </svg>
         </button>
+        <div class="topbar-logo"><img src="../images/RCDA%20logo.jpg" alt="RCDA"></div>
         <div class="topbar-title" id="instrTitle">My Dashboard</div>
       </div>
       <div class="topbar-right">
@@ -165,35 +173,28 @@
           <div class="card-head">
             <div>
               <h3>Assess a Student</h3>
-              <p style="font-size:12.5px;color:var(--gray);margin-top:3px;">PDC: rate steering, braking and side-mirror observation (1–5 stars), then describe the performance below. The AI reads your feedback and predicts Fast Learner, Average Learner, or Needs Improvement. TDC is exam-only.</p>
+              <p style="font-size:12.5px;color:var(--gray);margin-top:3px;">PDC: rate all five behind-the-wheel categories (1–5 stars), then describe the performance below — English o Tagalog, parehong maiintindihan ng AI. The AI reads your feedback and predicts Fast Learner, Average Learner, or Needs Improvement. TDC is exam-only.</p>
             </div>
           </div>
           <div class="two-col">
             <div>
-              <div class="two-col" style="gap:14px;">
-                <div class="field"><label>Session</label>
-                  <select id="assessSchedule" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);"></select>
+              <div class="sessions-tabs" role="tablist">
+                <button type="button" id="assessTabAll" class="sessions-tab" onclick="setAssessViewTab('ALL')">All</button>
+                <button type="button" id="assessTabTDC" class="sessions-tab" onclick="setAssessViewTab('TDC')">TDC</button>
+                <button type="button" id="assessTabPDC" class="sessions-tab" onclick="setAssessViewTab('PDC')">PDC</button>
+              </div>
+              <div class="sessions-toolbar">
+                <input id="assessSearch" type="text" class="sessions-search" placeholder="Search student, course, venue, date…" oninput="onAssessSearch(this.value)">
+                <div class="sessions-filter-wrap">
+                  <button type="button" id="assessDateFilterBtn" class="sessions-filter-btn" onclick="toggleAssessCalendar()">📅 Filter by date</button>
+                  <div id="assessCalendar" class="sessions-cal" style="display:none;"></div>
                 </div>
-                <div class="field"><label>Student</label>
-                  <select id="assessStudent" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);"></select>
-                </div>
+                <div id="assessActiveFilters" class="sessions-chips"></div>
               </div>
-
-              <p style="font-size:12.5px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 12px;" id="ratingLabel">PDC Skills Rating</p>
-              <div class="skills-rating-grid" id="skillsGrid">
-                <div class="skill-rate-row" data-cat="steering"><label>Steering Control</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span></div></div>
-                <div class="skill-rate-row" data-cat="brake"><label>Braking</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span></div></div>
-                <div class="skill-rate-row" data-cat="mirror"><label>Side Mirror &amp; Observation</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span></div></div>
+              <div id="assessSessionsGrid" class="sessions-grid assess-sessions-grid">
+                <div style="grid-column:1/-1;text-align:center;color:var(--gray);padding:20px;">Loading sessions…</div>
               </div>
-              <p style="font-size:12px;color:var(--gray);margin-top:8px;">Tap a star to rate 1–5. All three skills are required for PDC.</p>
-
-              <div class="field" id="examField" style="display:none;margin-top:18px;">
-                <label>Exam Score (%)</label>
-                <input id="assessExam" type="number" min="0" max="100" placeholder="0–100" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);">
-              </div>
-
-              <div class="field" style="margin-top:18px;"><label>Qualitative Feedback</label><textarea id="nlpInput2" rows="4" placeholder="Describe the student's performance in detail..." style="width:100%;padding:13px 15px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);resize:vertical;"></textarea></div>
-              <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:8px;" onclick="saveAssessment()">Save Assessment ➜</button>
+              <p style="font-size:12px;color:var(--gray);margin:10px 0 0;">Click a session, then pick a student to assess. Search by student name, and filter by type or date.</p>
             </div>
 
             <div>
@@ -284,13 +285,61 @@
       </div>
     </div>
   </div>
+
+  <!-- SESSION STUDENTS MODAL (Assess flow) -->
+  <div class="modal-overlay" id="assessStudentsOverlay" onclick="if(event.target===this)closeAssessModals()">
+    <div class="modal-box">
+      <div class="modal-head">
+        <div>
+          <h3 id="assessStudentsTitle">Session Students</h3>
+          <p id="assessStudentsMeta" style="font-size:12px;color:var(--gray);margin:2px 0 0;"></p>
+        </div>
+        <button class="modal-close" onclick="closeAssessModals()" aria-label="Close">✕</button>
+      </div>
+      <div id="assessStudentsList" style="display:flex;flex-direction:column;gap:10px;"></div>
+      <div class="modal-footer">
+        <button class="btn btn-sm btn-ghost" onclick="closeAssessModals()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ASSESSMENT FORM MODAL -->
+  <div class="modal-overlay" id="assessmentOverlay" onclick="if(event.target===this)closeAssessModals()">
+    <div class="modal-box" style="max-width:560px;">
+      <div class="modal-head">
+        <div>
+          <h3 id="assessFormTitle">Assess Student</h3>
+          <p id="assessFormMeta" style="font-size:12px;color:var(--gray);margin:2px 0 0;"></p>
+        </div>
+        <button class="modal-close" onclick="closeAssessModals()" aria-label="Close">✕</button>
+      </div>
+
+      <p style="font-size:12.5px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:14px 0 10px;" id="ratingLabel">PDC Skills Rating</p>
+      <div class="skills-rating-grid" id="skillsGrid">
+        <div class="skill-rate-row" data-cat="engine"><label>Engine &amp; Gear Control</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span></div></div>
+        <div class="skill-rate-row" data-cat="brake"><label>Smooth Braking &amp; Stopping</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span></div></div>
+        <div class="skill-rate-row" data-cat="turning"><label>Turning &amp; Lane Discipline</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span></div></div>
+        <div class="skill-rate-row" data-cat="parking"><label>Backing &amp; Precision Parking</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span></div></div>
+        <div class="skill-rate-row" data-cat="traffic"><label>Traffic Rules &amp; Speed Management</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span></div></div>
+      </div>
+      <p style="font-size:12px;color:var(--gray);margin-top:8px;">Tap a star to rate 1–5. All five categories are required for PDC.</p>
+
+      <div class="field" id="examField" style="display:none;margin-top:18px;">
+        <label>Exam Score (%)</label>
+        <input id="assessExam" type="number" min="0" max="100" placeholder="0–100" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);">
+      </div>
+
+      <div class="field" style="margin-top:18px;"><label>Qualitative Feedback <span style="font-weight:400;color:var(--gray);">— English or Filipino, both work</span></label><textarea id="nlpInput2" rows="4" placeholder="e.g. Magaling siya mag-shift ng gears pero sobra ang bilis kapag highway. He is smooth at turning but has poor parking calculations." style="width:100%;padding:13px 15px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);resize:vertical;"></textarea></div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:12px;" onclick="saveAssessment()">Save Assessment ➜</button>
+    </div>
+  </div>
 </div>
 
-<script src="../js/config.js?v=65"></script>
-<script src="../js/error-handler.js?v=65"></script>
-<script src="../js/shared.js?v=65"></script>
-<script src="../js/profile-panel.js?v=68"></script>
+<script src="../js/config.js?v=66"></script>
+<script src="../js/error-handler.js?v=66"></script>
+<script src="../js/shared.js?v=78"></script>
+<script src="../js/profile-panel.js?v=70"></script>
 <script src="../js/profile.js?v=65"></script>
-<script src="../js/instructor.js?v=65"></script>
+<script src="../js/instructor.js?v=69"></script>
 </body>
 </html>

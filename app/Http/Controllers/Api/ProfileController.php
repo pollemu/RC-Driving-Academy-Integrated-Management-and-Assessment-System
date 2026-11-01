@@ -138,20 +138,8 @@ class ProfileController extends Controller
         return response()->json(['ok' => true, 'message' => 'Email verified.']);
     }
 
-    /* Forgot-password request. Delivery needs SMS (Semaphore) or email (Brevo),
-       neither of which is active yet, so this reports that plainly instead of
-       silently failing. Wire the actual code delivery once a channel is live. */
-    public function forgotPassword(Request $request)
-    {
-        $request->validate([
-            'email' => ['required', 'email'],
-        ]);
-
-        return response()->json([
-            'ok' => false,
-            'message' => 'Password reset delivery is not available yet. Please ask the admin to reset your password.',
-        ], 503);
-    }
+    /* Forgot-password moved to PasswordResetController (Gmail / SMS picker
+       on the login page) and /api/password/reset. */
 
     /* ---- Admin: view / edit any user's profile ---- */
 

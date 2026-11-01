@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="icon" type="image/png" href="images/icon.png">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Log In - RC Driving Academy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/base.css?v=65">
+<link rel="stylesheet" href="css/base.css?v=66">
 <link rel="stylesheet" href="css/login.css?v=65">
 <link rel="stylesheet" href="css/legal.css?v=65">
 <link rel="stylesheet" href="css/responsive.css?v=65">
@@ -78,7 +79,7 @@
 
         <div class="row-between">
           <label class="remember"><input type="checkbox" checked> Remember Me</label>
-          <a href="#">Forgot Password?</a>
+          <a href="javascript:void(0)" onclick="openForgot()">Forgot Password?</a>
         </div>
 
         <p id="loginError" style="display:none;color:#dc2626;font-size:13px;margin-bottom:14px;"></p>
@@ -171,6 +172,17 @@
     .m-submit:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(192,57,43,.3); }
     .m-foot { text-align: center; margin-top: 16px; font-size: 13.5px; color: var(--gray); }
     .m-foot a { color: var(--orange); font-weight: 700; }
+    .forgot-card {
+      border: 2px solid var(--gray-light); border-radius: 13px; padding: 13px 12px;
+      display: flex; flex-direction: column; gap: 3px; align-items: flex-start;
+      transition: border-color .15s, background .15s; height: 100%; box-sizing: border-box;
+    }
+    .forgot-card b { font-size: 13.5px; color: var(--charcoal); }
+    .forgot-card span { font-size: 11.5px; color: var(--gray); line-height: 1.4; }
+    .forgot-card svg { margin-bottom: 4px; color: var(--gray); }
+    .forgot-card:hover { border-color: var(--orange); }
+    .forgot-card-sel { border-color: var(--orange); background: rgba(192,57,43,0.06); }
+    .forgot-card-sel svg, .forgot-card-sel b { color: var(--orange); }
 
     /* Back / Home button (login + signup) */
     .home-back {
@@ -197,6 +209,88 @@
       <h3 style="font-family:'Poppins';font-size:21px;font-weight:800;margin:0 0 8px;color:var(--charcoal);">All done!</h3>
       <p id="successMsg" style="font-size:14px;color:var(--gray);margin:0 0 28px;line-height:1.6;">Your account has been submitted successfully.</p>
       <button class="m-submit" onclick="closeSuccess()">Back to Sign In</button>
+    </div>
+  </div>
+
+  <!-- ===== FORGOT PASSWORD MODAL (Gmail or SMS picker) ===== -->
+  <div id="forgotModal" class="m-overlay" style="z-index:1002;">
+    <div class="m-box" style="max-width:440px;">
+      <button class="m-close" onclick="closeForgot()" aria-label="Close">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+      <div class="m-role-badge"><div class="dot"></div><span>Password Recovery</span></div>
+      <h2 class="m-title">Forgot password?</h2>
+      <p class="m-sub">We'll send a 6-digit code — pick <b>Gmail</b> or <b>SMS</b>. Any role: student, instructor, or admin.</p>
+
+      <div class="m-err" id="forgotError"></div>
+
+      <!-- Step 1: pick channel -->
+      <div id="forgotStep1">
+        <div class="m-field">
+          <label>How should we send the code? <span class="req">*</span></label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <label style="position:relative;cursor:pointer;">
+              <input type="radio" name="forgotChannel" value="email" checked style="position:absolute;opacity:0;" onchange="forgotPick();">
+              <div id="forgotCardEmail" class="forgot-card forgot-card-sel">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4V4z"/><path d="M22 6l-10 7L2 6"/></svg>
+                <b>Gmail</b><span>Send to my email inbox</span>
+              </div>
+            </label>
+            <label style="position:relative;cursor:pointer;">
+              <input type="radio" name="forgotChannel" value="sms" style="position:absolute;opacity:0;" onchange="forgotPick();">
+              <div id="forgotCardSms" class="forgot-card">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                <b>SMS</b><span>Text my phone number</span>
+              </div>
+            </label>
+          </div>
+        </div>
+        <div class="m-field">
+          <label id="forgotContactLabel">Email address <span class="req">*</span></label>
+          <div class="m-inp-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4V4z"/><path d="M22 6l-10 7L2 6"/></svg>
+            <input type="text" id="forgotContact" placeholder="you@gmail.com" onkeydown="forgotEnter1(event)">
+          </div>
+        </div>
+        <button class="m-submit" id="forgotSendBtn" onclick="forgotSend()">
+          Send Code
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+
+      <!-- Step 2: code + new password -->
+      <div id="forgotStep2" style="display:none;">
+        <div class="m-note">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b45309" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+          <p id="forgotSentNote">Code sent.</p>
+        </div>
+        <div class="m-field">
+          <label>6-digit code <span class="req">*</span></label>
+          <div class="m-inp-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+            <input type="text" id="forgotCode" inputmode="numeric" maxlength="6" placeholder="••••••" onkeydown="forgotEnter2(event)">
+          </div>
+        </div>
+        <div class="m-field">
+          <label>New password <span class="req">*</span></label>
+          <div class="m-inp-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+            <input type="password" id="forgotPass" placeholder="At least 8 characters" onkeydown="forgotEnter2(event)">
+          </div>
+        </div>
+        <div class="m-field">
+          <label>Confirm new password <span class="req">*</span></label>
+          <div class="m-inp-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+            <input type="password" id="forgotPass2" placeholder="Repeat the new password" onkeydown="forgotEnter2(event)">
+          </div>
+        </div>
+        <button class="m-submit" id="forgotResetBtn" onclick="forgotReset()">
+          Update Password
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+        <p class="m-foot"><a href="javascript:void(0)" onclick="forgotBack()">&#8592; Change email/number</a></p>
+      </div>
     </div>
   </div>
 
@@ -333,10 +427,10 @@
   </div>
 </div>
 
-<script src="js/config.js?v=65"></script>
-<script src="js/error-handler.js?v=65"></script>
+<script src="js/config.js?v=66"></script>
+<script src="js/error-handler.js?v=66"></script>
 <script src="js/autosave.js?v=65"></script>
-<script src="js/shared.js?v=65"></script>
-<script src="js/login.js?v=65"></script>
+<script src="js/shared.js?v=78"></script>
+<script src="js/login.js?v=66"></script>
 </body>
 </html>

@@ -48,9 +48,12 @@ function registerAccount(){
     }
     RCDA_AUTH.setToken(reg.data.token);
     RCDA_AUTH.setUser(reg.data.user);
-    RCDA.showToast('Account created! Complete your enrollment from the dashboard.', 'success');
+    RCDA.showToast('Account created! One more step: verify your identity.', 'success');
     RCDA.autosave.clear('signupForm');
-    window.location.href = 'student/dashboard.html';
+    /* KYC gate: new accounts verify identity (ID + selfie) before they can
+       book lessons or pay. The freshly-created user is always unverified,
+       so go straight to the KYC page. */
+    window.location.href = 'kyc.html?fresh=1';
   })();
 }
 

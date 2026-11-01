@@ -41,6 +41,7 @@ class AuthController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->role,
+                'avatar_url' => $user->avatar_path ? asset('storage/' . $user->avatar_path) : null,
             ],
         ]);
     }
@@ -107,6 +108,7 @@ class AuthController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->role,
+                'avatar_url' => $user->avatar_path ? asset('storage/' . $user->avatar_path) : null,
             ],
         ]);
     }
@@ -124,6 +126,7 @@ class AuthController extends Controller
                 'email' => $user->email,
                 'role' => $user->role,
                 'is_active' => $user->is_active,
+                'avatar_url' => $user->avatar_path ? asset('storage/' . $user->avatar_path) : null,
                 'gender' => $student?->gender,
                 'preferred_instructor_gender' => $student?->preferred_instructor_gender,
             ],

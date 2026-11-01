@@ -1378,8 +1378,11 @@ async function sendChat(e) {
   (data.messages || []).forEach(m => { if (m.sender !== 'student') chatBubble('bot', m.body); });
 }
 
-/* ---- VALID ID (dashboard reminder + inline card) ---- */
-let STUD_ID_STATUS = 'none';
+/* ---- KYC IDENTITY (dashboard reminder banner) ---- */
+/* The server enforces the real gate: booking and payment endpoints return
+   403 { requires_kyc: true } until users.kyc_status = 'verified'. This
+   banner explains that state and links to the KYC page (kyc.html). */
+let STUD_ID_STATUS = 'unverified';
 
 async function loadStudentIdCard() {
   const panel = document.getElementById('studIdPanel');
@@ -1391,26 +1394,26 @@ async function loadStudentIdCard() {
 }
 
 async function refreshStudentIdStatus() {
-  const { ok, data } = await RCDA.safeFetch(STUD_API() + '/student/id-document');
+  const { ok, data } = await RCDA.safeFetch(STUD_API() + '/student/kyc');
   if (!ok || !data) return;
 
-  const doc = data.id || {};
-  STUD_ID_STATUS = doc.status || 'none';
-  renderIdReminder(doc);
+  const kyc = data.kyc || {};
+  STUD_ID_STATUS = kyc.status || 'unverified';
+  renderIdReminder(kyc);
 }
 
-function renderIdReminder(doc) {
+function renderIdReminder(kyc) {
   const banner = document.getElementById('idReminderBanner');
   if (!banner) return;
 
-  const status = doc.status || 'none';
+  const status = kyc.status || 'unverified';
   const title = document.getElementById('idReminderTitle');
   const text = document.getElementById('idReminderText');
   const btn = document.getElementById('idReminderBtn');
 
-  // Verified students don't need a prompt — the card on the profile panel
-  // still shows the approved file and its review date.
-  if (status === 'approved') {
+  // Verified students don't need a prompt — the profile card still shows
+  // the submitted documents and their review date.
+  if (status === 'verified' || status === 'approved') {
     banner.style.display = 'none';
     return;
   }
@@ -1419,43 +1422,27 @@ function renderIdReminder(doc) {
   banner.classList.toggle('is-bad', status === 'rejected');
 
   if (status === 'pending') {
-    if (title) title.textContent = 'Your ID is being reviewed';
-    if (text) text.textContent = 'Thanks for uploading. The academy will verify it shortly — you can keep enrolling and booking while you wait.';
-    if (btn) btn.textContent = 'View submission';
+    if (title) title.textContent = 'Your identity documents are under review';
+    if (text) text.textContent = 'Thanks for submitting your ID and selfie. You can explore the dashboard while you wait, but booking lessons and payments unlock as soon as an administrator verifies you.';
+    if (btn) btn.textContent = 'View status';
   } else if (status === 'rejected') {
-    if (title) title.textContent = 'Your ID needs another look';
+    if (title) title.textContent = 'Your verification was not accepted';
     if (text) {
-      const reason = doc.rejection_reason || 'The copy we received was not clear enough.';
-      text.textContent = reason + (/upload/i.test(reason) ? '' : ' Please upload a clearer photo or PDF.');
+      const reason = kyc.rejection_reason || 'The documents we received could not be verified.';
+      text.textContent = reason + (/upload/i.test(reason) ? '' : ' Please resubmit clearer photos.');
     }
-    if (btn) btn.textContent = 'Re-upload valid ID';
+    if (btn) btn.textContent = 'Resubmit documents';
   } else {
-    if (title) title.textContent = 'Verify your identity';
-    if (text) text.textContent = 'Upload a valid government ID so the academy can verify your account. This does not block your lessons — you can enrol and book while it is being reviewed.';
-    if (btn) btn.textContent = 'Upload valid ID';
+    if (title) title.textContent = 'Verify your identity to start booking';
+    if (text) text.textContent = 'Upload a valid government ID and a selfie so the academy can verify who you are. Booking lessons and payments stay locked until an administrator approves your documents.';
+    if (btn) btn.textContent = 'Complete verification';
   }
 }
 
 function goToIdUpload() {
-  // Keep the sidebar highlight in sync when jumping here from the banner.
-  const navItem = document.querySelector('.sidebar-nav .nav-item[onclick*="showPanel(\'profile\'"]');
-  showPanel('profile', navItem || undefined);
-
-  const panel = document.getElementById('studIdPanel');
-  if (!panel) return;
-
-  setTimeout(() => {
-    const card = panel.querySelector('.rp-id-card');
-    const file = panel.querySelector('input[type=file]');
-    const target = card || panel;
-    if (target && target.scrollIntoView) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    if (file) file.focus({ preventScroll: true });
-  }, 250);
+  // The banner and profile card both jump to the dedicated KYC page.
+  window.location.href = /\/student\//.test(window.location.pathname) ? '../kyc.html' : 'kyc.html';
 }
-
-// The shared profile panel fires this after a successful upload so the
-// dashboard banner updates without a page reload.
-document.addEventListener('rcda:id-updated', () => { refreshStudentIdStatus(); });
 
 /* Re-open the sidebar tab the student was last on (see rememberPanel). */
 function restoreStudentPanel() {

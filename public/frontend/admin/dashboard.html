@@ -1,18 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="icon" type="image/png" href="../images/icon.png">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin Dashboard - RC Driving Academy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/base.css?v=65">
-<link rel="stylesheet" href="../css/admin.css?v=65">
+<link rel="stylesheet" href="../css/base.css?v=66">
+<link rel="stylesheet" href="../css/admin.css?v=66">
 </head>
 <body>
 
 <!-- Opaque splash: covers the dashboard until its data has loaded -->
-<div id="rcdaPageLoading" class="show" role="status" aria-live="polite">
+<div id="rcdaPageLoading" class="show" role="status" aria-live="polite"
+     style="position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;background:#FAF8F6;">
   <div class="rcda-pl-card"><div class="rcda-pl-spin"></div><div class="rcda-pl-label">Loading…</div></div>
 </div>
 <noscript><style>#rcdaPageLoading{display:none!important;}</style></noscript>
@@ -52,7 +54,7 @@
       </div>
       <div class="nav-item" onclick="showPanel('idverification',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="11" r="2"/><path d="M5 16c0-1.7 1.3-3 3-3s3 1.3 3 3"/><line x1="14" y1="10" x2="19" y2="10"/><line x1="14" y1="14" x2="19" y2="14"/></svg>
-        ID Verification
+        KYC Verification
       </div>
       <div class="nav-item" onclick="showPanel('schedule',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -113,6 +115,7 @@
             <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
           </svg>
         </button>
+        <div class="topbar-logo"><img src="../images/RCDA%20logo.jpg" alt="RCDA"></div>
         <div class="topbar-title" id="adminTitle">Dashboard</div>
       </div>
       <div class="topbar-right">
@@ -170,7 +173,7 @@
           <div class="card-head">
             <h3>All Students</h3>
             <div class="toolbar">
-              <input id="studentSearchInput" oninput="filterStudents()" placeholder="Search student..." style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;width:200px;">
+              <input id="studentSearchInput" oninput="onStudentSearchInput()" placeholder="Search student..." style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;width:200px;">
               <div class="filter-wrap">
                 <button class="btn btn-sm btn-ghost" onclick="toggleFilterMenu('studentFilterMenu')">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
@@ -189,13 +192,8 @@
               <button class="btn btn-sm btn-primary" onclick="openModal('addStudentModal')">+ Add Student</button>
             </div>
           </div>
-          <div style="overflow-x:auto;">
-            <table id="studentsTable">
-              <thead><tr><th>ID</th><th>Student</th><th>Course</th><th>Payment</th><th>Status</th><th>Valid ID</th><th>Instructor</th><th></th></tr></thead>
-              <tbody>
-                <tr><td colspan="8" style="text-align:center;color:var(--gray);padding:20px;">Loading students…</td></tr>
-              </tbody>
-            </table>
+          <div id="studentsGrid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;">
+            <div style="grid-column:1/-1;text-align:center;color:var(--gray);padding:24px;">Loading students…</div>
           </div>
         </div>
       </div>
@@ -310,7 +308,7 @@
       <div class="panel" id="admin-instructors">
         <div class="card">
           <div class="card-head"><h3>List of Instructors</h3><div class="toolbar">
-            <input id="instructorSearchInput" oninput="filterInstructors()" placeholder="Search instructor..." style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;width:200px;">
+            <input id="instructorSearchInput" oninput="onInstructorSearchInput()" placeholder="Search instructor..." style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;width:200px;">
             <div class="filter-wrap">
               <button class="btn btn-sm btn-ghost" onclick="toggleFilterMenu('instructorFilterMenu')">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>Filter
@@ -351,7 +349,7 @@
         </div>
         <div class="card">
           <div class="card-head"><h3>Payment Records</h3><div class="toolbar">
-            <input id="paymentSearchInput" oninput="filterPayments()" placeholder="Search payment..." style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;width:200px;">
+            <input id="paymentSearchInput" oninput="onPaymentSearchInput()" placeholder="Search payment..." style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;width:200px;">
             <div class="filter-wrap">
               <button class="btn btn-sm btn-ghost" onclick="toggleFilterMenu('paymentFilterMenu')">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>Filter
@@ -381,24 +379,25 @@
         </div>
       </div>
 
-      <!-- ID VERIFICATION PANEL -->
+      <!-- KYC VERIFICATION PANEL -->
       <div class="panel" id="admin-idverification">
         <div class="card">
           <div class="card-head">
-            <h3>Valid ID Verification</h3>
+            <h3>KYC Identity Verification</h3>
             <div class="toolbar">
-              <input id="idSearchInput" oninput="loadIdVerifications()" placeholder="Search student..." style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;width:200px;">
-              <select id="idStatusFilter" onchange="loadIdVerifications()" style="width:180px;padding:8px 12px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13px;background:var(--cream);">
+              <input id="kycSearchInput" oninput="loadKyc()" placeholder="Search student..." style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13.5px;width:200px;">
+              <select id="kycStatusFilter" onchange="loadKyc()" style="width:180px;padding:8px 12px;border-radius:10px;border:1.5px solid var(--gray-light);font-size:13px;background:var(--cream);">
                 <option value="pending">Pending review</option>
-                <option value="all">All submissions</option>
-                <option value="approved">Approved</option>
+                <option value="all">All students</option>
+                <option value="verified">Verified</option>
                 <option value="rejected">Rejected</option>
+                <option value="unverified">Not submitted</option>
               </select>
             </div>
           </div>
-          <div id="idCounts" style="display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 16px;"></div>
+          <div id="kycCounts" style="display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 16px;"></div>
           <div style="overflow-x:auto;">
-            <table id="idVerificationsTable">
+            <table id="kycTable">
               <thead><tr><th>Student</th><th>ID Type</th><th>Submitted</th><th>Status</th><th>Reviewed</th><th></th></tr></thead>
               <tbody>
                 <tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">Loading…</td></tr>
@@ -519,15 +518,59 @@
             <h3>Grading AI — teachable assessment model</h3>
             <span style="font-size:12px;color:var(--gray);">Type feedback like an instructor. The AI classifies it and learns from every real assessment.</span>
           </div>
-          <div style="margin-top:14px;" id="aiInfo"></div>
+          <div style="margin-top:14px;" id="aiInfo">
+          <div id="aiModel" style="display:none;border:1.5px solid var(--gray-light);border-radius:14px;padding:14px 16px;background:var(--cream);">
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+              <h4 style="margin:0;">How this AI works</h4>
+              <span class="badge verified" style="font-size:11px;">Multinomial Naive Bayes</span>
+              <span class="badge completed" style="font-size:11px;">Unigrams + Bigrams</span>
+              <span class="badge pending" style="font-size:11px;">Filipino · English · Taglish</span>
+            </div>
+            <p style="font-size:12.5px;color:var(--gray);line-height:1.6;margin:8px 0 0;">
+              Instructor feedback is read in <b>three languages</b> (English, Filipino and code-switched Taglish).
+              The text passes through a bilingual stop-word filter, then becomes <b>unigram + bigram features</b> —
+              word pairs like <code>paulit-ulit_bagal</code>, <code>first_attempt_parking</code>. A <b>Multinomial Naive Bayes</b> model (Laplace
+              smoothing) scores the sentiment wording of each class in <b>both languages</b> and picks the verdict.
+              Every verified assessment is added to the training set, so the model keeps learning as instructors grade.
+            </p>
+            <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:12.5px;">
+              <div style="flex:1;min-width:130px;background:#fff;border:1px solid var(--gray-light);border-radius:12px;padding:10px 12px;text-align:center;">
+                <div id="aiModelTotal" style="font-size:20px;font-weight:800;color:var(--charcoal);">—</div>
+                <div style="color:var(--gray);">dataset (labeled)</div>
+              </div>
+              <div style="flex:1;min-width:130px;background:#fff;border:1px solid var(--gray-light);border-radius:12px;padding:10px 12px;text-align:center;">
+                <div id="aiModelAccuracy" style="font-size:20px;font-weight:800;color:#2e7d32;">—</div>
+                <div style="color:var(--gray);">accuracy (70/30 split)</div>
+              </div>
+              <div style="flex:1;min-width:130px;background:#fff;border:1px solid var(--gray-light);border-radius:12px;padding:10px 12px;text-align:center;">
+                <div id="aiModelTrain" style="font-size:20px;font-weight:800;color:var(--charcoal);">—</div>
+                <div style="color:var(--gray);">train / test size</div>
+              </div>
+              <div style="flex:1;min-width:130px;background:#fff;border:1px solid var(--gray-light);border-radius:12px;padding:10px 12px;text-align:center;">
+                <div id="aiModelVocab" style="font-size:20px;font-weight:800;color:var(--charcoal);">—</div>
+                <div style="color:var(--gray);">vocabulary (uni+bi)</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;">
+              <div style="flex:2;min-width:220px;background:#fff;border:1px solid var(--gray-light);border-radius:12px;padding:10px 12px;">
+                <b style="font-size:12.5px;">Corpus by language (sentiment evidence in both)</b>
+                <div id="aiModelLangs" style="margin-top:8px;"></div>
+              </div>
+              <div style="flex:1;min-width:190px;background:#fff;border:1px solid var(--gray-light);border-radius:12px;padding:10px 12px;">
+                <b style="font-size:12.5px;">Per class</b>
+                <div id="aiModelClasses" style="margin-top:8px;font-size:12.5px;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
           <div class="field" style="margin-top:12px;">
             <label>A student's written feedback</label>
             <textarea id="nlpInput" rows="5" placeholder="Describe a student's driving performance in detail..." style="width:100%;padding:13px 15px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);resize:vertical;"></textarea>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center;">
-            <button class="btn btn-sm btn-ghost" onclick="sampleNLP('fast')">Fill: Fast example</button>
-            <button class="btn btn-sm btn-ghost" onclick="sampleNLP('avg')">Fill: Average example</button>
-            <button class="btn btn-sm btn-ghost" onclick="sampleNLP('needs')">Fill: Needs example</button>
+            <button class="btn btn-sm btn-ghost" onclick="sampleNLP('fast')">Fill: Fast example (Taglish)</button>
+            <button class="btn btn-sm btn-ghost" onclick="sampleNLP('avg')">Fill: Average example (English)</button>
+            <button class="btn btn-sm btn-ghost" onclick="sampleNLP('needs')">Fill: Needs example (Filipino)</button>
             <button class="btn btn-sm btn-primary" onclick="analyzeNLP()">Classify with AI</button>
           </div>
           <div id="nlpResult" style="display:none;margin-top:16px;padding:16px;border-radius:12px;background:#fff;border:1.5px solid var(--gray-light);">
@@ -574,7 +617,11 @@
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;font-size:13.5px;">
         <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--gray-light);"><span style="color:var(--gray);">Course</span><b id="modalStudentCourse">TDC + PDC</b></div>
-        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--gray-light);"><span style="color:var(--gray);">Instructor</span><b id="modalStudentInstructor">Mr. Juan Santos</b></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--gray-light);"><span style="color:var(--gray);">Age</span><b id="modalStudentAge">—</b></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--gray-light);"><span style="color:var(--gray);">Contact</span><b id="modalStudentContact">—</b></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--gray-light);"><span style="color:var(--gray);">Address</span><b id="modalStudentAddress">—</b></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--gray-light);"><span style="color:var(--gray);">Date Joined</span><b id="modalStudentJoined">—</b></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--gray-light);"><span style="color:var(--gray);">Instructor</span><b id="modalStudentInstructor">—</b></div>
         <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--gray-light);"><span style="color:var(--gray);">Student Gender</span><b id="modalStudentGender">—</b></div>
         <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--gray-light);"><span style="color:var(--gray);">Preferred Instructor Gender</span><b id="modalStudentPref">—</b></div>
         <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--gray-light);"><span style="color:var(--gray);">TDC Progress</span><b id="modalStudentTDC">—</b></div>
@@ -606,6 +653,15 @@
           <button class="btn btn-sm btn-primary" onclick="saveStudentRole()">Save Role Change</button>
         </div>
         <div id="roleChangeLog" style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--gray-light);font-size:12.5px;color:var(--gray);"></div>
+        <div style="padding-top:10px;border-top:1px solid var(--gray-light);margin-top:8px;">
+          <span style="color:var(--gray);font-size:12px;">Manage student</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+            <button class="btn btn-sm btn-ghost" onclick="openUserProfile(window._viewStudent && window._viewStudent.user_id, window._viewStudent && window._viewStudent.name)">Edit Profile</button>
+            <button class="btn btn-sm btn-ghost" onclick="openAssignInstructorModal(window._viewStudent && window._viewStudent.id)">Assign Instructor</button>
+            <button class="btn btn-sm btn-ghost" id="modalStudentToggleBtn" onclick="toggleStudentActiveFromModal()">Deactivate</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteStudentFromModal()">Delete</button>
+          </div>
+        </div>
       </div>
     </div>
     <div id="ptab-attend-content" style="display:none;">
@@ -617,10 +673,12 @@
       <div id="modalAssessmentBody" style="font-size:13.5px;color:var(--gray);text-align:center;padding:20px 0;">No assessment yet. Ask the instructor to assess this student.</div>
     </div>
     <div id="ptab-pay-content" style="display:none;">
-      <p style="font-size:13px;color:var(--gray);margin-bottom:14px;">Payment status for this student.</p>
+      <p style="font-size:13px;color:var(--gray);margin-bottom:14px;">Payment status and history for this student.</p>
       <div style="text-align:center;padding:16px 0;">
         <span id="modalStudentPayment" class="badge verified" style="display:inline-block;padding:8px 20px;font-size:14px;">Paid</span>
+        <div id="modalStudentPaymentTotal" style="font-size:12.5px;color:var(--gray);margin-top:8px;"></div>
       </div>
+      <div id="modalStudentPaymentsList" style="font-size:13px;"></div>
     </div>
   </div>
 </div>
@@ -849,14 +907,14 @@
   </div>
 </div>
 
-<!-- VALID ID DOCUMENT PREVIEW MODAL -->
+<!-- KYC DOCUMENTS REVIEW MODAL (ID + selfie side by side) -->
 <div class="modal-overlay" id="idDocumentModal">
   <div class="modal-box" style="max-width:880px;">
     <div class="modal-head">
-      <h3 id="idDocumentTitle">Valid ID</h3>
+      <h3 id="kycDocTitle">KYC documents</h3>
       <button class="modal-close" onclick="closeIdDocumentModal()">✕</button>
     </div>
-    <div id="idDocumentBody" style="min-height:240px;display:flex;align-items:center;justify-content:center;background:var(--cream);border-radius:12px;overflow:auto;padding:10px;"></div>
+    <div id="kycDocBody" style="min-height:240px;display:flex;align-items:center;justify-content:center;background:var(--cream);border-radius:12px;overflow:auto;padding:10px;"></div>
   </div>
 </div>
 
@@ -897,11 +955,11 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
-<script src="../js/config.js?v=65"></script>
-<script src="../js/error-handler.js?v=65"></script>
-<script src="../js/shared.js?v=65"></script>
-<script src="../js/profile-panel.js?v=68"></script>
+<script src="../js/config.js?v=66"></script>
+<script src="../js/error-handler.js?v=66"></script>
+<script src="../js/shared.js?v=78"></script>
+<script src="../js/profile-panel.js?v=70"></script>
 <script src="../js/profile.js?v=65"></script>
-<script src="../js/admin.js?v=73"></script>
+<script src="../js/admin.js?v=77"></script>
 </body>
 </html>

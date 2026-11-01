@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CourseController;
+use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
@@ -14,8 +16,8 @@ use App\Http\Controllers\Api\Admin\RequestController as AdminRequestController;
 use App\Http\Controllers\Api\Admin\NlpController as AdminNlpController;
 use App\Http\Controllers\Api\Student\RequestController as StudentRequestController;
 use App\Http\Controllers\Api\Student\ChatController as StudentChatController;
-use App\Http\Controllers\Api\Student\IdDocumentController as StudentIdDocumentController;
-use App\Http\Controllers\Api\Admin\IdVerificationController as AdminIdVerificationController;
+use App\Http\Controllers\Api\Student\KycController as StudentKycController;
+use App\Http\Controllers\Api\Admin\KycController as AdminKycController;
 use App\Http\Controllers\Api\Instructor\DashboardController as InstructorDashboardController;
 use App\Http\Controllers\Api\Instructor\AttendanceController as InstructorAttendanceController;
 use App\Http\Controllers\Api\Instructor\FeedbackController as InstructorFeedbackController;
@@ -29,7 +31,11 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:register');
-Route::post('/password/forgot', [ProfileController::class, 'forgotPassword'])->middleware('throttle:login');
+/* Public catalogue for the landing page pricing (never auth-gated). */
+Route::get('/courses', [CourseController::class, 'index']);
+/* Self-service password reset — picks Gmail (email) or SMS delivery. */
+Route::post('/password/forgot', [PasswordResetController::class, 'request'])->middleware('throttle:login');
+Route::post('/password/reset', [PasswordResetController::class, 'reset'])->middleware('throttle:login');
 
 Route::middleware('auth:sanctum')->group(function () {
         Route::get('/me', [AuthController::class, 'me']);
@@ -59,6 +65,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/notifications/summary', [AdminReportController::class, 'notificationSummary'])->name('api.admin.notifications.summary');
         Route::post('/notifications/read', [AdminReportController::class, 'markNotificationsRead'])->name('api.admin.notifications.read');
         Route::post('/nlp/classify', [AdminNlpController::class, 'classify'])->name('api.admin.nlp.classify');
+        Route::get('/nlp/evaluate', [AdminNlpController::class, 'evaluate'])->name('api.admin.nlp.evaluate');
         Route::apiResource('instructors', AdminInstructorController::class)->except(['create', 'edit', 'show', 'update']);
         Route::post('/instructors/{instructor}/toggle-active', [AdminInstructorController::class, 'toggleActive'])->name('api.admin.instructors.toggle');
         Route::get('/schedules', [AdminScheduleController::class, 'index'])->name('api.admin.schedules.index');
@@ -72,11 +79,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/payments/{payment}/verify', [AdminPaymentController::class, 'verify'])->name('api.admin.payments.verify');
         Route::post('/payments/{payment}/reject', [AdminPaymentController::class, 'reject'])->name('api.admin.payments.reject');
         Route::get('/certifications/ready', [AdminCertificationController::class, 'ready'])->name('api.admin.certifications.ready');
-        Route::get('/id-verifications', [AdminIdVerificationController::class, 'index'])->name('api.admin.id-verifications.index');
-        Route::get('/id-verifications/{student}', [AdminIdVerificationController::class, 'show'])->name('api.admin.id-verifications.show');
-        Route::get('/id-verifications/{student}/file', [AdminIdVerificationController::class, 'file'])->name('api.admin.id-verifications.file');
-        Route::post('/id-verifications/{student}/approve', [AdminIdVerificationController::class, 'approve'])->name('api.admin.id-verifications.approve');
-        Route::post('/id-verifications/{student}/reject', [AdminIdVerificationController::class, 'reject'])->name('api.admin.id-verifications.reject');
+        Route::get('/kyc', [AdminKycController::class, 'index'])->name('api.admin.kyc.index');
+        Route::get('/kyc/{user}/file/{file}', [AdminKycController::class, 'file'])->name('api.admin.kyc.file');
+        Route::post('/kyc/{user}/approve', [AdminKycController::class, 'approve'])->name('api.admin.kyc.approve');
+        Route::post('/kyc/{user}/reject', [AdminKycController::class, 'reject'])->name('api.admin.kyc.reject');
         Route::get('/requests', [AdminRequestController::class, 'index'])->name('api.admin.requests.index');
         Route::post('/requests/{studentRequest}/accept', [AdminRequestController::class, 'accept'])->name('api.admin.requests.accept');
         Route::post('/requests/{studentRequest}/reject', [AdminRequestController::class, 'reject'])->name('api.admin.requests.reject');
@@ -103,15 +109,19 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::middleware('api.role:student')->prefix('student')->group(function () {
         Route::get('/dashboard', [StudentDashboardController::class, 'index'])->name('api.student.dashboard');
+        /* KYC identity verification. */
+        Route::get('/kyc', [StudentKycController::class, 'show'])->name('api.student.kyc.show');
+        Route::post('/kyc', [StudentKycController::class, 'store'])->middleware('throttle:10,1')->name('api.student.kyc.store');
+        Route::get('/kyc/file/{file}', [StudentKycController::class, 'file'])->name('api.student.kyc.file');
         Route::get('/enroll', [StudentEnrollController::class, 'index'])->name('api.student.enroll.index');
-        Route::post('/enroll/cart', [StudentEnrollController::class, 'cartEnroll'])->name('api.student.enroll.cart');
+        Route::post('/enroll/cart', [StudentEnrollController::class, 'cartEnroll'])->middleware('api.kyc')->name('api.student.enroll.cart');
         Route::get('/payments', [StudentPaymentController::class, 'index'])->name('api.student.payments.index');
-        Route::post('/payments/cart', [StudentPaymentController::class, 'cartStore'])->name('api.student.payments.cart');
+        Route::post('/payments/cart', [StudentPaymentController::class, 'cartStore'])->middleware('api.kyc')->name('api.student.payments.cart');
         Route::get('/payments/return', [StudentPaymentController::class, 'returnVerify'])->name('api.student.payments.return');
         Route::get('/payments/{enrollment}/create', [StudentPaymentController::class, 'create'])->name('api.student.payments.create');
-        Route::post('/payments/{enrollment}', [StudentPaymentController::class, 'store'])->name('api.student.payments.store');
+        Route::post('/payments/{enrollment}', [StudentPaymentController::class, 'store'])->middleware('api.kyc')->name('api.student.payments.store');
         Route::get('/schedules', [StudentScheduleController::class, 'index'])->name('api.student.schedules.index');
-        Route::post('/schedules/{schedule}/book', [StudentScheduleController::class, 'book'])->name('api.student.schedules.book');
+        Route::post('/schedules/{schedule}/book', [StudentScheduleController::class, 'book'])->middleware('api.kyc')->name('api.student.schedules.book');
         Route::delete('/schedules/{schedule}/book', [StudentScheduleController::class, 'cancel'])->name('api.student.schedules.cancel');
         Route::get('/schedules/pdc-calendar', [StudentScheduleController::class, 'pdcCalendar'])->name('api.student.schedules.pdcCalendar');
         Route::get('/schedules/pdc-day', [StudentScheduleController::class, 'pdcDay'])->name('api.student.schedules.pdcDay');
@@ -123,9 +133,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/requests/{studentRequest}', [StudentRequestController::class, 'destroy'])->name('api.student.requests.destroy');
         Route::get('/chat', [StudentChatController::class, 'index'])->name('api.student.chat.index');
         Route::post('/chat', [StudentChatController::class, 'send'])->middleware('throttle:30,1')->name('api.student.chat.send');
-        Route::get('/id-document', [StudentIdDocumentController::class, 'show'])->name('api.student.id-document.show');
-        Route::post('/id-document', [StudentIdDocumentController::class, 'store'])->middleware('throttle:10,1')->name('api.student.id-document.store');
-        Route::get('/id-document/file', [StudentIdDocumentController::class, 'file'])->name('api.student.id-document.file');
     });
 });
 

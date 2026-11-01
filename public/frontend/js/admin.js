@@ -7,7 +7,7 @@ const ADMIN_TITLES = {
   attendance:'Instructor Attendance', instructors:'Instructors',
   payments:'Payments', certifications:'Certifications', reports:'Reports',
   notifications:'Notifications', bookings:'Pending Bookings', requests:'Student Requests', ai:'Grading AI',
-  idverification:'ID Verification',
+  idverification:'KYC Verification',
   profile:'My Profile', settings:'Account Settings'
 };
 
@@ -30,7 +30,7 @@ function showPanel(panel, el){
   if (panel === 'reports') loadReports();
   if (panel === 'notifications') { loadNotifications(); loadNotifSummary(); }
   if (panel === 'requests') loadAdminRequests();
-  if (panel === 'idverification') loadIdVerifications();
+  if (panel === 'idverification') loadKyc();
   if (panel === 'certifications') loadCertifications();
   if (panel === 'profile') {
     if (window.RCDAProfile) {
@@ -50,6 +50,7 @@ function showPanel(panel, el){
       }
     }
   }
+  if (panel === 'ai') loadAIModel();
   if (typeof rememberPanel === 'function') rememberPanel(panel);
 }
 
@@ -74,6 +75,43 @@ function sampleNLP(type){
   if (el) el.value = nlpData[type].text;
 }
 
+/* Live model card for the Grading AI panel — same stratified 70/30
+   methodology as `php artisan nlp:evaluate`, so the panel always shows the
+   official Chapter 4 numbers (dataset 500+, target accuracy 90%+). */
+async function loadAIModel(){
+  const card = document.getElementById('aiModel');
+  if (!card || card.dataset.loaded) return;
+  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/nlp/evaluate`, { method: 'GET' });
+  if (!ok || !data) return;
+  card.dataset.loaded = '1';
+  card.style.display = 'block';
+
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('aiModelTotal', data.total);
+  set('aiModelAccuracy', data.test_size ? Math.round(data.accuracy * 100) + '%' : '—');
+  set('aiModelTrain', data.train_size + ' / ' + data.test_size);
+  set('aiModelVocab', data.vocab_size);
+
+  const langs = data.per_language || {};
+  const langTotal = Object.values(langs).reduce((a, b) => a + b, 0) || 1;
+  const colors = { english: '#4a7cd4', filipino: '#e07b39', taglish: '#7d5bb5' };
+  const pretty = { english: 'English', filipino: 'Filipino (Tagalog)', taglish: 'Taglish' };
+  document.getElementById('aiModelLangs').innerHTML = Object.keys(langs).map(k => {
+    const n = langs[k];
+    const pct = Math.round(n / langTotal * 100);
+    return `<div style="margin-bottom:6px;">
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--gray);"><span>${pretty[k] || k}</span><b>${n} · ${pct}%</b></div>
+      <div style="height:6px;border-radius:99px;background:var(--gray-light);margin-top:3px;"><div style="height:6px;border-radius:99px;background:${colors[k] || 'var(--orange)'};width:${pct}%;"></div></div>
+    </div>`;
+  }).join('');
+
+  const perClass = data.per_class || {};
+  const clsPretty = { fast: '⚡ Fast Learner', average: '📊 Average Learner', needs: '⚠ Needs Improvement' };
+  document.getElementById('aiModelClasses').innerHTML =
+    Object.keys(perClass).map(k => `<div style="display:flex;justify-content:space-between;"><span>${clsPretty[k] || k}</span><b>${perClass[k]}</b></div>`).join('')
+    || '<span style="color:var(--gray);">No data yet.</span>';
+}
+
 async function analyzeNLP(){
   const txt = (document.getElementById('nlpInput') || {}).value || '';
   if (!txt) return;
@@ -94,7 +132,7 @@ async function analyzeNLP(){
     if(badge){ badge.textContent = map.badge; badge.className = 'nlp-badge ' + map.cls; }
     if(score) score.textContent = Math.round((data.confidence || 0) * 100) + '%';
     if(msg)   msg.textContent = data.recommendation + ' — learned from ' + data.training_size + ' assessments';
-    if(tokens) tokens.innerHTML = (data.tokens || []).map(t => `<span class="token-chip ${t.c}">${escapeHtml(t.t)}</span>`).join('') || '<span class="token-chip">—</span>';
+    if(tokens) tokens.innerHTML = (data.tokens || []).map(t => `<span class="token-chip ${t.c}" title="${t.t.includes('_') ? 'bigram feature' : 'unigram feature'}">${escapeHtml((t.t || '').replace(/_/g, '&#8202;·&#8202;'))}</span>`).join('') || '<span class="token-chip">—</span>';
     if(result) result.style.display = 'block';
   } else {
     if(badge){ badge.textContent = 'Untrained'; badge.className = 'nlp-badge'; }
@@ -842,42 +880,49 @@ function renderCourseBreakdown(c){
 
 async function loadStudents(page){
   page = page || 1;
-  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/students?page=${page}`, { method: 'GET' });
+  /* Search goes to the API (filterStudents no longer filters by text —
+     see the server-side panel search note below). */
+  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/students?page=${page}${panelSearchQS('studentSearchInput')}`, { method: 'GET' });
   if (ok && data) renderStudents(data.students || [], data.pagination);
 }
 
+/* Students browse as a card grid (2 per row): name, course, joined, View.
+   Management actions (edit/assign/delete/deactivate) live inside the
+   student's View modal so the list stays light. */
 function renderStudents(students, pagination){
-  const tbody = document.querySelector('#studentsTable tbody');
-  if (!tbody) return;
-  tbody.innerHTML = students.map(st => {
-    const status = st.is_active ? 'Active' : 'Inactive';
-    const statusBadge = st.is_active ? 'active' : 'pending';
-    const payBadge = st.payment_status === 'Paid' ? 'verified' : (st.payment_status === 'Pending' ? 'pending' : 'pending');
-    const instructor = st.instructor_name ? escapeHtml(st.instructor_name) : '<span style="color:var(--gray);font-size:12px;">—</span>';
-    const idMeta = {
-      approved: ['verified', 'Verified'],
-      pending: ['pending', 'Pending'],
-      rejected: ['rejected', 'Rejected'],
-      none: ['upcoming', 'Not submitted']
-    }[st.id_status || 'none'] || ['upcoming', 'Not submitted'];
-    return `<tr data-status="${status}" data-id="${st.id}">
-      <td class="mono" style="color:var(--gray);font-size:12px;">#${st.id}</td>
-      <td><b>${escapeHtml(st.name)}</b><br><span style="font-size:11.5px;color:var(--gray);">${maskEmail(st.email)}</span></td>
-      <td>${escapeHtml(st.course)}</td>
-      <td><span class="badge ${payBadge}">${escapeHtml(st.payment_status)}</span></td>
-      <td><span class="badge ${statusBadge}">${status}</span></td>
-      <td><span class="badge ${idMeta[0]}">${idMeta[1]}</span></td>
-      <td>${instructor}</td>
-      <td><div style="display:flex;gap:6px;"><button class="btn btn-sm btn-ghost" onclick="viewStudent(this)">View</button><button class="btn btn-sm btn-ghost" onclick="openUserProfile(${st.user_id || 0},'${escapeHtml(st.name).replace(/'/g, "\\'")}')">Edit Profile</button><button class="btn btn-sm btn-primary" onclick="openAssignInstructorModal(${st.id})">Assign</button><button class="btn btn-sm btn-ghost" onclick="toggleStudentActive(${st.id})">${st.is_active ? 'Deactivate' : 'Activate'}</button><button class="btn btn-sm btn-danger" onclick="deleteStudent(this)">Delete</button></div></td>
-    </tr>`;
-  }).join('') || `<tr><td colspan="8" style="text-align:center;color:var(--gray);padding:20px;">No students yet.</td></tr>`;
+  const grid = document.getElementById('studentsGrid');
+  if (!grid) return;
+
+  grid.innerHTML = students.map(st => {
+    const statusDot = st.is_active ? '' : '<span class="badge pending" style="margin-left:8px;">Inactive</span>';
+    const joined = st.joined_at ? fmtJoined(st.joined_at) : '—';
+    return `<div class="stud-card" data-status="${st.is_active ? 'Active' : 'Inactive'}" data-name="${escapeHtml(st.name || '').toLowerCase()}" data-id="${st.id}">
+      <div style="min-width:0;">
+        <div style="font-weight:700;color:var(--charcoal);font-size:14.5px;display:flex;align-items:center;">
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(st.name)}</span>${statusDot}
+        </div>
+        <div style="font-size:12.5px;color:var(--gray);margin-top:4px;display:flex;gap:8px;align-items:center;">
+          <span style="background:var(--cream);border-radius:8px;padding:2px 10px;font-weight:600;color:var(--charcoal);">${escapeHtml(st.course)}</span>
+          <span>Joined ${joined}</span>
+        </div>
+      </div>
+      <button class="btn btn-sm btn-primary" data-id="${st.id}" data-user-id="${st.user_id || 0}" data-name="${escapeHtml(st.name || '')}" onclick="viewStudent(this)">View</button>
+    </div>`;
+  }).join('') || '<div style="grid-column:1/-1;text-align:center;color:var(--gray);padding:24px;">No students yet.</div>';
+
   filterStudents();
-  renderPagination(document.getElementById('studentsTable'), 'studentsPagination', pagination, 'loadStudents');
+  renderPagination(grid, 'studentsPagination', pagination, 'loadStudents');
+}
+
+function fmtJoined(iso){
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 async function loadInstructors(page){
   page = page || 1;
-  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/instructors?page=${page}`, { method: 'GET' });
+  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/instructors?page=${page}${panelSearchQS('instructorSearchInput')}`, { method: 'GET' });
   if (ok && data) renderInstructors(data.instructors || [], data.pagination);
 }
 
@@ -1183,7 +1228,7 @@ async function viewScheduleAttendance(id){
 
 async function loadPayments(page){
   page = page || 1;
-  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/payments?page=${page}`, { method: 'GET' });
+  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/payments?page=${page}${panelSearchQS('paymentSearchInput')}`, { method: 'GET' });
   if (ok && data) renderPayments(data.payments || [], data.pagination);
 }
 
@@ -1266,34 +1311,57 @@ document.addEventListener('click', function(e){
   }
 });
 
+/* ---------- Server-side panel search ----------
+   Students / instructors / payments are paginated (10 rows per page), so the
+   old client-only search box only ever saw the current page — a match on
+   page 3 was invisible while you sat on page 1. The search box now re-queries
+   the API (which matches across ALL pages) after a short debounce, and
+   landing on page 1 of the results. The checkbox status filters and the
+   A–Z / Z–A sort still run client-side on the current page. */
+function panelSearchQS(id){
+  const el = document.getElementById(id);
+  const val = el ? el.value.trim() : '';
+  return val ? `&search=${encodeURIComponent(val)}` : '';
+}
+
+const PANEL_SEARCH_TIMERS = {};
+function debouncePanelSearch(key, fn){
+  clearTimeout(PANEL_SEARCH_TIMERS[key]);
+  PANEL_SEARCH_TIMERS[key] = setTimeout(fn, 350);
+}
+
+function onStudentSearchInput(){ debouncePanelSearch('students', () => loadStudents(1)); }
+function onInstructorSearchInput(){ debouncePanelSearch('instructors', () => loadInstructors(1)); }
+function onPaymentSearchInput(){ debouncePanelSearch('payments', () => loadPayments(1)); }
+
 function filterStudents(){
-  const query = ((document.getElementById('studentSearchInput') || {}).value || '').toLowerCase();
+  /* Text filtering is server-side now; this only applies the
+     status checkboxes + A–Z sort to the current page's cards. */
   const menu = document.getElementById('studentFilterMenu');
   const checked = menu ? Array.from(menu.querySelectorAll('input[type=checkbox]:checked')).map(cb => cb.value) : [];
   const sortMode = menu ? (menu.querySelector('input[name=studentSort]:checked') || {}).value : '';
 
-  const tbody = document.querySelector('#studentsTable tbody');
-  if (!tbody) return;
-  const rows = Array.from(tbody.querySelectorAll('tr'));
+  const grid = document.getElementById('studentsGrid');
+  if (!grid) return;
+  const cards = Array.from(grid.querySelectorAll('.stud-card'));
 
-  rows.forEach(row => {
-    const matchesText = row.textContent.toLowerCase().includes(query);
-    const matchesStatus = checked.length === 0 || checked.includes(row.dataset.status);
-    row.style.display = (matchesText && matchesStatus) ? '' : 'none';
+  cards.forEach(card => {
+    const matchesStatus = checked.length === 0 || checked.includes(card.dataset.status);
+    card.style.display = matchesStatus ? '' : 'none';
   });
 
   if (sortMode === 'az' || sortMode === 'za') {
-    const getName = row => (row.querySelector('td:nth-child(2)') || {}).textContent.trim().toLowerCase();
-    rows.sort((a, b) => {
-      const cmp = getName(a).localeCompare(getName(b));
+    const nameOf = card => (card.dataset.name || '');
+    cards.sort((a, b) => {
+      const cmp = nameOf(a).localeCompare(nameOf(b));
       return sortMode === 'az' ? cmp : -cmp;
     });
-    rows.forEach(row => tbody.appendChild(row));
+    cards.forEach(card => grid.appendChild(card));
   }
 }
 
 function filterInstructors(){
-  const query = ((document.getElementById('instructorSearchInput') || {}).value || '').toLowerCase();
+  /* Text filtering is server-side now; checkboxes + sort stay client-side. */
   const menu = document.getElementById('instructorFilterMenu');
   const checked = menu ? Array.from(menu.querySelectorAll('input[type=checkbox]:checked')).map(cb => cb.value) : [];
   const sortMode = menu ? (menu.querySelector('input[name=instructorSort]:checked') || {}).value : '';
@@ -1303,9 +1371,8 @@ function filterInstructors(){
   const rows = Array.from(tbody.querySelectorAll('tr'));
 
   rows.forEach(row => {
-    const matchesText = row.textContent.toLowerCase().includes(query);
     const matchesStatus = checked.length === 0 || checked.includes(row.dataset.status);
-    row.style.display = (matchesText && matchesStatus) ? '' : 'none';
+    row.style.display = matchesStatus ? '' : 'none';
   });
 
   if (sortMode === 'az' || sortMode === 'za') {
@@ -1417,32 +1484,36 @@ async function addStudent(){
    always showing the same hardcoded demo student.
    ============================================================ */
 async function viewStudent(btn){
-  const row = btn.closest('tr');
-  if (!row) return;
-  const id = row.dataset.id;
+  const id = btn.dataset.id;
   if (!id) return;
 
   const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/students/${id}`, { method: 'GET' });
   if (!ok || !data) { RCDA.showToast('Could not load student.', 'error'); return; }
 
-  const s = data.student;
+  const s = data.student || {};
+  const p = data.profile || {};
   const user = s.user || {};
-  window._viewUserId = user.id;
-  window._viewUserName = user.name || '';
+  window._viewStudent = {
+    id: s.id,
+    user_id: user.id,
+    name: user.name || 'Student',
+    is_active: !!user.is_active,
+  };
   const name = user.name || 'Student';
   const initials = name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
   const isActive = !!(user.is_active);
   const status = isActive ? 'Active' : 'Inactive';
   const statusClass = isActive ? 'active' : 'pending';
 
-  const courses = (s.enrollments || []).map(e => (e.course ? e.course.name : '—'));
-  const courseLabel = courses.length ? courses.join(', ') : '—';
-
   const titleEl = document.getElementById('modalStudentTitle');
   const avatarEl = document.getElementById('modalStudentAvatar');
   const nameEl = document.getElementById('modalStudentName');
   const metaEl = document.getElementById('modalStudentMeta');
   const courseEl = document.getElementById('modalStudentCourse');
+  const ageEl = document.getElementById('modalStudentAge');
+  const contactEl = document.getElementById('modalStudentContact');
+  const addressEl = document.getElementById('modalStudentAddress');
+  const joinedEl = document.getElementById('modalStudentJoined');
   const instructorEl = document.getElementById('modalStudentInstructor');
   const genderEl = document.getElementById('modalStudentGender');
   const prefEl = document.getElementById('modalStudentPref');
@@ -1455,14 +1526,57 @@ async function viewStudent(btn){
   if (avatarEl) avatarEl.textContent = initials || '—';
   if (nameEl) nameEl.textContent = name;
   if (metaEl) metaEl.textContent = '#' + s.id + ' · ' + (user.email || '');
-  if (courseEl) courseEl.textContent = courseLabel;
-  if (instructorEl) instructorEl.textContent = '—';
+  if (courseEl) courseEl.textContent = p.course || '—';
+  if (ageEl) ageEl.textContent = p.age != null ? p.age : '—';
+  if (contactEl) contactEl.textContent = p.phone || '—';
+  if (addressEl) addressEl.textContent = p.address || '—';
+  if (joinedEl) joinedEl.textContent = p.joined_at ? fmtJoined(p.joined_at) : '—';
   if (genderEl) genderEl.textContent = s.gender ? (s.gender.charAt(0).toUpperCase() + s.gender.slice(1)) : '—';
   if (prefEl) prefEl.textContent = s.preferred_instructor_gender ? (s.preferred_instructor_gender === 'male' ? 'Male' : 'Female') : 'No preference';
-  if (tdcEl) tdcEl.textContent = '—';
-  if (pdcEl) pdcEl.textContent = '—';
+
+  /* Assigned / preferred instructor — only if the student actually has one. */
+  if (instructorEl) {
+    instructorEl.textContent = p.instructor_name || '—';
+  }
+
+  /* TDC progress: book status + exam score when assessed. */
+  if (tdcEl) {
+    const tdc = p.tdc || {};
+    if (!tdc.enrolled && !p.tdc_verified) {
+      tdcEl.textContent = 'Not enrolled';
+    } else {
+      let t = 'Booked 1 class block';
+      if (p.tdc_verified) t = 'Verified (external)';
+      else if (tdc.assessment) {
+        t = (tdc.assessment.passed ? 'PASSED' : 'Not passed')
+          + (tdc.assessment.exam_score != null ? ' — exam ' + tdc.assessment.exam_score : '');
+      } else {
+        t = tdc.booked_blocks > 0 ? 'Booked — awaiting assessment' : 'Awaiting class + assessment';
+      }
+      tdcEl.textContent = t;
+    }
+  }
+
+  /* PDC progress: sessions booked + latest assessment score/classification. */
+  if (pdcEl) {
+    const pdc = p.pdc || {};
+    if (!pdc.enrolled) {
+      pdcEl.textContent = 'Not enrolled';
+    } else {
+      pdcEl.textContent = pdc.booked_sessions + ' session' + (pdc.booked_sessions === 1 ? '' : 's')
+        + (pdc.assessed_sessions
+          ? ' · assessed ' + pdc.assessed_sessions + '×'
+            + (pdc.latest_classification ? ' (' + pdc.latest_classification + (pdc.latest_score != null ? ' · ' + pdc.latest_score : '') + ')' : '')
+          : ' · not assessed yet');
+    }
+  }
+
   if (statusEl) { statusEl.textContent = status; statusEl.className = 'badge ' + statusClass; }
-  if (paymentEl) { paymentEl.textContent = '—'; paymentEl.className = 'badge pending'; }
+  renderModalPayments(data.payments || [], p);
+  renderModalAssessments(data.assessments || []);
+
+  const toggleBtn = document.getElementById('modalStudentToggleBtn');
+  if (toggleBtn) toggleBtn.textContent = isActive ? 'Deactivate' : 'Activate';
 
   const roleSel = document.getElementById('modalStudentRole');
   if (roleSel) roleSel.value = user.role || 'student';
@@ -1473,6 +1587,112 @@ async function viewStudent(btn){
   profileTab('info');
   openModal('studentModal');
   loadRoleChangeLog(user.id);
+}
+
+/* Renders the View modal's Assessment tab: score headline + expandable
+   five-category breakdown and the instructor's raw feedback. */
+function renderModalAssessments(list){
+  const body = document.getElementById('modalAssessmentBody');
+  if (!body) return;
+
+  if (!list.length) {
+    body.innerHTML = '<div style="color:var(--gray);text-align:center;padding:20px 0;">No assessment yet. Ask the instructor to assess this student.</div>';
+    return;
+  }
+
+  const classBadge = {
+    fast: ['verified', 'Fast learner'],
+    average: ['completed', 'Average'],
+    needs: ['pending', 'Needs improvement'],
+  };
+  body.innerHTML = list.map((a, i) => {
+    const [cls, label] = classBadge[a.classification] || ['pending', a.classification || '—'];
+    const scoreLine = a.score != null ? 'Score ' + a.score : (a.exam_score != null ? 'Exam ' + a.exam_score : '');
+    const cats = (a.categories || []).filter(c => c.score != null).map(c =>
+      `<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px dashed var(--gray-light);">
+        <span style="color:var(--gray);">${escapeHtml(c.label)}</span>
+        <b>${'★'.repeat(c.score)}${'☆'.repeat(Math.max(0, 5 - c.score))}</b>
+      </div>`).join('');
+    return `<div class="stud-assess" style="border:1px solid var(--gray-light);border-radius:12px;padding:12px 14px;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+        <div>
+          <b>${escapeHtml(a.course_name || a.course_type || 'Session')}</b>
+          <span style="font-size:11.5px;color:var(--gray);margin-left:6px;">${escapeHtml(a.date || '')}</span>
+        </div>
+        <span class="badge ${cls}">${escapeHtml(label)}</span>
+      </div>
+      ${scoreLine ? `<div style="font-size:13px;margin-top:6px;color:var(--charcoal);"><b>${escapeHtml(scoreLine)}</b>${a.passed != null ? (a.passed ? ' · <span style="color:#2e7d32;">Passed</span>' : ' · <span style="color:#B42318;">Not passed</span>') : ''}</div>` : ''}
+      <details style="margin-top:8px;">
+        <summary style="font-size:12.5px;color:var(--gray);cursor:pointer;">Show assessment details</summary>
+        ${cats ? `<div style="margin-top:8px;">${cats}</div>` : ''}
+        ${a.feedback ? `<p style="font-size:12.5px;color:var(--gray);margin:8px 0 0;line-height:1.5;">"${escapeHtml(a.feedback)}"</p>` : ''}
+        ${a.recommendation ? `<p style="font-size:12.5px;color:var(--charcoal);margin:8px 0 0;">${escapeHtml(a.recommendation)}</p>` : ''}
+      </details>
+    </div>`;
+  }).join('');
+}
+
+/* Renders the View modal's Payment tab: badge + per-payment history. */
+function renderModalPayments(list, profile){
+  const badge = document.getElementById('modalStudentPayment');
+  if (badge) {
+    const st = profile.payment_status || '—';
+    badge.textContent = st;
+    badge.className = 'badge ' + (st === 'Paid' ? 'verified' : st === 'Pending' ? 'pending' : 'pending');
+  }
+  const total = document.getElementById('modalStudentPaymentTotal');
+  if (total) total.textContent = profile.payment_paid_total
+    ? 'Verified payments total ₱' + Number(profile.payment_paid_total).toLocaleString('en-PH')
+    : 'No verified payments yet.';
+  const box = document.getElementById('modalStudentPaymentsList');
+  if (!box) return;
+
+  box.innerHTML = list.length ? list.map(p =>
+    `<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--gray-light);">
+      <div>
+        <b>₱${Number(p.amount || 0).toLocaleString('en-PH')}</b>
+        <span style="font-size:11.5px;color:var(--gray);margin-left:8px;text-transform:capitalize;">${escapeHtml(p.method || '—')}</span>
+      </div>
+      <div style="text-align:right;">
+        ${statusBadge(p.status)}
+        <div style="font-size:11px;color:var(--gray);">${escapeHtml(fmtJoined(p.date))}</div>
+      </div>
+    </div>`).join('')
+    : '<div style="color:var(--gray);text-align:center;padding:12px 0;">No payments recorded yet.</div>';
+}
+
+/* Modal management actions (moved here when the list became read-only cards). */
+async function toggleStudentActiveFromModal(){
+  const st = window._viewStudent;
+  if (!st) return;
+  const { ok } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/students/${st.id}/toggle-active`, { method: 'POST' });
+  if (!ok) { RCDA.showToast('Could not update the student.', 'error'); return; }
+  RCDA.showToast('Student status updated.', 'success');
+  loadStudents(1);
+  viewStudentByRefresh();
+}
+
+function deleteStudentFromModal(){
+  const st = window._viewStudent;
+  if (!st) return;
+  if (!confirm(`Remove ${st.name} from the students list?`)) return;
+  RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/students/${st.id}`, { method: 'DELETE' }).then(({ ok }) => {
+    if (!ok) { RCDA.showToast('Could not delete student.', 'error'); return; }
+    RCDA.showToast('Student removed.', 'success');
+    closeModal('studentModal');
+    loadStudents(1);
+  });
+}
+
+/* Re-opens the same student's modal after an in-modal state change. */
+async function viewStudentByRefresh(){
+  const st = window._viewStudent;
+  if (!st) { loadStudents(1); return; }
+  const fakeBtn = document.createElement('button');
+  fakeBtn.dataset.id = st.id;
+  fakeBtn.dataset.userId = st.user_id;
+  fakeBtn.dataset.name = st.name;
+  await viewStudent(fakeBtn);
 }
 
 /* Instructors are created by promoting a student, not by direct sign-up. */
@@ -1487,7 +1707,7 @@ async function saveStudentRole(){
   const role = sel ? sel.value : 'student';
   const specSel = document.getElementById('modalStudentSpec');
   const reasonEl = document.getElementById('modalStudentRoleReason');
-  const id = window._viewUserId;
+  const id = window._viewStudent && window._viewStudent.user_id;
   if (!id) return;
   const body = { role };
   if (role === 'instructor' && specSel) body.specialization = specSel.value;
@@ -1519,7 +1739,7 @@ async function loadRoleChangeLog(userId){
   if (!el || !userId) return;
   const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/users/role-changes`, { method: 'GET' });
   if (!ok || !data) { el.innerHTML = ''; return; }
-  const mine = (data.changes || []).filter(c => c.user_name && window._viewUserName === c.user_name);
+  const mine = (data.changes || []).filter(c => c.user_name && window._viewStudent && window._viewStudent.name === c.user_name);
   if (!mine.length) { el.innerHTML = '<i>No prior role changes recorded.</i>'; return; }
   el.innerHTML = '<b>Role change history</b>' + mine.map(c =>
     `<div style="padding:5px 0;border-top:1px solid var(--gray-light);margin-top:6px;">
@@ -1533,38 +1753,8 @@ async function loadRoleChangeLog(userId){
    Delete Student / Delete Instructor — confirm before removing
    the row from the table.
    ============================================================ */
-/* Bootstrap 5 Modal instance for the Delete Student confirmation ONLY */
-let _deleteStudentModal = null;
-let _pendingDeleteStudentRow = null;
-
-function deleteStudent(btn){
-  const row = btn.closest('tr');
-  if (!row) return;
-  const name = (row.querySelector('td:nth-child(2)') || {}).textContent.trim() || 'this student';
-
-  const el = document.getElementById('deleteStudentModal');
-  if (!el) { if (confirm(`Remove ${name} from the students list?`)) row.remove(); return; }
-
-  if (!_deleteStudentModal) {
-    _deleteStudentModal = new bootstrap.Modal(el);
-    document.getElementById('deleteStudentConfirmBtn').addEventListener('click', async () => {
-      const row = _pendingDeleteStudentRow;
-      _pendingDeleteStudentRow = null;
-      _deleteStudentModal.hide();
-      if (!row) return;
-      const id = row.dataset.id;
-      if (id) {
-        const { ok } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/students/${id}`, { method: 'DELETE' });
-        if (!ok) { RCDA.showToast('Could not delete student.', 'error'); loadStudents(); return; }
-      }
-      row.remove();
-    });
-  }
-  _pendingDeleteStudentRow = row;
-  const msgEl = document.getElementById('deleteStudentMessage');
-  if (msgEl) msgEl.textContent = `Remove ${name} from the students list?`;
-  _deleteStudentModal.show();
-}
+/* The row-based deleteStudent() was retired with the old students table:
+   deletion is now deleteStudentFromModal(), driven from the View modal. */
 
 /* Bootstrap 5 Modal instance for the Delete Instructor confirmation ONLY */
 let _deleteInstructorModal = null;
@@ -1604,7 +1794,7 @@ function deleteInstructor(btn){
    the Students/Instructors tables.
    ============================================================ */
 function filterPayments(){
-  const query = ((document.getElementById('paymentSearchInput') || {}).value || '').toLowerCase();
+  /* Text filtering is server-side now; checkboxes + sort stay client-side. */
   const menu = document.getElementById('paymentFilterMenu');
   const checked = menu ? Array.from(menu.querySelectorAll('input[type=checkbox]:checked')).map(cb => cb.value) : [];
   const sortMode = menu ? (menu.querySelector('input[name=paymentSort]:checked') || {}).value : '';
@@ -1614,9 +1804,8 @@ function filterPayments(){
   const rows = Array.from(tbody.querySelectorAll('tr'));
 
   rows.forEach(row => {
-    const matchesText = row.textContent.toLowerCase().includes(query);
     const matchesStatus = checked.length === 0 || checked.includes(row.dataset.status);
-    row.style.display = (matchesText && matchesStatus) ? '' : 'none';
+    row.style.display = matchesStatus ? '' : 'none';
   });
 
   if (sortMode === 'az' || sortMode === 'za') {
@@ -1668,35 +1857,37 @@ function exportPaymentsPDF(){
 }
 
 /* ============================================================
-   Valid ID verification queue — the admin opens the private file,
-   then approves or rejects it. Reviewing is status-only: an
-   unverified ID never blocks enrolment, booking or payment.
+   KYC verification queue — the admin opens the student's uploaded
+   ID photo and selfie SIDE BY SIDE and verifies BY EYE that it is
+   the same person and the ID looks legitimate. Approval attests to
+   that manual inspection (the server also requires BOTH confirm
+   flags). Verified students can book lessons and pay.
    ============================================================ */
-let ADMIN_ID_DOC_URL = '';
+let KYC_DOC_URLS = { id: '', selfie: '' };
 
-async function loadIdVerifications(){
-  const status = (document.getElementById('idStatusFilter') || {}).value || 'pending';
-  const search = ((document.getElementById('idSearchInput') || {}).value || '').trim();
+async function loadKyc(){
+  const status = (document.getElementById('kycStatusFilter') || {}).value || 'pending';
+  const search = ((document.getElementById('kycSearchInput') || {}).value || '').trim();
 
   const params = new URLSearchParams({ status });
   if (search) params.set('search', search);
 
-  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/id-verifications?${params.toString()}`, { method: 'GET' });
+  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/kyc?${params.toString()}`, { method: 'GET' });
   if (!ok || !data) return;
 
-  renderIdCounts(data.counts || {});
-  renderIdVerifications(data.verifications || []);
+  renderKycCounts(data.counts || {});
+  renderKycRows(data.verifications || []);
 }
 
-function renderIdCounts(counts){
-  const el = document.getElementById('idCounts');
+function renderKycCounts(counts){
+  const el = document.getElementById('kycCounts');
   if (!el) return;
 
   const boxes = [
     ['Pending review', counts.pending || 0],
-    ['Approved', counts.approved || 0],
+    ['Verified', counts.verified || 0],
     ['Rejected', counts.rejected || 0],
-    ['Not submitted', counts.none || 0],
+    ['Not submitted', counts.unverified || 0],
   ];
 
   el.innerHTML = boxes.map(([label, value]) =>
@@ -1706,8 +1897,8 @@ function renderIdCounts(counts){
     </div>`).join('');
 }
 
-function idStatusText(status){
-  return { approved: 'Approved', pending: 'Pending', rejected: 'Rejected', none: 'Not submitted' }[status] || '—';
+function kycStatusText(status){
+  return { verified: 'Verified', pending: 'Pending', rejected: 'Rejected', unverified: 'Not submitted' }[status] || '—';
 }
 
 function idDate(value){
@@ -1717,103 +1908,140 @@ function idDate(value){
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-function renderIdVerifications(list){
-  const tb = document.querySelector('#idVerificationsTable tbody');
+function renderKycRows(list){
+  const tb = document.querySelector('#kycTable tbody');
   if (!tb) return;
 
   tb.innerHTML = list.length ? list.map(v => {
-    const badge = { approved: 'verified', pending: 'pending', rejected: 'rejected' }[v.status] || 'upcoming';
+    const badge = { verified: 'completed', pending: 'pending', rejected: 'rejected' }[v.status] || 'upcoming';
     const actions = [];
 
-    if (v.has_document) {
-      actions.push(`<button class="btn btn-sm btn-ghost" onclick="viewIdDocument(${v.student_id})">View ID</button>`);
+    if (v.has_id || v.has_selfie) {
+      actions.push(`<button class="btn btn-sm btn-ghost" onclick="viewKyc(${v.user_id},this)">Review</button>`);
     }
-    if (v.has_document && v.status !== 'approved') {
-      actions.push(`<button class="btn btn-sm btn-primary" onclick="approveId(${v.student_id},this)">Approve</button>`);
+    if ((v.has_id && v.has_selfie) && v.status !== 'verified') {
+      actions.push(`<button class="btn btn-sm btn-primary" onclick="approveKyc(${v.user_id},this)">Approve</button>`);
     }
-    if (v.has_document && v.status !== 'rejected') {
-      actions.push(`<button class="btn btn-sm btn-danger" onclick="rejectId(${v.student_id},this)">Reject</button>`);
+    if ((v.has_id && v.has_selfie) && v.status !== 'rejected') {
+      actions.push(`<button class="btn btn-sm btn-danger" onclick="rejectKyc(${v.user_id},this)">Reject</button>`);
     }
 
     const reason = (v.status === 'rejected' && v.rejection_reason)
       ? `<div style="font-size:11px;color:var(--gray);margin-top:4px;max-width:220px;">${escapeHtml(v.rejection_reason)}</div>`
       : '';
 
-    return `<tr data-student-id="${v.student_id}">
+    return `<tr data-user-id="${v.user_id}">
       <td><b>${escapeHtml(v.student_name || 'Student')}</b><br><span style="font-size:11.5px;color:var(--gray);">${escapeHtml(maskEmail(v.email || ''))}</span></td>
-      <td>${escapeHtml(v.document_type_label || '—')}<br><span style="font-size:11px;color:var(--gray);">${escapeHtml(v.document_name || '')}</span></td>
+      <td>${v.has_id ? escapeHtml(v.id_type_label || 'Uploaded') : '—'}</td>
       <td>${escapeHtml(idDate(v.submitted_at))}</td>
-      <td><span class="badge ${badge}">${escapeHtml(idStatusText(v.status))}</span>${reason}</td>
-      <td>${v.reviewed_by ? escapeHtml(v.reviewed_by) : '—'}${v.reviewed_at ? `<br><span style="font-size:11px;color:var(--gray);">${escapeHtml(idDate(v.reviewed_at))}</span>` : ''}</td>
+      <td><span class="badge ${badge}">${escapeHtml(kycStatusText(v.status))}</span>${reason}</td>
+      <td>${v.verified_by ? escapeHtml(v.verified_by) : '—'}${v.verified_at ? `<br><span style="font-size:11px;color:var(--gray);">${escapeHtml(idDate(v.verified_at))}</span>` : ''}</td>
       <td><div style="display:flex;gap:6px;flex-wrap:wrap;">${actions.join('') || '<span style="font-size:12px;color:var(--gray);">—</span>'}</div></td>
     </tr>`;
   }).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">Nothing to review here.</td></tr>';
 }
 
-async function viewIdDocument(studentId){
-  const body = document.getElementById('idDocumentBody');
-  const title = document.getElementById('idDocumentTitle');
-
-  clearIdDocument();
-  if (title) title.textContent = 'Loading valid ID…';
-  if (body) body.innerHTML = '<div style="color:var(--gray);font-size:13px;">Loading document…</div>';
-  openModal('idDocumentModal');
-
-  const res = await fetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/id-verifications/${studentId}/file`, {
+function kycAuthFetch(url){
+  return fetch(url, {
     headers: {
       'Accept': '*/*',
       'Authorization': 'Bearer ' + ((window.RCDA_AUTH && RCDA_AUTH.getToken && RCDA_AUTH.getToken()) || localStorage.getItem('rcda_token') || '')
     }
   });
-
-  if (!res.ok) {
-    if (body) body.innerHTML = '<div style="color:var(--danger2);font-size:13px;">Could not open this document.</div>';
-    return;
-  }
-
-  const blob = await res.blob();
-  ADMIN_ID_DOC_URL = URL.createObjectURL(blob);
-
-  if (title) title.textContent = 'Valid ID';
-  if (body) {
-    body.innerHTML = blob.type === 'application/pdf'
-      ? `<iframe src="${ADMIN_ID_DOC_URL}" title="Valid ID" style="width:100%;height:65vh;border:0;border-radius:10px;background:#fff;"></iframe>`
-      : `<img src="${ADMIN_ID_DOC_URL}" alt="Valid ID" style="max-width:100%;max-height:70vh;border-radius:10px;">`;
-  }
 }
 
-function clearIdDocument(){
-  if (ADMIN_ID_DOC_URL) {
-    URL.revokeObjectURL(ADMIN_ID_DOC_URL);
-    ADMIN_ID_DOC_URL = '';
+async function viewKyc(userId){
+  const body = document.getElementById('kycDocBody');
+  const title = document.getElementById('kycDocTitle');
+
+  clearKycDocs();
+  if (title) title.textContent = 'KYC documents';
+  if (body) body.innerHTML = '<div style="color:var(--gray);font-size:13px;width:100%;text-align:center;">Loading documents…</div>';
+  openModal('idDocumentModal');
+
+  /* Both files load in parallel; each pane fills independently so one
+     failure never hides the other document. */
+  const panes = [
+    { key: 'id',     label: 'Valid ID photo' },
+    { key: 'selfie', label: 'Selfie (compare with the ID)' },
+  ];
+  const base = `${RCDA_CONFIG.getApiBaseUrl()}/admin/kyc/${userId}/file/`;
+
+  if (body) {
+    body.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;width:100%;">` +
+      panes.map(pn => `<div style="min-width:0;">
+        <div style="font-size:12px;font-weight:700;color:var(--charcoal);margin-bottom:8px;">${pn.label}</div>
+        <div id="kycPane-${pn.key}" style="background:var(--cream);border-radius:10px;min-height:180px;display:flex;align-items:center;justify-content:center;color:var(--gray);font-size:12.5px;">Loading…</div>
+      </div>`).join('') +
+      `</div>`;
   }
-  const body = document.getElementById('idDocumentBody');
+
+  await Promise.all(panes.map(async ({ key }) => {
+    const pane = document.getElementById('kycPane-' + key);
+    if (!pane) return;
+
+    try {
+      const res = await kycAuthFetch(base + key);
+      if (!res.ok) {
+        pane.innerHTML = '<div style="color:var(--gray);font-size:12.5px;">No file</div>';
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      KYC_DOC_URLS[key] = url;
+      pane.style.minHeight = '0';
+      pane.innerHTML = blob.type === 'application/pdf'
+        ? `<iframe src="${url}" title="${key}" style="width:100%;height:60vh;border:0;border-radius:10px;background:#fff;"></iframe>`
+        : `<img src="${url}" alt="${panes.find(p => p.key === key).label}" style="width:100%;max-height:65vh;object-fit:contain;border-radius:10px;">`;
+      if (title) title.textContent = 'Compare identity — same person on both photos?';
+    } catch (e) {
+      pane.innerHTML = '<div style="color:var(--danger2);font-size:12.5px;">Could not open this file.</div>';
+    }
+  }));
+}
+
+function clearKycDocs(){
+  Object.keys(KYC_DOC_URLS).forEach(k => {
+    if (KYC_DOC_URLS[k]) {
+      URL.revokeObjectURL(KYC_DOC_URLS[k]);
+      KYC_DOC_URLS[k] = '';
+    }
+  });
+  const body = document.getElementById('kycDocBody');
   if (body) body.innerHTML = '';
 }
 
 function closeIdDocumentModal(){
-  clearIdDocument();
+  clearKycDocs();
   closeModal('idDocumentModal');
 }
 
-async function approveId(studentId, btn){
+async function approveKyc(userId, btn){
+  const okFace = confirm('Confirm: the SELFIE shows the same person as the ID photo?');
+  if (!okFace) return;
+  const okId = confirm('Confirm: the ID photo is a valid government ID?');
+  if (!okId) return;
+
   if (btn) { btn.disabled = true; btn.textContent = 'Approving…'; }
 
-  const { ok, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/id-verifications/${studentId}/approve`, { method: 'POST' });
+  const { ok, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/kyc/${userId}/approve`, {
+    method: 'POST',
+    body: { face_match_confirmed: true, id_document_confirmed: true },
+  });
 
   if (!ok) {
-    RCDA.showToast(error || 'Could not approve the ID.', 'error');
+    RCDA.showToast(error || 'Could not verify this student.', 'error');
     if (btn) { btn.disabled = false; btn.textContent = 'Approve'; }
     return;
   }
 
-  RCDA.showToast('Valid ID approved.', 'success');
-  loadIdVerifications();
+  RCDA.showToast('Identity verified — the student can now book and pay.', 'success');
+  loadKyc();
   loadDashboardStats();
 }
 
-async function rejectId(studentId, btn){
-  const reason = prompt('Why is this ID being rejected? The student will see this message.');
+async function rejectKyc(userId, btn){
+  const reason = prompt('Why are these documents rejected? The student will see this message and can resubmit.');
   if (reason === null) return;
   if (reason.trim().length < 5) {
     RCDA.showToast('Write a short reason (at least 5 characters).', 'error');
@@ -1822,19 +2050,19 @@ async function rejectId(studentId, btn){
 
   if (btn) { btn.disabled = true; btn.textContent = 'Rejecting…'; }
 
-  const { ok, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/id-verifications/${studentId}/reject`, {
+  const { ok, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/kyc/${userId}/reject`, {
     method: 'POST',
     body: { reason: reason.trim() },
   });
 
   if (!ok) {
-    RCDA.showToast(error || 'Could not reject the ID.', 'error');
+    RCDA.showToast(error || 'Could not reject the submission.', 'error');
     if (btn) { btn.disabled = false; btn.textContent = 'Reject'; }
     return;
   }
 
-  RCDA.showToast('Valid ID rejected.', 'success');
-  loadIdVerifications();
+  RCDA.showToast('KYC rejected — the student can resubmit.', 'success');
+  loadKyc();
   loadDashboardStats();
 }
 

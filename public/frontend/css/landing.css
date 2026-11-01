@@ -1,4 +1,4 @@
-/* ========== SHOWROOM BACKDROP (keeps the glossy theme going past the hero) ========== */
+﻿/* ========== SHOWROOM BACKDROP (keeps the glossy theme going past the hero) ========== */
 body{
   background:
     radial-gradient(1000px 520px at 88% 4%, rgba(192,57,43,0.07), transparent 62%),
@@ -155,4 +155,8 @@ body{
   height: 44px;
   object-fit: contain;
   display: block;
+}
+/* Live course pricing variant line under the price (landing cards). */
+.price-variants {
+  margin-top:10px;font-size:12px;color:var(--gray);letter-spacing:.2px;
 }

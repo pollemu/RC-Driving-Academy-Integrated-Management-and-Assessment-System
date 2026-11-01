@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Assessment;
 use App\Models\Feedback;
+use App\Services\NlpClassifier;
 use App\Services\NlpService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -54,7 +55,7 @@ class ProcessAssessment implements ShouldQueue
         $recommendation = $result['recommendation'] ?? $assessment->recommendation;
         $override = ! empty($result['override_applied']);
 
-        if ($this->hasSafetyKeyword($this->feedback->raw_text)) {
+        if ($this->feedback?->id && (new NlpClassifier())->hasSafetyKeyword($this->feedback->raw_text)) {
             $classification = 'needs';
             $recommendation = 'Mandatory intervention. Extended hours required before reassessment.';
             $override = true;
@@ -75,44 +76,31 @@ class ProcessAssessment implements ShouldQueue
     protected function trainModel(Assessment $assessment): void
     {
         $stars = [
-            'steering' => $this->feedback->star_steering,
-            'brake'    => $this->feedback->star_brake,
-            'mirror'   => $this->feedback->star_mirror,
+            'engine'  => $this->feedback->star_engine,
+            'brake'   => $this->feedback->star_brake,
+            'turning' => $this->feedback->star_turning,
+            'parking' => $this->feedback->star_parking,
+            'traffic' => $this->feedback->star_traffic,
         ];
 
         $notes = [
-            'steering' => $this->feedback->note_steering,
-            'brake'    => $this->feedback->note_brake,
-            'mirror'   => $this->feedback->note_mirror,
+            'engine'  => $this->feedback->note_engine,
+            'brake'   => $this->feedback->note_brake,
+            'turning' => $this->feedback->note_turning,
+            'parking' => $this->feedback->note_parking,
+            'traffic' => $this->feedback->note_traffic,
         ];
 
         $nlp = new NlpService();
         $nlp->train([
             'text' => $this->feedback->raw_text,
-            'label' => $this->hasSafetyKeyword($this->feedback->raw_text) ? 'needs' : $assessment->classification,
+            'label' => (new NlpClassifier())->hasSafetyKeyword($this->feedback->raw_text)
+                ? 'needs'
+                : $assessment->classification,
             'stars' => $stars,
             'notes' => $notes,
             'schedule_id' => $this->feedback->schedule_id,
             'student_id' => $this->feedback->student_id,
         ]);
-    }
-
-    protected function hasSafetyKeyword(string $text): bool
-    {
-        $keywords = [
-            'bumangga', 'collision', 'near-collision', 'dangerous', 'hazard', 'crash',
-            'accident', 'took control', 'had to take control', 'emergency',
-            'unsafe speed', 'erratic', 'delikado', 'mapanganib', 'muntik na kaming bumangga',
-        ];
-
-        $lower = mb_strtolower($text);
-
-        foreach ($keywords as $keyword) {
-            if (str_contains($lower, mb_strtolower($keyword))) {
-                return true;
-            }
-        }
-
-        return false;
     }
 }

@@ -6,6 +6,7 @@ use App\Models\Student;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class ProfileTest extends TestCase
@@ -81,10 +82,77 @@ class ProfileTest extends TestCase
         $this->assertTrue(Hash::check('newpassword123', $user->fresh()->password));
     }
 
+    public function test_forgot_password_requires_a_known_email(): void
+    {
+        $this->postJson('/api/password/forgot', [
+            'channel' => 'email',
+            'email' => 'nobody@example.com',
+        ])->assertStatus(404);
+    }
+
+    public function test_forgot_password_sets_a_hashed_code_with_expiry(): void
+    {
+        Mail::fake();
+        config(['notifications.mail.enabled' => true]);
+
+        $user = User::factory()->create(['email' => 'reset@example.com']);
+
+        $this->postJson('/api/password/forgot', [
+            'channel' => 'email',
+            'email' => 'reset@example.com',
+        ])->assertOk()->assertJsonPath('ok', true);
+
+        $fresh = $user->fresh();
+        $this->assertNotNull($fresh->email_verification_code);
+        $this->assertNotSame('', $fresh->email_verification_code);
+        $this->assertNotNull($fresh->email_verification_expires_at);
+        $this->assertTrue($fresh->email_verification_expires_at->isFuture());
+    }
+
+    public function test_password_reset_rejects_a_wrong_code_but_accepts_the_right_one(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'codeflow@example.com',
+            'password' => Hash::make('originalpass'),
+        ]);
+        $user->forceFill([
+            'email_verification_code' => Hash::make('456789'),
+            'email_verification_expires_at' => now()->addMinutes(15),
+        ])->save();
+
+        // Correct format but wrong digits — must NOT be accepted.
+        $this->postJson('/api/password/reset', [
+            'channel' => 'email',
+            'email' => 'codeflow@example.com',
+            'code' => '123456',
+            'password' => 'brandnewpass1',
+            'password_confirmation' => 'brandnewpass1',
+        ])->assertStatus(422);
+
+        // Correct code — the password is replaced and the code cleared.
+        $this->postJson('/api/password/reset', [
+            'channel' => 'email',
+            'email' => 'codeflow@example.com',
+            'code' => '456789',
+            'password' => 'brandnewpass1',
+            'password_confirmation' => 'brandnewpass1',
+        ])->assertOk()->assertJsonPath('ok', true);
+
+        $fresh = $user->fresh();
+        $this->assertTrue(Hash::check('brandnewpass1', $fresh->password));
+        $this->assertNull($fresh->email_verification_code);
+    }
+
     public function test_forgot_password_reports_channel_unavailable(): void
     {
-        $this->postJson('/api/password/forgot', ['email' => 'someone@example.com'])
-            ->assertStatus(503);
+        config(['notifications.mail.enabled' => false]);
+
+        User::factory()->create(['email' => 'someone@example.com']);
+
+        $this->postJson('/api/password/forgot', [
+            'channel' => 'email',
+            'email' => 'someone@example.com',
+        ])->assertStatus(503);
     }
 
     public function test_changing_email_clears_the_verified_flag(): void

@@ -199,6 +199,56 @@ window.RCDA = window.RCDA || {};
     }
   };
 
+  /* Multipart upload (files + fields) — same response shape as safeFetch.
+     Usage: const fd = new FormData(); fd.append('document', file); ...
+            RCDA.safeUpload('/api/...', fd)
+     Do NOT set 'Content-Type' on the FormData yourself — the browser adds
+     the multipart boundary automatically, so only auth goes in headers. */
+  RCDA.safeUpload = async function (url, formData) {
+    const controller = new AbortController();
+    const timeoutMs = ((window.RCDA_CONFIG && RCDA_CONFIG.API_TIMEOUT_MS) || 10000) + 20000; // uploads get headroom
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    const headers = {};
+    const token = (window.RCDA_AUTH && RCDA_AUTH.getToken && RCDA_AUTH.getToken()) || null;
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+
+    try {
+      const res = await fetch(url, { method: 'POST', headers, body: formData, signal: controller.signal });
+      clearTimeout(timer);
+
+      let data = null;
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await res.json().catch(() => null);
+      }
+
+      /* Unauthenticated / token expired → clear and send to login. */
+      if (res.status === 401) {
+        if (window.RCDA_AUTH) RCDA_AUTH.clear();
+        const onAuthPage = window.location.pathname.endsWith('login.html') ||
+                           window.location.pathname.endsWith('signup.html') ||
+                           window.location.pathname.endsWith('index.html');
+        if (!onAuthPage) {
+          const inSubfolder = /\/(admin|instructor|student)\//.test(window.location.pathname);
+          window.location.href = inSubfolder ? '../login.html' : 'login.html';
+        }
+        return { ok: false, status: 401, data, error: (data && (data.message || data.error)) || 'Session expired. Please log in again.' };
+      }
+
+      if (!res.ok) {
+        return { ok: false, status: res.status, data, error: (data && (data.message || data.error)) || `Upload failed (${res.status})` };
+      }
+      return { ok: true, status: res.status, data, error: null };
+    } catch (err) {
+      clearTimeout(timer);
+      if (err.name === 'AbortError') {
+        return { ok: false, status: 0, data: null, error: 'The upload timed out. Please check your connection and try again.' };
+      }
+      return { ok: false, status: 0, data: null, error: 'Network error during upload. Please try again.' };
+    }
+  };
+
   /* ---- tryRun: wrap any handler so a thrown error doesn't
      silently break the page (shows a toast instead) ---- */
   RCDA.tryRun = function (fn, context) {

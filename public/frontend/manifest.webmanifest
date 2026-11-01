@@ -1,0 +1,14 @@
+{
+  "name": "RC Driving Academy — Instructor",
+  "short_name": "RCDA",
+  "description": "Record session attendance and student assessments in the field, even without internet.",
+  "start_url": "/frontend/instructor/dashboard.html",
+  "scope": "/frontend/",
+  "display": "standalone",
+  "background_color": "#FFF8F0",
+  "theme_color": "#C0392B",
+  "icons": [
+    { "src": "/frontend/images/icon.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/frontend/images/icon.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

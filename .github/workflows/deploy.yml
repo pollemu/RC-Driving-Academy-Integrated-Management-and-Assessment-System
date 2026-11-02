@@ -1,0 +1,53 @@
+name: Deploy to Azure VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Pull & Rebuild on Azure VPS
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.1.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.VPS_HOST || '20.196.64.121' }}
+          username: ${{ secrets.VPS_USER || 'azureuser' }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          envs: GH_TOKEN
+          command_timeout: 15m
+          script: |
+            set -e
+            cd /opt/rcda
+
+            echo "== Pulling latest code from main =="
+            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/pollemu/RC-Driving-Academy-Integrated-Management-and-Assessment-System.git"
+            git fetch origin main
+            git reset --hard origin/main
+            git remote set-url origin "https://github.com/pollemu/RC-Driving-Academy-Integrated-Management-and-Assessment-System.git"
+
+            echo "== Building and restarting app container =="
+            docker compose up -d --build app
+
+            echo "== Running migrations & refreshing caches =="
+            docker compose exec -T app php artisan migrate --force
+            docker compose exec -T app php artisan config:cache
+            docker compose exec -T app php artisan view:cache
+
+            echo "== Cleaning up old Docker images =="
+            docker image prune -f
+
+            echo "== Deployment complete! =="

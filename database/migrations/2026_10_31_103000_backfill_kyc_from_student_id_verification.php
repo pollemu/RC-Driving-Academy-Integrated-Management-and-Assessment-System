@@ -20,8 +20,8 @@ return new class extends Migration
                 kyc_submitted_at = (SELECT s.id_submitted_at FROM students s WHERE s.user_id = users.id),
                 kyc_verified_at = (SELECT s.id_reviewed_at FROM students s WHERE s.user_id = users.id),
                 kyc_verified_by = (SELECT s.id_reviewed_by FROM students s WHERE s.user_id = users.id),
-                liveness_passed = 1,
-                auto_verified = 0
+                liveness_passed = TRUE,
+                auto_verified = FALSE
             WHERE EXISTS (
                 SELECT 1 FROM students s
                 WHERE s.user_id = users.id

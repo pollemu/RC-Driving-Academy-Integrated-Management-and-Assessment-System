@@ -12,9 +12,19 @@ use Illuminate\Validation\Rule;
 
 /* KYC (identity verification) submission for the authenticated student.
 
-   Collects ONE government-ID photo/PDF and ONE selfie for the admin to
-   compare manually (face match is done by a human, not by software — the
-   face_match_score column stays null until such a system exists).
+   Collects ONE government-ID photo and ONE selfie. The student's browser
+   runs an embedded face-embedding model (face-api.js, self-hosted weights)
+   BEFORE uploading and reports how similar the two faces are
+   (face_match_score, 0..1). A confident match verifies the identity
+   AUTOMATICALLY — same principle banks use when you selfie to open an
+   account — and anything the model is less sure about still lands in the
+   admin review queue for a human comparison. The score is stored so the
+   admin panel and the thesis evaluation can show the exact numbers.
+
+   Known (documented) limitation: the check runs client-side, so a student
+   who bypasses the page can claim any score; the defense is that documents
+   remain on the private disk, every auto-verification stores the score +
+   flag, and any auto-verified identity can still be rejected by an admin.
 
    Files live on the PRIVATE disk (storage/app/private) and are only ever
    readable through this API, size- and MIME-checked, streamed with
@@ -22,6 +32,12 @@ use Illuminate\Validation\Rule;
    this replaces). */
 class KycController extends Controller
 {
+    /* Similarity (1 = identical face, 0 = nothing alike) at or above which
+       the submission is verified automatically instead of queued for the
+       admin. 0.60 corresponds to a very tight face-distance (~0.40) of the
+       FaceNet embedding in face-api.js — high true-accept rate, the false
+       accepts still pass through admin eyes. Tune via KYC_AUTO_VERIFY_MIN. */
+    public const AUTO_VERIFY_MIN_SIMILARITY = 0.60;
     /* Accepted government IDs. Everything except 'other' is a pre-license
        identity document — NOT a driver's license or student permit, since
        those are issued by LTO *after* the training this academy gives, and
@@ -94,7 +110,10 @@ class KycController extends Controller
                 'mimetypes:' . self::MIMES,
             ],
             'consent' => ['accepted'],
-            /* Photo evidence is always an image — a PDF selfie is meaningless. */
+            /* The browser's face-embedding similarity of ID vs selfie (0..1).
+               Reported by the KYC page after running the embedded model; the
+               server decides what it counts for. */
+            'face_match_score' => ['nullable', 'numeric', 'between:0,1'],
         ], [
             'id_type.required' => 'Please choose which ID you are uploading.',
             'id_document.required' => 'Upload a photo of your valid ID.',
@@ -115,6 +134,20 @@ class KycController extends Controller
             return response()->json(['message' => 'Your documents could not be saved. Please try again.'], 500);
         }
 
+        $similarity = array_key_exists('face_match_score', $data) && $data['face_match_score'] !== null
+            ? (float) $data['face_match_score']
+            : null;
+
+        /* A "selfie" that is byte-for-byte the same file as the ID photo can
+           only mean the form was scripted — never trust the auto path then. */
+        if ($similarity !== null
+            && md5_file(Storage::disk('local')->path($idPath)) === md5_file(Storage::disk('local')->path($selfiePath))) {
+            $similarity = null;
+        }
+
+        $threshold = (float) env('KYC_AUTO_VERIFY_MIN', self::AUTO_VERIFY_MIN_SIMILARITY);
+        $autoVerified = $similarity !== null && $similarity >= $threshold;
+
         // Only delete the old files AFTER the new ones are safely stored.
         if ($user->id_document_path) {
             Storage::disk('local')->delete($user->id_document_path);
@@ -124,23 +157,46 @@ class KycController extends Controller
         }
 
         $user->update([
-            'kyc_status' => User::KYC_PENDING,
+            'kyc_status' => $autoVerified ? User::KYC_VERIFIED : User::KYC_PENDING,
             'id_type' => $data['id_type'],
             'id_document_path' => $idPath,
             'selfie_path' => $selfiePath,
+            'face_match_score' => $similarity,
+            'auto_verified' => $autoVerified,
+            /* liveness_passed attests that a live subject was present. For an
+               auto verification the face-embedding match is the closest
+               automated analog (documented limit: no anti-spoofing sensor). */
+            'liveness_passed' => $autoVerified,
             'kyc_submitted_at' => now(),
-            'kyc_verified_at' => null,
-            'kyc_verified_by' => null,
+            'kyc_verified_at' => $autoVerified ? now() : null,
+            'kyc_verified_by' => null, // nothing human touched it yet
             'kyc_rejection_reason' => null,
-            'liveness_passed' => false,
         ]);
+
+        // Keep the legacy students.id_status in sync so any un-migrated
+        // consumer of that column still reads a sane value.
+        if ($autoVerified) {
+            optional($user->student)->update([
+                'id_status' => 'approved',
+                'id_reviewed_at' => now(),
+                'id_reviewed_by' => null,
+                'id_rejection_reason' => null,
+            ]);
+        }
 
         try {
             AdminNotification::record(
                 AdminNotification::CATEGORY_ACCOUNT,
-                'KYC submitted for review',
-                ($user->name ?? 'A student') . ' uploaded a '
-                    . (self::TYPES[$data['id_type']] ?? 'valid ID') . ' + selfie.',
+                $autoVerified
+                    ? 'KYC auto-verified by face match'
+                    : 'KYC submitted for review',
+                $autoVerified
+                    ? ($user->name ?? 'A student') . ' verified automatically — face similarity '
+                        . number_format($similarity * 100, 1) . '% (≥ ' . number_format($threshold * 100, 0) . '%).'
+                    : ($user->name ?? 'A student') . ' uploaded a '
+                        . (self::TYPES[$data['id_type']] ?? 'valid ID') . ' + selfie'
+                        . ($similarity !== null ? ' (face similarity ' . number_format($similarity * 100, 1) . '%).'
+                            : ' (no AI similarity reported).'),
                 ['user_id' => $user->id, 'panel' => 'kyc'],
                 $user->id
             );
@@ -150,7 +206,10 @@ class KycController extends Controller
 
         return response()->json([
             'ok' => true,
-            'message' => 'Identity documents submitted. An administrator will review them shortly — you can explore the dashboard in the meantime, but booking and payments wait until your account is verified.',
+            'message' => $autoVerified
+                ? 'Identity verified automatically! Your face matched your ID at ' . number_format($similarity * 100, 1)
+                    . '% — booking and payments are unlocked.'
+                : 'Documents submitted. The automatic check did not reach the confidence threshold, so an administrator will compare them manually — you can explore the dashboard in the meantime.',
             'kyc' => $this->payload($user->fresh()),
         ]);
     }
@@ -211,6 +270,8 @@ class KycController extends Controller
             'submitted_at' => $user->kyc_submitted_at?->toIso8601String(),
             'verified_at' => $user->kyc_verified_at?->toIso8601String(),
             'rejection_reason' => $user->kyc_rejection_reason,
+            'auto_verified' => (bool) $user->auto_verified,
+            'face_match_score' => $user->face_match_score !== null ? (float) $user->face_match_score : null,
             'has_id' => (bool) $user->id_document_path,
             'has_selfie' => (bool) $user->selfie_path,
         ];

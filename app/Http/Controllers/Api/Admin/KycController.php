@@ -170,6 +170,8 @@ class KycController extends Controller
             'verified_at' => $user->kyc_verified_at?->toIso8601String(),
             'verified_by' => $user->kycVerifiedBy?->name,
             'rejection_reason' => $user->kyc_rejection_reason,
+            'auto_verified' => (bool) $user->auto_verified,
+            'face_match_score' => $user->face_match_score !== null ? (float) $user->face_match_score : null,
             'has_id' => (bool) $user->id_document_path,
             'has_selfie' => (bool) $user->selfie_path,
             'id_file_url' => $user->id_document_path ? '/admin/kyc/' . $user->id . '/file/id' : null,

@@ -105,6 +105,11 @@ class StudentController extends Controller
             ->get()
             ->map(function (Assessment $a) {
                 $f = $a->feedback;
+                // Orphaned assessment (feedback row gone) or a deleted
+                // schedule must never 500 the whole View modal.
+                if (! $f) {
+                    return null;
+                }
                 $categories = collect(AssessmentSuggestion::CATEGORIES)
                     ->map(fn ($def, $key) => [
                         'key' => $key,
@@ -116,9 +121,9 @@ class StudentController extends Controller
                     ->all();
 
                 return [
-                    'course_name' => $f->schedule->course->name ?? '—',
-                    'course_type' => $f->schedule->course->type ?? '—',
-                    'date' => $f->schedule->date?->format('Y-m-d'),
+                    'course_name' => $f->schedule?->course?->name ?? '—',
+                    'course_type' => $f->schedule?->course?->type ?? '—',
+                    'date' => $f->schedule?->date?->format('Y-m-d'),
                     'classification' => $a->classification,
                     'score' => $a->score,
                     'exam_score' => $a->exam_score,
@@ -128,7 +133,9 @@ class StudentController extends Controller
                     'feedback' => $f->raw_text,
                     'categories' => $categories,
                 ];
-            });
+            })
+            ->filter()
+            ->values();
 
         // TDC progress: one 2-day class block + a passing assessment (75+),
         // or an externally verified TDC.
@@ -160,7 +167,10 @@ class StudentController extends Controller
                 'is_active' => $user->is_active,
                 'course' => $courseLabel,
                 'preferred_instructor_gender' => $student->preferred_instructor_gender,
-                'instructor_name' => optional($student->instructor)->user->name,
+                /* $student->instructor is null for every signup student until
+                   the admin assigns one — the old optional() chain read
+                   "name" on null and 500'd the whole View modal. */
+                'instructor_name' => $student->instructor?->user?->name,
                 'kyc_status' => $user->kyc_status,
                 'payment_status' => $paymentStatus,
                 'payment_paid_total' => $paidTotal,

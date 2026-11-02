@@ -1578,15 +1578,8 @@ async function viewStudent(btn){
   const toggleBtn = document.getElementById('modalStudentToggleBtn');
   if (toggleBtn) toggleBtn.textContent = isActive ? 'Deactivate' : 'Activate';
 
-  const roleSel = document.getElementById('modalStudentRole');
-  if (roleSel) roleSel.value = user.role || 'student';
-  const specSel = document.getElementById('modalStudentSpec');
-  if (specSel) specSel.value = s.instructor?.specialization || 'TDC';
-  syncRoleSpecialization();
-
   profileTab('info');
   openModal('studentModal');
-  loadRoleChangeLog(user.id);
 }
 
 /* Renders the View modal's Assessment tab: score headline + expandable
@@ -1693,60 +1686,6 @@ async function viewStudentByRefresh(){
   fakeBtn.dataset.userId = st.user_id;
   fakeBtn.dataset.name = st.name;
   await viewStudent(fakeBtn);
-}
-
-/* Instructors are created by promoting a student, not by direct sign-up. */
-function promoteInstructorHint(){
-  showPanel('students');
-  RCDA.showToast('Open a student profile and use “Set Role → Instructor” to make them an instructor.', 'info');
-}
-
-/* Promote/demote the viewed user (admin only). */
-async function saveStudentRole(){
-  const sel = document.getElementById('modalStudentRole');
-  const role = sel ? sel.value : 'student';
-  const specSel = document.getElementById('modalStudentSpec');
-  const reasonEl = document.getElementById('modalStudentRoleReason');
-  const id = window._viewStudent && window._viewStudent.user_id;
-  if (!id) return;
-  const body = { role };
-  if (role === 'instructor' && specSel) body.specialization = specSel.value;
-  if (reasonEl && reasonEl.value.trim()) body.reason = reasonEl.value.trim();
-  const { ok, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/users/${id}/set-role`, {
-    method: 'POST',
-    body
-  });
-  if (!ok) { RCDA.showToast(error || 'Could not update role.', 'error'); return; }
-  RCDA.showToast('Role updated to ' + role + '.', 'success');
-  loadStudents();
-  loadInstructors();
-  loadRoleChangeLog(id);
-}
-
-/* Toggle the specialization field depending on the chosen role. */
-function syncRoleSpecialization(){
-  const sel = document.getElementById('modalStudentRole');
-  const wrap = document.getElementById('specializationWrap');
-  if (sel && wrap) wrap.style.display = sel.value === 'instructor' ? 'block' : 'none';
-}
-if (document.getElementById('modalStudentRole')) {
-  document.getElementById('modalStudentRole').addEventListener('change', syncRoleSpecialization);
-}
-
-/* Load the audit trail of role changes for the viewed user. */
-async function loadRoleChangeLog(userId){
-  const el = document.getElementById('roleChangeLog');
-  if (!el || !userId) return;
-  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/users/role-changes`, { method: 'GET' });
-  if (!ok || !data) { el.innerHTML = ''; return; }
-  const mine = (data.changes || []).filter(c => c.user_name && window._viewStudent && window._viewStudent.name === c.user_name);
-  if (!mine.length) { el.innerHTML = '<i>No prior role changes recorded.</i>'; return; }
-  el.innerHTML = '<b>Role change history</b>' + mine.map(c =>
-    `<div style="padding:5px 0;border-top:1px solid var(--gray-light);margin-top:6px;">
-      ${escapeHtml(c.from_role)} → <b>${escapeHtml(c.to_role)}</b> by ${escapeHtml(c.changed_by || '—')}
-      <span style="color:var(--gray);">· ${c.created_at ? new Date(c.created_at).toLocaleDateString('en-PH') : ''}</span>
-      ${c.reason ? `<br><span style="color:var(--gray);">"${escapeHtml(c.reason)}"</span>` : ''}
-    </div>`).join('');
 }
 
 /* ============================================================
@@ -1917,12 +1856,15 @@ function renderKycRows(list){
     const actions = [];
 
     if (v.has_id || v.has_selfie) {
-      actions.push(`<button class="btn btn-sm btn-ghost" onclick="viewKyc(${v.user_id},this)">Review</button>`);
+      actions.push(`<button class="btn btn-sm btn-ghost" onclick="viewKyc(${v.user_id},this,'${v.status}')">Review</button>`);
     }
-    if ((v.has_id && v.has_selfie) && v.status !== 'verified') {
-      actions.push(`<button class="btn btn-sm btn-primary" onclick="approveKyc(${v.user_id},this)">Approve</button>`);
+    /* Legacy rows (the old valid-ID flow) may carry only an ID photo and
+       no selfie — the human still decides: accept what is there or reject
+       with a reason that lets the student resubmit. */
+    if ((v.has_id || v.has_selfie) && v.status !== 'verified') {
+      actions.push(`<button class="btn btn-sm btn-primary" onclick="approveKyc(${v.user_id},this)">Accept</button>`);
     }
-    if ((v.has_id && v.has_selfie) && v.status !== 'rejected') {
+    if ((v.has_id || v.has_selfie) && v.status !== 'rejected') {
       actions.push(`<button class="btn btn-sm btn-danger" onclick="rejectKyc(${v.user_id},this)">Reject</button>`);
     }
 
@@ -1930,11 +1872,19 @@ function renderKycRows(list){
       ? `<div style="font-size:11px;color:var(--gray);margin-top:4px;max-width:220px;">${escapeHtml(v.rejection_reason)}</div>`
       : '';
 
+    /* AI face-match chip: green = ran, matched above the auto threshold
+       (usually a verified row); amber = ran but below threshold (queued
+       for this human eye). The % is the stored embedding similarity. */
+    const pct = v.face_match_score != null ? Math.round(v.face_match_score * 1000) / 10 : null;
+    const aiChip = v.auto_verified
+      ? `<span class="badge completed" title="Verified automatically by the embedded face-similarity model">${pct != null ? 'AI ' + pct + '%' : 'AI verified'}</span>`
+      : (pct != null ? `<span class="badge pending" title="The automatic check did not reach the auto-verify threshold — compare manually">AI ${pct}%</span>` : '');
+
     return `<tr data-user-id="${v.user_id}">
       <td><b>${escapeHtml(v.student_name || 'Student')}</b><br><span style="font-size:11.5px;color:var(--gray);">${escapeHtml(maskEmail(v.email || ''))}</span></td>
       <td>${v.has_id ? escapeHtml(v.id_type_label || 'Uploaded') : '—'}</td>
       <td>${escapeHtml(idDate(v.submitted_at))}</td>
-      <td><span class="badge ${badge}">${escapeHtml(kycStatusText(v.status))}</span>${reason}</td>
+      <td><span class="badge ${badge}">${escapeHtml(kycStatusText(v.status))}</span>${aiChip}${reason}</td>
       <td>${v.verified_by ? escapeHtml(v.verified_by) : '—'}${v.verified_at ? `<br><span style="font-size:11px;color:var(--gray);">${escapeHtml(idDate(v.verified_at))}</span>` : ''}</td>
       <td><div style="display:flex;gap:6px;flex-wrap:wrap;">${actions.join('') || '<span style="font-size:12px;color:var(--gray);">—</span>'}</div></td>
     </tr>`;
@@ -1950,7 +1900,7 @@ function kycAuthFetch(url){
   });
 }
 
-async function viewKyc(userId){
+async function viewKyc(userId, btn, status){
   const body = document.getElementById('kycDocBody');
   const title = document.getElementById('kycDocTitle');
 
@@ -1968,12 +1918,19 @@ async function viewKyc(userId){
   const base = `${RCDA_CONFIG.getApiBaseUrl()}/admin/kyc/${userId}/file/`;
 
   if (body) {
+    const footer = status === 'pending'
+      ? `<div style="display:flex;gap:10px;justify-content:flex-end;width:100%;margin-top:12px;padding-top:12px;border-top:1px solid var(--gray-light);flex-wrap:wrap;align-items:center;">
+          <span style="font-size:11.5px;color:var(--gray);margin-right:auto;max-width:340px;">Older submissions may have no selfie yet — accept after checking the ID photo by eye, or reject with a reason.</span>
+          <button class="btn btn-sm btn-danger" onclick="rejectKyc(${userId},this,true)">Reject</button>
+          <button class="btn btn-sm btn-primary" onclick="approveKyc(${userId},this,true)">Accept &amp; verify identity</button>
+        </div>`
+      : '';
     body.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;width:100%;">` +
       panes.map(pn => `<div style="min-width:0;">
         <div style="font-size:12px;font-weight:700;color:var(--charcoal);margin-bottom:8px;">${pn.label}</div>
         <div id="kycPane-${pn.key}" style="background:var(--cream);border-radius:10px;min-height:180px;display:flex;align-items:center;justify-content:center;color:var(--gray);font-size:12.5px;">Loading…</div>
       </div>`).join('') +
-      `</div>`;
+      `</div>${footer}`;
   }
 
   await Promise.all(panes.map(async ({ key }) => {
@@ -2016,12 +1973,13 @@ function closeIdDocumentModal(){
   closeModal('idDocumentModal');
 }
 
-async function approveKyc(userId, btn){
+async function approveKyc(userId, btn, closeAfter){
   const okFace = confirm('Confirm: the SELFIE shows the same person as the ID photo?');
   if (!okFace) return;
   const okId = confirm('Confirm: the ID photo is a valid government ID?');
   if (!okId) return;
 
+  const approveBtnLabel = btn ? btn.textContent : null;
   if (btn) { btn.disabled = true; btn.textContent = 'Approving…'; }
 
   const { ok, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/kyc/${userId}/approve`, {
@@ -2031,16 +1989,17 @@ async function approveKyc(userId, btn){
 
   if (!ok) {
     RCDA.showToast(error || 'Could not verify this student.', 'error');
-    if (btn) { btn.disabled = false; btn.textContent = 'Approve'; }
+    if (btn) { btn.disabled = false; btn.textContent = approveBtnLabel || 'Approve'; }
     return;
   }
 
+  if (closeAfter) closeIdDocumentModal();
   RCDA.showToast('Identity verified — the student can now book and pay.', 'success');
   loadKyc();
   loadDashboardStats();
 }
 
-async function rejectKyc(userId, btn){
+async function rejectKyc(userId, btn, closeAfter){
   const reason = prompt('Why are these documents rejected? The student will see this message and can resubmit.');
   if (reason === null) return;
   if (reason.trim().length < 5) {
@@ -2061,6 +2020,7 @@ async function rejectKyc(userId, btn){
     return;
   }
 
+  if (closeAfter) closeIdDocumentModal();
   RCDA.showToast('KYC rejected — the student can resubmit.', 'success');
   loadKyc();
   loadDashboardStats();

@@ -20,7 +20,7 @@ use App\Http\Controllers\Student\ProgressController;
 use App\Http\Controllers\Student\ScheduleController as StudentBookingController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', fn () => redirect('/frontend/index.html'));
+Route::get('/', fn () => response()->file(public_path('frontend/index.html')));
 Route::get('/student/dashboard.html', fn () => redirect('/frontend/student/dashboard.html'));
 Route::get('/admin/dashboard.html', fn () => redirect('/frontend/admin/dashboard.html'));
 Route::get('/instructor/dashboard.html', fn () => redirect('/frontend/instructor/dashboard.html'));

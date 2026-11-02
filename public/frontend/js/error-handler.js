@@ -174,7 +174,8 @@ window.RCDA = window.RCDA || {};
       /* Unauthenticated / token expired → clear and send to login. */
       if (res.status === 401) {
         if (window.RCDA_AUTH) RCDA_AUTH.clear();
-        const onAuthPage = window.location.pathname.endsWith('login.html') ||
+        const onAuthPage = window.location.pathname === '/' ||
+                           window.location.pathname.endsWith('login.html') ||
                            window.location.pathname.endsWith('signup.html') ||
                            window.location.pathname.endsWith('index.html');
         if (!onAuthPage) {
@@ -226,7 +227,8 @@ window.RCDA = window.RCDA || {};
       /* Unauthenticated / token expired → clear and send to login. */
       if (res.status === 401) {
         if (window.RCDA_AUTH) RCDA_AUTH.clear();
-        const onAuthPage = window.location.pathname.endsWith('login.html') ||
+        const onAuthPage = window.location.pathname === '/' ||
+                           window.location.pathname.endsWith('login.html') ||
                            window.location.pathname.endsWith('signup.html') ||
                            window.location.pathname.endsWith('index.html');
         if (!onAuthPage) {

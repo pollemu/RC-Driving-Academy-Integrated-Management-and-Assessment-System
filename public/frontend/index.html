@@ -1,22 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <link rel="icon" type="image/png" href="images/icon.png">
+  <script>
+    if (location.pathname === '/frontend/index.html' || location.pathname === '/frontend/') {
+      history.replaceState(null, '', '/' + location.search + location.hash);
+    }
+  </script>
+  <link rel="icon" type="image/png" href="/frontend/images/icon.png">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RC Driving Academy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/base.css?v=66">
-<link rel="stylesheet" href="css/landing.css?v=66">
-<link rel="stylesheet" href="css/legal.css?v=65">
-<link rel="stylesheet" href="css/responsive.css?v=65">
+<link rel="stylesheet" href="/frontend/css/base.css?v=66">
+<link rel="stylesheet" href="/frontend/css/landing.css?v=66">
+<link rel="stylesheet" href="/frontend/css/legal.css?v=65">
+<link rel="stylesheet" href="/frontend/css/responsive.css?v=65">
 </head>
 <body>
 
   <nav class="nav" id="mainNav">
     <div class="brand">
-      <img src="images/RCDA logo.jpg" alt="RCDA" class="logo" onerror="this.style.display='none';this.nextSibling.style.display='flex'">
+      <img src="/frontend/images/RCDA logo.jpg" alt="RCDA" class="logo" onerror="this.style.display='none';this.nextSibling.style.display='flex'">
       <div class="mark" style="display:none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2L20 20H4L12 2Z" stroke="#C0392B" stroke-width="2" stroke-linejoin="round"/></svg></div>
       <span>RC DRIVING ACADEMY - LIPA BRANCH</span>
     </div>
@@ -25,8 +30,8 @@
       <a href="#testimonials">Testimonials</a><a href="#contact">Contact</a>
     </div>
     <div class="nav-cta">
-      <button class="btn btn-ghost" onclick="location.href='login.html'">Log In</button>
-      <button class="btn btn-primary" onclick="location.href='signup.html'">Enroll Now</button>
+      <button class="btn btn-ghost" onclick="location.href='/frontend/login.html'">Log In</button>
+      <button class="btn btn-primary" onclick="location.href='/frontend/signup.html'">Enroll Now</button>
       <button class="nav-burger" onclick="toggleLandingNav()" aria-label="Open menu" aria-expanded="false">
         <span></span><span></span><span></span>
       </button>
@@ -36,8 +41,8 @@
       <a href="#courses" onclick="toggleLandingNav()">Courses</a>
       <a href="#testimonials" onclick="toggleLandingNav()">Testimonials</a>
       <a href="#contact" onclick="toggleLandingNav()">Contact</a>
-      <button class="btn btn-ghost" style="margin-top:8px;" onclick="location.href='login.html'">Log In</button>
-      <button class="btn btn-primary" style="margin-top:8px;" onclick="location.href='signup.html'">Enroll Now</button>
+      <button class="btn btn-ghost" style="margin-top:8px;" onclick="location.href='/frontend/login.html'">Log In</button>
+      <button class="btn btn-primary" style="margin-top:8px;" onclick="location.href='/frontend/signup.html'">Enroll Now</button>
     </div>
   </nav>
 
@@ -52,7 +57,7 @@
         <h1>Your Road to <span>Safe Driving</span> Starts Here</h1>
         <p class="lead">RC Driving Academy's Integrated Management and Assessment System brings enrollment, scheduling, attendance, and AI-assisted performance evaluation into one connected platform.</p>
         <div class="hero-actions">
-          <button class="btn btn-primary btn-lg" onclick="location.href='login.html'">Get Started
+          <button class="btn btn-primary btn-lg" onclick="location.href='/frontend/login.html'">Get Started
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
           </button>
           <button class="btn btn-ghost btn-lg" style="border-color:var(--line);color:white;" onclick="document.getElementById('courses').scrollIntoView({behavior:'smooth'})">View Courses</button>
@@ -108,7 +113,7 @@
         </div>
         <div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;">
           <span style="font-size:11.5px;color:rgba(255,255,255,0.35);letter-spacing:.5px;">LTO-REQUIRED DOCUMENTS</span>
-          <button class="btn btn-primary btn-sm" onclick="location.href='signup.html'">Enroll Now →</button>
+          <button class="btn btn-primary btn-sm" onclick="location.href='/frontend/signup.html'">Enroll Now →</button>
         </div>
       </div>
     </div>
@@ -117,10 +122,10 @@
   <section class="section" id="about">
     <div class="about-grid">
       <div class="about-visual">
-        <img src="images/RCDA display.jpg" alt="RC Driving Academy">
+        <img src="/frontend/images/RCDA display.jpg" alt="RC Driving Academy">
         <div class="badge-float">
           <div class="ico" id="ltoIco" style="background:transparent;">
-            <img src="images/LTO logo.png" alt="LTO">
+            <img src="/frontend/images/LTO logo.png" alt="LTO">
           </div>
           <div><b>LTO-Recognized Training Center</b><span>Accredited theoretical & practical curriculum</span></div>
         </div>
@@ -170,7 +175,7 @@
         </ul>
         <div class="price-row">
           <div class="price"><b id="tdcPrice">From ₱799</b><span> /course</span></div>
-          <button class="btn btn-ghost" onclick="location.href='signup.html'">Enroll Now</button>
+          <button class="btn btn-ghost" onclick="location.href='/frontend/signup.html'">Enroll Now</button>
         </div>
         <div class="price-variants" id="tdcVariants">Face-to-Face ₱799 · Online ₱999</div>
       </div>
@@ -190,7 +195,7 @@
         </ul>
         <div class="price-row">
           <div class="price"><b id="pdcPrice">From ₱1,499</b><span> /course</span></div>
-          <button class="btn btn-primary" onclick="location.href='signup.html'">Enroll Now</button>
+          <button class="btn btn-primary" onclick="location.href='/frontend/signup.html'">Enroll Now</button>
         </div>
         <div class="price-variants" id="pdcVariants">2 Wheels ₱1,499 · 4 Wheels ₱4,000</div>
       </div>
@@ -258,7 +263,7 @@
     <div class="footer-grid">
       <div>
         <div class="brand" style="color:white;margin-bottom:14px;">
-          <img src="images/RCDA logo.jpg" alt="RCDA" class="logo" style="width:32px;height:32px;" onerror="this.style.display='none';this.nextSibling.style.display='flex'">
+          <img src="/frontend/images/RCDA logo.jpg" alt="RCDA" class="logo" style="width:32px;height:32px;" onerror="this.style.display='none';this.nextSibling.style.display='flex'">
           <div class="mark" style="display:none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2L20 20H4L12 2Z" stroke="#C0392B" stroke-width="2" stroke-linejoin="round"/></svg></div>
           RC DRIVING ACADEMY - LIPA BRANCH
         </div>
@@ -452,8 +457,8 @@
     } catch (e) { /* landing gracefully keeps its static fees */ }
   })();
 </script>
-<script src="js/config.js?v=66"></script>
-<script src="js/error-handler.js?v=66"></script>
-<script src="js/shared.js?v=78"></script>
+<script src="/frontend/js/config.js?v=66"></script>
+<script src="/frontend/js/error-handler.js?v=66"></script>
+<script src="/frontend/js/shared.js?v=78"></script>
 </body>
 </html>

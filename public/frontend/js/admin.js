@@ -8,6 +8,7 @@ const ADMIN_TITLES = {
   payments:'Payments', certifications:'Certifications', reports:'Reports',
   notifications:'Notifications', bookings:'Pending Bookings', requests:'Student Requests', ai:'Grading AI',
   idverification:'KYC Verification',
+  studentchat:'Student Chat', tdcverification:'TDC Verification',
   profile:'My Profile', settings:'Account Settings'
 };
 
@@ -31,6 +32,8 @@ function showPanel(panel, el){
   if (panel === 'notifications') { loadNotifications(); loadNotifSummary(); }
   if (panel === 'requests') loadAdminRequests();
   if (panel === 'idverification') loadKyc();
+  if (panel === 'studentchat') loadAdminChat();
+  if (panel === 'tdcverification') loadTdcVerification();
   if (panel === 'certifications') loadCertifications();
   if (panel === 'profile') {
     if (window.RCDAProfile) {
@@ -2584,8 +2587,8 @@ async function loadAdminRequests(page) {
   if (!list.length) { tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">No requests found.</td></tr>'; return; }
 
   tb.innerHTML = list.map(r => {
-    const typeLabel = r.type === 'reschedule' ? 'Reschedule' : (r.type === 'booking' ? 'PDC Booking' : 'Instructor Preference');
-    const typeCls = r.type === 'reschedule' ? 'needs' : (r.type === 'booking' ? 'verified' : 'upcoming');
+    const typeLabel = r.type === 'reschedule' ? 'Reschedule' : (r.type === 'booking' ? 'PDC Booking' : (r.type === 'retake' ? 'TDC Exam Retake' : 'Instructor Preference'));
+    const typeCls = r.type === 'reschedule' ? 'needs' : (r.type === 'booking' ? 'verified' : (r.type === 'retake' ? 'pending' : 'upcoming'));
     const statusCls = r.status === 'pending' ? 'pending' : (r.status === 'accepted' ? 'verified' : 'needs');
 
     let detail = '';
@@ -2604,6 +2607,8 @@ async function loadAdminRequests(page) {
           </select>
         </div>`;
       }
+    } else if (r.type === 'retake') {
+      detail = 'Student failed a TDC exam and asks to retake it. Accepting clears them to book the next available TDC session.';
     } else {
       const pref = r.preferred_gender === 'male' ? 'Male' : (r.preferred_gender === 'female' ? 'Female' : 'No preference');
       detail = `Requested instructor gender: <b>${escapeHtml(pref)}</b>`;
@@ -2648,4 +2653,265 @@ async function rejectRequest(id) {
   if (!ok) { RCDA.showToast(error || 'Could not reject request.'); return; }
   RCDA.showToast('Request rejected. Student notified.', 'success');
   loadAdminRequests();
+}
+
+/* ============================================================
+   STUDENT CHAT — the human side of the support chatbot.
+   Students ask the bot to "talk to a human"; the thread shows up
+   here. The admin replies into the SAME thread the student already
+   has, which resolves their pending chat escalation.
+   ============================================================ */
+let ADMIN_CHAT_STUDENT = null;
+let ADMIN_CHAT_LAST_ID = 0;
+let ADMIN_CHAT_TIMER = null;
+
+async function loadAdminChat() {
+  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/chat`);
+  const list = document.getElementById('adminChatThreads');
+  if (!list) return;
+  if (!ok || !data) {
+    list.innerHTML = '<div style="color:var(--gray);font-size:12.5px;padding:12px;">Could not load conversations.</div>';
+    return;
+  }
+
+  const threads = data.threads || [];
+  const needsHumanCount = threads.filter(t => t.needs_human).length;
+  const badge = document.getElementById('chatNavBadge');
+  if (badge) {
+    badge.hidden = needsHumanCount === 0;
+    badge.textContent = needsHumanCount;
+  }
+
+  if (!threads.length) {
+    list.innerHTML = '<div style="color:var(--gray);font-size:12.5px;padding:12px;">No conversations yet. Students reach this chat through the support widget on their dashboard — the bot answers instantly, and their “talk to a human” asks land here.</div>';
+    return;
+  }
+
+  list.innerHTML = threads.map(t => `
+    <div id="chatThread-${t.student_id}" class="chat-inbox-row${ADMIN_CHAT_STUDENT === t.student_id ? ' active' : ''}" onclick="openAdminThread(${t.student_id})">
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
+          <b style="font-size:13.5px;">${escapeHtml(t.name)}</b>
+          ${t.needs_human
+            ? '<span class="chat-badge-unread">wants human</span>'
+            : (t.unread ? `<span class="chat-badge-unread">${t.unread}</span>` : '')}
+        </div>
+        <div style="font-size:12px;color:var(--gray);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">
+          ${t.last_message
+            ? (t.last_message.sender === 'student' ? '' : (t.last_message.sender === 'admin' ? '<b>You:</b> ' : '<b>Bot:</b> '))
+              + escapeHtml(String(t.last_message.body || '').slice(0, 60))
+            : '—'}
+        </div>
+      </div>
+    </div>`).join('');
+
+  // Keep an already-open thread fresh (unread counters reset, etc).
+  if (ADMIN_CHAT_STUDENT) await openAdminThread(ADMIN_CHAT_STUDENT, true);
+  if (!ADMIN_CHAT_TIMER) ADMIN_CHAT_TIMER = setInterval(adminChatPoll, 8000);
+}
+
+async function openAdminThread(studentId, quiet) {
+  ADMIN_CHAT_STUDENT = studentId;
+  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/chat/${studentId}`);
+  if (!ok || !data) {
+    if (!quiet) RCDA.showToast('Could not open that conversation.');
+    return;
+  }
+
+  document.querySelectorAll('.chat-inbox-row').forEach(el => el.classList.remove('active'));
+  const row = document.getElementById('chatThread-' + studentId);
+  if (row) row.classList.add('active');
+
+  const last = (data.messages || [])[data.messages.length - 1];
+  ADMIN_CHAT_LAST_ID = last ? Number(last.id) : 0;
+
+  const name = document.getElementById('adminChatName');
+  if (name) name.textContent = 'Chat — ' + ((data.student && data.student.name) || 'Student');
+
+  const input = document.getElementById('adminChatInput');
+  const send = document.getElementById('adminChatSend');
+  if (input) { input.disabled = false; input.placeholder = 'Reply to ' + ((data.student && data.student.name) || 'the student') + '…'; }
+  if (send) send.disabled = false;
+
+  const log = document.getElementById('adminChatLog');
+  if (log) {
+    log.innerHTML = (data.messages || []).map(adminChatBubble).join('') ||
+      '<div style="margin:auto;color:var(--gray);font-size:13px;">No messages yet.</div>';
+    log.scrollTop = log.scrollHeight;
+  }
+}
+
+/* Bubble renderer differs from the student's view: here the admin is the
+   "sender" (right, blue), the bot replies are muted gray. */
+function adminChatBubble(m) {
+  const when = m.created_at ? new Date(m.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+  if (m.sender === 'admin') {
+    return `<div class="chat-msg-admin"><div style="font-size:10px;font-weight:700;opacity:.8;letter-spacing:.6px;text-transform:uppercase;margin-bottom:3px;">RCDA Admin</div>${escapeHtml(m.body)}<div class="chat-msg-time">${escapeHtml(when)}</div></div>`;
+  }
+  if (m.sender === 'student') {
+    return `<div class="chat-msg-student">${escapeHtml(m.body)}<div class="chat-msg-time">${escapeHtml(when)}</div></div>`;
+  }
+  return `<div class="chat-msg-bot">Bot · ${escapeHtml(m.body)}<div class="chat-msg-time">${escapeHtml(when)}</div></div>`;
+}
+
+async function sendAdminReply(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  const input = document.getElementById('adminChatInput');
+  if (!input || !input.value.trim() || !ADMIN_CHAT_STUDENT) return false;
+
+  const { ok, data } = await RCDA.safeFetch(
+    `${RCDA_CONFIG.getApiBaseUrl()}/admin/chat/${ADMIN_CHAT_STUDENT}/reply`,
+    { method: 'POST', body: { body: input.value.trim() } }
+  );
+
+  if (!ok) { RCDA.showToast('Could not send the reply. Please try again.'); return false; }
+
+  input.value = '';
+  const log = document.getElementById('adminChatLog');
+  if (log && data && data.message) {
+    log.insertAdjacentHTML('beforeend', adminChatBubble(data.message));
+    log.scrollTop = log.scrollHeight;
+    ADMIN_CHAT_LAST_ID = Number(data.message.id) || ADMIN_CHAT_LAST_ID;
+  }
+  // Refresh the inbox so unread/wants-human badges reflect the answer right away.
+  loadAdminChat();
+  return false;
+}
+
+/* Light polling keeps an open thread in sync while the panel is showing. */
+async function adminChatPoll() {
+  const panel = document.getElementById('admin-studentchat');
+  if (!panel || !panel.classList.contains('active') || !ADMIN_CHAT_STUDENT) return;
+  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/chat/${ADMIN_CHAT_STUDENT}`);
+  if (!ok || !data) return;
+  const count = (data.messages || []).length;
+  const last = (data.messages || [])[count - 1];
+  const lastId = last ? Number(last.id) : 0;
+  if (lastId !== ADMIN_CHAT_LAST_ID) openAdminThread(ADMIN_CHAT_STUDENT, true);
+}
+
+/* ============================================================
+   TDC VERIFICATION — external certificates from other schools.
+   Approving sets tdc_verified, which the certification gate reads
+   ("TDC verified (External)").
+   ============================================================ */
+let TDC_SUBMISSIONS = [];
+
+async function loadTdcVerification() {
+  const { ok, data } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/tdc-verification`);
+  const tb = document.getElementById('tdcTbody');
+  const sum = document.getElementById('tdcSummary');
+  if (!tb) return;
+  if (!ok || !data) {
+    tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">Could not load submissions.</td></tr>';
+    return;
+  }
+
+  TDC_SUBMISSIONS = data.submissions || [];
+  const counts = data.counts || {};
+
+  const pendingBadge = document.getElementById('tdcNavBadge');
+  const pendingCount = counts.pending || 0;
+  if (pendingBadge) { pendingBadge.hidden = pendingCount === 0; pendingBadge.textContent = pendingCount; }
+
+  if (sum) sum.innerHTML = `
+    <div style="background:#fff7ed;border:1px solid #fdba74;border-radius:12px;padding:10px 16px;font-size:13px;"><b>${pendingCount}</b> <span style="color:var(--gray);">pending review</span></div>
+    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:12px;padding:10px 16px;font-size:13px;"><b>${counts.verified || 0}</b> <span style="color:var(--gray);">verified (External)</span></div>
+    <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:12px;padding:10px 16px;font-size:13px;"><b>${counts.rejected || 0}</b> <span style="color:var(--gray);">rejected</span></div>`;
+
+  tb.innerHTML = TDC_SUBMISSIONS.length ? TDC_SUBMISSIONS.map(s => {
+    const badgeCls = s.status === 'verified' ? 'verified' : (s.status === 'rejected' ? 'needs' : 'pending');
+    const statusText = s.status === 'verified' ? 'TDC verified (External)' : (s.status === 'rejected' ? 'Rejected' : 'Pending review');
+    const when = s.submitted_at ? new Date(s.submitted_at).toLocaleDateString('en-PH') : '—';
+    const reason = s.rejection_reason ? `<br><span style="font-size:11.5px;color:var(--gray);">Reason: ${escapeHtml(s.rejection_reason)}</span>` : '';
+    const actions = s.status === 'pending'
+      ? `<div style="display:flex;gap:6px;flex-wrap:wrap;">
+           <button class="btn btn-sm btn-success" onclick="approveTdc(${s.student_id}, this, true)">Verify</button>
+           <button class="btn btn-sm btn-danger" onclick="rejectTdc(${s.student_id}, this, true)">Reject</button>
+         </div>`
+      : (s.status === 'rejected'
+        ? '<button class="btn btn-sm btn-ghost" onclick="viewTdcProof(' + s.student_id + ')">Re-review</button>'
+        : `<span style="font-size:11.5px;color:var(--gray);">${s.verified_at ? new Date(s.verified_at).toLocaleDateString('en-PH') : ''}</span>`);
+
+    return `<tr data-tdc-id="${s.student_id}">
+      <td><b>${escapeHtml(s.name)}</b></td>
+      <td>${escapeHtml(s.issuer || '—')}</td>
+      <td>${escapeHtml(s.completion_date || '—')}</td>
+      <td style="white-space:nowrap;color:var(--gray);">${when}</td>
+      <td><span class="badge ${badgeCls}">${statusText}</span>${reason}</td>
+      <td><button class="btn btn-sm btn-ghost" onclick="viewTdcProof(${s.student_id})">View</button></td>
+      <td>${actions}</td>
+    </tr>`;
+  }).join('')
+    : '<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">No external TDC submissions yet. Students upload theirs in their Results tab.</td></tr>';
+}
+
+/* Open the shared document modal with the certificate streamed from the
+   private disk (auth header — same flow as the KYC viewer). */
+async function viewTdcProof(studentId) {
+  const item = TDC_SUBMISSIONS.find(x => x.student_id === studentId);
+  if (!item) return;
+
+  const title = document.getElementById('kycDocTitle');
+  const body = document.getElementById('kycDocBody');
+  if (title) title.textContent = 'External TDC certificate';
+  if (body) {
+    const footer = item.status === 'pending'
+      ? `<div style="display:flex;gap:10px;justify-content:flex-end;width:100%;margin-top:12px;padding-top:12px;border-top:1px solid var(--gray-light);">
+          <button class="btn btn-sm btn-danger" onclick="rejectTdc(${studentId}, this, true)">Reject</button>
+          <button class="btn btn-sm btn-primary" onclick="approveTdc(${studentId}, this, true)">Verify &amp; unlock PDC</button>
+        </div>`
+      : '';
+    body.innerHTML = `
+      <div style="width:100%;">
+        <div style="font-size:12px;font-weight:700;color:var(--charcoal);margin-bottom:8px;">Certificate from ${escapeHtml(item.issuer || '—')} · completed ${escapeHtml(item.completion_date || '—')}</div>
+        <div id="tdcProofPane" style="background:var(--cream);border-radius:10px;min-height:180px;display:flex;align-items:center;justify-content:center;color:var(--gray);font-size:12.5px;">Loading…</div>
+        ${footer}
+      </div>`;
+  }
+  openModal('idDocumentModal');
+
+  const pane = document.getElementById('tdcProofPane');
+  if (!pane) return;
+  try {
+    const res = await kycAuthFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/tdc-verification/${studentId}/file`);
+    if (!res.ok) { pane.innerHTML = '<div style="color:var(--gray);font-size:12.5px;">No file.</div>'; return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    KYC_DOC_URLS.tdc = url; // cleared + revoked by clearKycDocs()
+    pane.style.minHeight = '0';
+    pane.innerHTML = blob.type === 'application/pdf'
+      ? `<iframe src="${url}" title="TDC certificate" style="width:100%;height:60vh;border:0;border-radius:10px;background:#fff;"></iframe>`
+      : `<img src="${url}" alt="External TDC certificate" style="width:100%;max-height:65vh;object-fit:contain;border-radius:10px;">`;
+  } catch (e) {
+    pane.innerHTML = '<div style="color:var(--danger2);font-size:12.5px;">Could not open this file.</div>';
+  }
+}
+
+async function approveTdc(studentId, btn, closeAfter) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Verifying…'; }
+  const { ok, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/tdc-verification/${studentId}/approve`, { method: 'POST', body: {} });
+  if (btn) { btn.disabled = false; btn.textContent = 'Verify'; }
+
+  if (!ok) { RCDA.showToast(error || 'Could not verify this certificate.'); return; }
+
+  if (closeAfter) closeIdDocumentModal();
+  RCDA.showToast('TDC verified (External) — the student can now proceed to PDC.', 'success');
+  loadTdcVerification();
+}
+
+async function rejectTdc(studentId, btn, closeAfter) {
+  const reason = prompt('Why is this TDC certificate rejected? The student will see the reason and can re-upload.');
+  if (reason === null) return;
+  if (reason.trim().length < 5) { RCDA.showToast('Write a short reason (at least 5 characters).'); return; }
+
+  if (btn) { btn.disabled = true; }
+  const { ok, error } = await RCDA.safeFetch(`${RCDA_CONFIG.getApiBaseUrl()}/admin/tdc-verification/${studentId}/reject`, { method: 'POST', body: { reason: reason.trim() } });
+  if (btn) { btn.disabled = false; }
+
+  if (!ok) { RCDA.showToast(error || 'Could not reject this certificate.'); return; }
+
+  if (closeAfter) closeIdDocumentModal();
+  RCDA.showToast('Certificate rejected — the student was told why and can re-upload.', 'success');
+  loadTdcVerification();
 }

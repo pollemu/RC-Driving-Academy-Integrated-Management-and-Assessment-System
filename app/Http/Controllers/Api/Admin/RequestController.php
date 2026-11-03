@@ -221,7 +221,9 @@ class RequestController extends Controller
                     ? "Your reschedule request was $decision."
                     : ($req->type === StudentRequest::TYPE_BOOKING
                         ? "Your PDC session request for {$req->preferred_date} was $decision."
-                        : "Your instructor preference request was $decision.");
+                        : ($req->type === StudentRequest::TYPE_RETAKE
+                            ? "Your TDC retake request was $decision. Once accepted, book the next available TDC session."
+                            : "Your instructor preference request was $decision."));
                 (new NotificationService())->requestReceived($student, $summary);
             }
         } catch (\Throwable $e) {

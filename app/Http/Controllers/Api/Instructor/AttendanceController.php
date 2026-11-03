@@ -62,7 +62,7 @@ class AttendanceController extends Controller
                 'time_end' => $schedule->time_end,
                 'venue' => $schedule->venue,
                 'status' => $schedule->status,
-                'course' => ['name' => $schedule->course->name],
+                'course' => ['name' => $schedule->course->name, 'type' => $schedule->course->type],
             ],
             'bookings' => $bookings,
             'records' => $records,

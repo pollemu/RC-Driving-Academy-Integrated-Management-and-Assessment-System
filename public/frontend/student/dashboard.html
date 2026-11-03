@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/base.css?v=66">
-<link rel="stylesheet" href="../css/student.css?v=65">
+<link rel="stylesheet" href="../css/student.css?v=67">
 </head>
 <body>
 
@@ -341,12 +341,15 @@
   <div id="chatPanel" class="chat-panel" style="display:none;">
     <div class="chat-head">
       <div>
-        <b>RCDA Support Bot</b>
-        <div class="chat-sub">Ask about enrolling, payments, bookings, rescheduling & more</div>
+        <b>Royal Couple Driving Academy Support</b>
+        <div class="chat-sub" id="chatSub">Bot answers instantly — request a human and we reply here too</div>
       </div>
       <button class="chat-x" onclick="toggleChat()" aria-label="Close">✕</button>
     </div>
     <div id="chatLog" class="chat-log"></div>
+    <div style="display:flex;justify-content:center;padding:7px 12px 0;background:#fff;">
+      <button type="button" class="bot-human-chip" onclick="requestHuman()">👤 Talk to a human</button>
+    </div>
     <form id="chatForm" class="chat-input" onsubmit="return sendChat(event)">
       <input id="chatText" type="text" placeholder="Type your question…" autocomplete="off">
       <button type="submit" class="btn btn-primary btn-sm">Send</button>
@@ -390,6 +393,6 @@
 <script src="../js/shared.js?v=78"></script>
 <script src="../js/profile-panel.js?v=70"></script>
 <script src="../js/profile.js?v=65"></script>
-<script src="../js/student.js?v=66"></script>
+<script src="../js/student.js?v=67"></script>
 </body>
 </html>

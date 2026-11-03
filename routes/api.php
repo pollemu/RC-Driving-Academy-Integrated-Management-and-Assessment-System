@@ -18,6 +18,9 @@ use App\Http\Controllers\Api\Student\RequestController as StudentRequestControll
 use App\Http\Controllers\Api\Student\ChatController as StudentChatController;
 use App\Http\Controllers\Api\Student\KycController as StudentKycController;
 use App\Http\Controllers\Api\Admin\KycController as AdminKycController;
+use App\Http\Controllers\Api\Admin\ChatController as AdminChatController;
+use App\Http\Controllers\Api\Admin\TdcReviewController as AdminTdcReviewController;
+use App\Http\Controllers\Api\Student\TdcReviewController as StudentTdcReviewController;
 use App\Http\Controllers\Api\Instructor\DashboardController as InstructorDashboardController;
 use App\Http\Controllers\Api\Instructor\AttendanceController as InstructorAttendanceController;
 use App\Http\Controllers\Api\Instructor\FeedbackController as InstructorFeedbackController;
@@ -95,6 +98,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/reports/cert-settings', [AdminReportController::class, 'updateCertSettings'])->name('api.admin.reports.cert-settings');
         Route::get('/attendance', [AdminScheduleController::class, 'attendanceIndex'])->name('api.admin.attendance.index');
         Route::get('/attendance/{schedule}', [AdminScheduleController::class, 'attendanceShow'])->name('api.admin.attendance.show');
+        Route::get('/chat', [AdminChatController::class, 'index'])->name('api.admin.chat.threads');
+        Route::get('/chat/{student}', [AdminChatController::class, 'show'])->name('api.admin.chat.thread');
+        Route::post('/chat/{student}/reply', [AdminChatController::class, 'reply'])->name('api.admin.chat.reply');
+        Route::get('/tdc-verification', [AdminTdcReviewController::class, 'index'])->name('api.admin.tdc.index');
+        Route::get('/tdc-verification/{student}/file', [AdminTdcReviewController::class, 'file'])->name('api.admin.tdc.file');
+        Route::post('/tdc-verification/{student}/approve', [AdminTdcReviewController::class, 'approve'])->name('api.admin.tdc.approve');
+        Route::post('/tdc-verification/{student}/reject', [AdminTdcReviewController::class, 'reject'])->name('api.admin.tdc.reject');
     });
 
     Route::middleware('api.role:instructor')->prefix('instructor')->group(function () {
@@ -130,9 +140,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/requests/instructor-preference', [StudentRequestController::class, 'instructorPreference'])->name('api.student.requests.preference');
         Route::post('/requests/booking', [StudentRequestController::class, 'bookingRequest'])->name('api.student.requests.booking');
         Route::post('/requests/reschedule', [StudentRequestController::class, 'reschedule'])->name('api.student.requests.reschedule');
+        Route::post('/requests/retake', [StudentRequestController::class, 'retake'])->name('api.student.requests.retake');
         Route::delete('/requests/{studentRequest}', [StudentRequestController::class, 'destroy'])->name('api.student.requests.destroy');
         Route::get('/chat', [StudentChatController::class, 'index'])->name('api.student.chat.index');
         Route::post('/chat', [StudentChatController::class, 'send'])->middleware('throttle:30,1')->name('api.student.chat.send');
+        Route::get('/tdc-review', [StudentTdcReviewController::class, 'show'])->name('api.student.tdc.show');
+        Route::post('/tdc-review', [StudentTdcReviewController::class, 'store'])->middleware('throttle:10,1')->name('api.student.tdc.store');
+        Route::get('/tdc-review/file', [StudentTdcReviewController::class, 'file'])->name('api.student.tdc.file');
     });
 });
 

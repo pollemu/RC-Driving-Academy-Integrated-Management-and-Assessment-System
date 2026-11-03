@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/base.css?v=66">
-<link rel="stylesheet" href="../css/admin.css?v=66">
+<link rel="stylesheet" href="../css/admin.css?v=67">
 </head>
 <body>
 
@@ -71,6 +71,16 @@
       <div class="nav-item" onclick="showPanel('requests',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
         Student Requests
+      </div>
+      <div class="nav-item" onclick="showPanel('studentchat',this)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+        Student Chat
+        <span class="nav-badge" id="chatNavBadge" hidden>0</span>
+      </div>
+      <div class="nav-item" onclick="showPanel('tdcverification',this)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/><path d="M4 2l2 2m14-2l-2 2" opacity=".5"/></svg>
+        TDC Verification
+        <span class="nav-badge" id="tdcNavBadge" hidden>0</span>
       </div>
       <div class="sidebar-section-label">Operations</div>
       <div class="nav-item" onclick="showPanel('instructors',this)">
@@ -511,6 +521,47 @@
         </div>
       </div>
 
+    <!-- STUDENT CHAT PANEL -->
+      <div class="panel" id="admin-studentchat">
+        <div style="display:grid;grid-template-columns:300px 1fr;gap:14px;align-items:start;">
+          <div class="card" style="min-height:520px;">
+            <div class="card-head"><h3>Student Chat</h3><span style="font-size:12px;color:var(--gray);">One thread per student</span></div>
+            <div id="adminChatThreads" style="display:flex;flex-direction:column;gap:10px;overflow-y:auto;max-height:640px;padding-right:2px;">
+              <div style="text-align:center;color:var(--gray);padding:14px;">Loading threads…</div>
+            </div>
+          </div>
+          <div class="card" style="display:flex;flex-direction:column;min-height:520px;">
+            <div class="card-head"><h3 id="adminChatName" style="font-size:15px;">Select a student</h3><span id="adminChatHint" style="font-size:12px;color:var(--gray);">Your reply appears instantly in the student's chat widget.</span></div>
+            <div id="adminChatLog" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;background:var(--cream);border:1px solid var(--gray-light);border-radius:12px;padding:14px;max-height:560px;">
+              <div style="margin:auto;color:var(--gray);font-size:13px;">Pick a student on the left to open their chat.</div>
+            </div>
+            <form style="display:flex;gap:8px;padding-top:10px;" onsubmit="return sendAdminReply(event)">
+              <input id="adminChatInput" type="text" placeholder="Type your reply — the student sees it as an official RCDA message…" autocomplete="off" disabled
+                style="flex:1;border:1.5px solid var(--gray-light);border-radius:10px;padding:10px 12px;font-size:13.5px;outline:none;background:var(--cream);">
+              <button class="btn btn-primary" id="adminChatSend" type="submit" disabled>Reply</button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+    <!-- EXTERNAL TDC VERIFICATION PANEL -->
+      <div class="panel" id="admin-tdcverification">
+        <div class="card">
+          <div class="card-head"><h3>External TDC Certificates</h3>
+            <span style="font-size:12.5px;color:var(--gray);">Students who already completed TDC at another school. Verifying marks their requirement complete ("TDC verified (External)").</span>
+          </div>
+          <div id="tdcSummary" style="display:flex;gap:14px;margin-bottom:12px;flex-wrap:wrap;"></div>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead><tr><th>Student</th><th>Issuing School</th><th>Completion</th><th>Submitted</th><th>Status</th><th>Proof</th><th></th></tr></thead>
+              <tbody id="tdcTbody">
+                <tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">Loading submissions…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
     <!-- GRADING AI PANEL -->
       <div class="panel" id="admin-ai">
         <div class="card">
@@ -933,6 +984,6 @@
 <script src="../js/shared.js?v=78"></script>
 <script src="../js/profile-panel.js?v=70"></script>
 <script src="../js/profile.js?v=65"></script>
-<script src="../js/admin.js?v=81"></script>
+<script src="../js/admin.js?v=82"></script>
 </body>
 </html>

@@ -485,15 +485,26 @@ async function setupAssessForm() {
   renderAssessBrowser();
 }
 
-/* TDC is graded by exam score only; PDC by driving star ratings. */
+/* TDC is graded by exam score only; PDC by driving star ratings. The
+   qualitative-feedback example must match the course type too — the TDC
+   placeholder talks about the WRITTEN exam / classroom participation, never
+   about gears and parking (that is PDC). */
 function toggleAssessMode(sch) {
   const isTdc = sch && sch.course && sch.course.type === 'TDC';
   const grid = document.getElementById('skillsGrid');
   const exam = document.getElementById('examField');
   const label = document.getElementById('ratingLabel');
+  const hint = document.getElementById('assessHintLine');
+  const ta = document.getElementById('nlpInput2');
   if (grid) grid.style.display = isTdc ? 'none' : 'grid';
   if (exam) exam.style.display = isTdc ? 'block' : 'none';
-  if (label) label.textContent = isTdc ? 'Exam Score' : 'PDC Skills Rating';
+  if (label) label.textContent = isTdc ? 'Exam Score (TDC written exam)' : 'PDC Skills Rating';
+  if (hint) hint.textContent = isTdc
+    ? 'TDC needs only the exam score — the pass mark is 75%.'
+    : 'Tap a star to rate 1–5. All five categories are required for PDC.';
+  if (ta) ta.placeholder = isTdc
+    ? (ta.dataset.placeholderTdc || 'e.g. Scored well on the written exam and joined the class discussions actively.')
+    : (ta.dataset.placeholderPdc || '');
 }
 
 /* ============================================================
@@ -737,14 +748,20 @@ async function loadInstructorAttendance(){
     list.innerHTML = '<div style="color:var(--gray);padding:14px;">No sessions yet.</div>';
     return;
   }
-  list.innerHTML = data.schedules.map(s => `
+  list.innerHTML = data.schedules.map(s => {
+    const type = (((s.course && s.course.type) || '') || '').toUpperCase();
+    const dateLabel = s.end_date && s.end_date !== s.date
+      ? `${String(s.date || '').slice(0, 10)} – ${String(s.end_date || '').slice(0, 10)}`
+      : String(s.date || '');
+    return `
     <div class="cert-row" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border:1px solid var(--gray-light);border-radius:12px;background:var(--cream);">
       <div>
-        <b>${escapeHtml(s.course?.name || '')}</b><br>
-        <span style="font-size:12px;color:var(--gray);">${escapeHtml(String(s.date || ''))} · ${statusBadge(s.status)}</span>
+        <b>${escapeHtml((s.course && s.course.name) || '')}</b>${type ? ` <span class="badge ${type === 'PDC' ? 'needs' : 'upcoming'}" style="font-size:10px;padding:2px 7px;">${type}</span>` : ''}<br>
+        <span style="font-size:12px;color:var(--gray);">${escapeHtml(dateLabel)}${type === 'TDC' ? ' · 2-day theory class' : ''} · ${statusBadge(s.status)}</span>
       </div>
       <button class="btn btn-sm btn-primary" onclick="openInstructorAttendance(${s.id})">Open</button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 async function openInstructorAttendance(id){

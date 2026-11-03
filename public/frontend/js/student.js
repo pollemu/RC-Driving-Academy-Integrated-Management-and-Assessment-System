@@ -221,6 +221,44 @@ async function loadStudentSessions() {
 
   SESSIONS_CACHE = { schedules, bookedIds, bookings, hasUpcoming, activeTypes, tdc: (sched.ok && sched.data.tdc) || null };
 
+  const todayIso = ymdLocal(new Date());
+  /* Sessions happening today (or inside a 2-day block that covers today) —
+     these get pinned above the list and re-computed on every load, so the
+     banner follows the current date automatically. */
+  const todaySessions = bookings.filter(b =>
+    b.status !== 'cancelled' && b.date &&
+    (b.date === todayIso || (b.end_date && b.end_date >= todayIso && b.date <= todayIso)));
+
+  const todayPinned = todaySessions.length ? `
+    <div class="card" style="margin-bottom:18px;border:2px solid var(--orange);background:#fff8f4;">
+      <div class="card-head" style="margin-bottom:4px;">
+        <h3>⚑ Your Session Today</h3>
+        <span class="badge confirmed">${escapeHtml(monthDayIso(todayIso))}</span>
+      </div>
+      ${todaySessions.map(b => `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border:1px solid var(--gray-light);border-radius:12px;background:#fff;margin-top:8px;">
+          <div style="min-width:0;">
+            <b style="font-size:14px;">${escapeHtml(b.course ? b.course.name : '—')}</b><br>
+            <span style="font-size:12px;color:var(--gray);">${escapeHtml((b.time_start || '') + (b.time_end ? ' – ' + b.time_end : ''))} · ${escapeHtml(b.venue || '—')} · ${escapeHtml(b.instructor_name || 'To be assigned')}</span>
+          </div>
+          ${b.status === 'done'
+            ? '<span class="badge enrolled">Complete ✓</span>'
+            : (b.status === 'pending'
+              ? '<span class="badge pending">Pending acceptance</span>'
+              : '<span class="badge confirmed">Scheduled</span>')}
+        </div>`).join('')}
+    </div>` : '';
+
+  const bookedStatus = (b) => b.status === 'pending'
+    ? '<span class="badge pending">Pending acceptance</span>'
+    : (b.status === 'done'
+      ? '<span class="badge enrolled">Complete ✓</span>'
+      : (b.status === 'cancelled'
+        ? '<span class="badge needs">Cancelled</span>'
+        : (b.cancelable
+          ? `<button class="btn btn-sm" style="border:1px solid #dc2626;color:#dc2626;background:#fff;" onclick="cancelBooking(${b.schedule_id})">Cancel</button>`
+          : '<span class="badge confirmed">Booked</span>')));
+
   const bookedRows = bookings.length ? bookings.map(b => {
     const dateRange = b.end_date && b.end_date !== b.date
       ? `${b.date} – ${b.end_date}`
@@ -234,16 +272,13 @@ async function loadStudentSessions() {
       <td>${escapeHtml((b.time_start || '') + (b.time_end ? ' – ' + b.time_end : ''))}</td>
       <td>${escapeHtml(b.instructor_name || 'To be assigned')}</td>
       <td>${escapeHtml(b.venue || '—')}</td>
-      <td>${b.status === 'pending'
-        ? `<span class="badge pending">Pending acceptance</span>`
-        : (b.cancelable
-          ? `<button class="btn btn-sm" style="border:1px solid #dc2626;color:#dc2626;background:#fff;" onclick="cancelBooking(${b.schedule_id})">Cancel</button>`
-          : `<span class="badge confirmed">Booked</span>`)}</td>
+      <td>${bookedStatus(b)}</td>
     </tr>`; }).join('')
     : '<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:18px;">No sessions booked yet.</td></tr>';
 
   const body = document.getElementById('studSessionsBody');
   if (body) body.innerHTML = `
+    ${todayPinned}
     <div class="card">
       <div class="card-head"><h3>My Booked Sessions</h3></div>
       <div style="overflow-x:auto;">
@@ -300,6 +335,13 @@ function setBookType(t) { SESSIONS_CACHE._type = t; renderBookWizard(); }
 /* Local YYYY-MM-DD for a Date (avoids UTC shifting the day). */
 function ymdLocal(d) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+/* "Nov 3" for an ISO date string. */
+function monthDayIso(iso) {
+  if (!iso) return '';
+  return new Date(iso.slice(0, 10) + 'T00:00:00')
+    .toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
 }
 
 /* TDC is a group class completed with one fixed 2-day block. Several blocks
@@ -673,7 +715,11 @@ function assessmentSummaryHtml(a) {
       <p style="font-size:14px;margin-top:16px;text-align:center;">${escapeHtml(a.recommendation || 'Your instructor will advise next steps.')}</p>
       ${a.feedback ? `<div style="margin-top:14px;padding:12px 14px;background:var(--cream);border:1px solid var(--gray-light);border-radius:12px;font-size:13px;color:var(--gray);"><b style="color:var(--charcoal);">Instructor feedback:</b> ${escapeHtml(a.feedback)}</div>` : ''}
       ${isTdc
-        ? `<div style="margin-top:14px;text-align:center;font-size:13.5px;">Theory exam score: <b>${examNum != null ? examNum + '%' : '—'}</b> <span style="color:var(--gray);">(passing mark 75%)</span></div>`
+        ? `<div style="margin-top:14px;text-align:center;font-size:13.5px;">Theory exam score: <b>${examNum != null ? examNum + '%' : '—'}</b> <span style="color:var(--gray);">(passing mark 75%)</span></div>
+           ${a.passed === false ? `<div style="text-align:center;margin-top:12px;">
+             <button class="btn btn-primary" onclick="requestRetake()">Request a Retake</button>
+             <p style="font-size:11.5px;color:var(--gray);margin-top:6px;">Filing this tells the admin you need to retake the TDC exam. Once accepted, book the next available TDC session.</p>
+           </div>` : ''}`
         : `<div style="margin-top:14px;">
              ${renderStarCategories(a.categories)}
              <p style="font-size:11.5px;color:var(--gray);margin-top:8px;">Steering, braking and side-mirror observation · ${rated}/3 skills rated</p>
@@ -716,12 +762,16 @@ function assessmentHistoryHtml(a, i) {
 }
 
 async function loadStudentResults() {
-  const { ok, data } = await RCDA.safeFetch(STUD_API() + '/student/progress');
+  const [{ ok, data }, tdcRes] = await Promise.all([
+    RCDA.safeFetch(STUD_API() + '/student/progress'),
+    RCDA.safeFetch(STUD_API() + '/student/tdc-review'),
+  ]);
   const body = document.getElementById('studResultsBody');
   if (!ok) { if (body) body.innerHTML = '<div class="card">We couldn’t load this right now. Please refresh.</div>'; return; }
 
   const assessments = data.assessments || [];
   const certs = data.certifications || [];
+  const tdc = (tdcRes.ok && tdcRes.data.tdc) || null;
 
   STUD_ASSESSMENTS = assessments;
   STUDENT_CERTS = certs;
@@ -758,7 +808,73 @@ async function loadStudentResults() {
         <div class="card-head" style="margin-top:18px;"><h3>Certifications</h3></div>
         ${certHtml}
       </div>
+    </div>
+    ${tdcCardHtml(tdc)}`;
+}
+
+/* ---- EXTERNAL TDC CERTIFICATE (already TDC-trained at another school) ---- */
+function tdcCardHtml(t) {
+  if (!t) return '';
+  if (t.status === 'verified') {
+    return `
+    <div class="card" style="margin-top:18px;border:1px solid #16a34a;">
+      <div class="card-head"><h3>External TDC Certificate</h3><span class="badge enrolled">TDC verified (External)</span></div>
+      <div style="font-size:13px;color:var(--gray);">Issued by <b style="color:var(--charcoal);">${escapeHtml(t.issuer || '—')}</b>${t.completion_date ? ' on ' + escapeHtml(monthDayIso(t.completion_date)) : ''}. Your TDC requirement is recognized — no academy TDC session is needed${t.has_proof ? ' · <a href="' + t.file_url + '" target="_blank">view uploaded copy</a>' : ''}.</div>
     </div>`;
+  }
+
+  const resub = t.status === 'rejected';
+  return `
+  <div class="card" style="margin-top:18px;">
+    <div class="card-head"><h3>Already have your TDC from another school?</h3><span style="font-size:12.5px;color:var(--gray);">Upload it for review</span></div>
+    ${resub ? `<div class="enroll-note" style="margin:0 0 12px;">Your previous certificate was not accepted: <b>${escapeHtml(t.rejection_reason || 'Unspecified reason.')}</b> Please fix it and re-upload below.</div>`
+      : (t.status === 'pending' ? `<div class="enroll-note" style="margin:0 0 12px;color:#92400e;background:#fef3c7;border-color:#fcd34d;">Your certificate is submitted and awaiting admin review — you'll get a notification when it's processed.${t.has_proof ? ' <a href="' + t.file_url + '" target="_blank">View your uploaded copy.</a>' : ''}</div>` : '')}
+    ${t.status === 'pending' ? '<div style="font-size:12px;color:var(--gray);">If the details were wrong, re-upload below and the newer copy replaces the older one.</div>' : ''}
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+      <label style="font-size:12.5px;color:var(--gray);">Issuing school / training center</label>
+      <input id="tdcIssuer" class="sched-pick" type="text" placeholder="e.g. ABC Driving School — LTO accredited" value="${t.issuer ? escapeHtml(t.issuer) : ''}">
+      <label style="font-size:12.5px;color:var(--gray);">Date you completed the TDC</label>
+      <input id="tdcCompletion" class="sched-pick" type="date" value="${t.completion_date || ''}" max="${ymdLocal(new Date())}">
+      <label style="font-size:12.5px;color:var(--gray);">Certificate (JPG / PNG / WEBP photo or PDF scan · max 5 MB)</label>
+      <input id="tdcProof" class="sched-pick" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" onchange="previewTdcChoice(this)">
+      <span id="tdcProofName" style="font-size:11.5px;color:var(--gray);"></span>
+      <button class="btn btn-primary" id="tdcSubmitBtn" onclick="submitTdcReview()">${t.status === 'pending' || resub ? 'Re-upload Certificate' : 'Submit for Review'}</button>
+      <p style="font-size:12px;color:var(--gray);">An administrator verifies the certificate — once approved, the system marks your TDC requirement complete and lets you proceed to PDC.</p>
+    </div>
+  </div>`;
+}
+
+function previewTdcChoice(input) {
+  const el = document.getElementById('tdcProofName');
+  if (el) el.textContent = input.files && input.files[0] ? 'Selected: ' + input.files[0].name : '';
+}
+
+async function submitTdcReview() {
+  const issuer = (document.getElementById('tdcIssuer') || {}).value || '';
+  const completion = (document.getElementById('tdcCompletion') || {}).value || '';
+  const proof = (document.getElementById('tdcProof') || {}).files;
+  const btn = document.getElementById('tdcSubmitBtn');
+
+  if (!issuer.trim()) { RCDA.showToast('Enter the name of the school that issued your TDC certificate.'); return; }
+  if (!completion) { RCDA.showToast('Enter the date you completed the TDC.'); return; }
+  if (!proof || !proof[0]) { RCDA.showToast('Choose your certificate file (photo or PDF).'); return; }
+
+  const fd = new FormData();
+  fd.append('tdc_issuer', issuer.trim());
+  fd.append('tdc_completion_date', completion);
+  fd.append('tdc_proof', proof[0], proof[0].name || 'tdc-certificate.jpg');
+
+  if (btn) { btn.disabled = true; }
+  const res = await RCDA.safeUpload(STUD_API() + '/student/tdc-review', fd);
+  if (btn) { btn.disabled = false; }
+  RCDA.showToast(res.ok ? (res.data && res.data.message) || 'Certificate submitted for review.' : (res.error || 'Upload failed. Please try again.'), res.ok ? 'success' : undefined);
+  if (res.ok) loadStudentResults();
+}
+
+/* ---- RETAKE a failed TDC exam ---- */
+async function requestRetake() {
+  const res = await RCDA.safeFetch(STUD_API() + '/student/requests/retake', { method: 'POST', body: {} });
+  RCDA.showToast(res.ok ? (res.data && res.data.message) || 'Retake request sent.' : (res.data && res.data.message) || 'Could not send the retake request.', res.ok ? 'success' : undefined);
 }
 
 /* ---- CERTIFICATE VIEWER / PRINTER (student) ---- */
@@ -1215,7 +1331,7 @@ async function loadStudentRequests() {
   const bookedIds = (sched.ok && sched.data.bookedIds) || [];
 
   const reqRows = list.length ? list.map(r => {
-    const typeLabel = r.type === 'reschedule' ? 'Reschedule' : (r.type === 'booking' ? 'PDC booking' : 'Instructor preference');
+    const typeLabel = r.type === 'reschedule' ? 'Reschedule' : (r.type === 'booking' ? 'PDC booking' : (r.type === 'retake' ? 'TDC exam retake' : 'Instructor preference'));
     const detail = r.type === 'reschedule'
       ? `${r.from_schedule ? formatDate(r.from_schedule.date) : '?'} → ${r.to_schedule ? formatDate(r.to_schedule.date) : '?'}`
       : (r.type === 'booking'
@@ -1332,8 +1448,12 @@ async function cancelRequest(id) {
   loadStudentRequests();
 }
 
-/* ---- AI SUPPORT CHATBOT ---- */
+/* ---- AI SUPPORT CHATBOT (bot answers instantly; a real admin can join the
+same thread when the student asks to talk to a human) ---- */
 let CHAT_LOADED = false;
+let CHAT_HUMAN = false;
+let CHAT_LAST_ID = 0;
+let CHAT_POLL_TIMER = null;
 
 function toggleChat() {
   const panel = document.getElementById('chatPanel');
@@ -1341,16 +1461,29 @@ function toggleChat() {
   const open = panel.style.display === 'none' || !panel.style.display;
   panel.style.display = open ? 'flex' : 'none';
   if (open && !CHAT_LOADED) { loadChat(); CHAT_LOADED = true; }
+  if (open) chatStartPoll(); else chatStopPoll();
   const log = document.getElementById('chatLog');
   if (log) log.scrollTop = log.scrollHeight;
+}
+
+function chatSub(text) {
+  const el = document.getElementById('chatSub');
+  if (el) el.textContent = text;
 }
 
 function chatBubble(sender, text) {
   const log = document.getElementById('chatLog');
   if (!log) return;
   const div = document.createElement('div');
-  div.className = 'chat-msg ' + (sender === 'user' ? 'user' : 'bot');
-  div.textContent = text;
+  div.className = 'chat-msg ' + (sender === 'user' ? 'user' : sender);
+  if (sender === 'admin') {
+    // Human bubble: label it so it clearly reads as an official reply.
+    const tag = document.createElement('div');
+    tag.className = 'chat-msg-tag';
+    tag.textContent = 'RCDA Admin';
+    div.appendChild(tag);
+  }
+  div.appendChild(document.createTextNode(text));
   log.appendChild(div);
   log.scrollTop = log.scrollHeight;
 }
@@ -1359,23 +1492,82 @@ async function loadChat() {
   const { ok, data } = await RCDA.safeFetch(STUD_API() + '/student/chat');
   const log = document.getElementById('chatLog');
   if (!log) return;
+  log.innerHTML = '';
   if (ok && data.messages && data.messages.length) {
-    data.messages.forEach(m => chatBubble(m.sender === 'student' ? 'user' : 'bot', m.body));
+    data.messages.forEach(m => {
+      chatBubble(m.sender === 'student' ? 'user' : m.sender, m.body);
+      const id = Number(m.id) || 0;
+      if (id > CHAT_LAST_ID) CHAT_LAST_ID = id;
+    });
   } else {
-    chatBubble('bot', "Hi! I'm the RCDA support bot. Ask me what to do after signing up, or about enrolling, TDC/PDC, payments, bookings, rescheduling, instructor preferences, or certificates — or type 'talk to human' to reach our admin team.");
+    chatBubble('bot', "Hi! I'm the RCDA support bot. Ask me what to do after signing up, or about enrolling, TDC/PDC, payments, bookings, rescheduling, instructor preferences, or certificates — or tap “Talk to a human” and our admin will reply right here.");
   }
+  CHAT_HUMAN = !!(data && data.human_thread);
+  chatSub(CHAT_HUMAN
+    ? 'Our admin team replies right here in this chat.'
+    : 'Bot answers instantly — tap “Talk to a human” and an admin joins this chat.');
 }
 
 async function sendChat(e) {
-  e.preventDefault();
+  if (e && e.preventDefault) e.preventDefault();
   const input = document.getElementById('chatText');
-  if (!input || !input.value.trim()) return;
+  if (!input || !input.value.trim()) return false;
   const text = input.value.trim();
   input.value = '';
   chatBubble('user', text);
   const { ok, data, error } = await RCDA.safeFetch(STUD_API() + '/student/chat', { method: 'POST', body: { body: text } });
-  if (!ok) { chatBubble('bot', 'Sorry, I could not respond right now. Please try again.'); return; }
-  (data.messages || []).forEach(m => { if (m.sender !== 'student') chatBubble('bot', m.body); });
+  if (!ok) { chatBubble('bot', 'Sorry, I could not respond right now. Please try again.'); return false; }
+  (data.messages || []).forEach(m => {
+    const id = Number(m.id) || 0;
+    if (id > CHAT_LAST_ID) CHAT_LAST_ID = id;
+    if (m.sender !== 'student') chatBubble(m.sender, m.body);
+  });
+  if (data && data.human_thread) markHumanThread();
+  return false;
+}
+
+/* The moment an admin joins, flag the header so the student knows a real
+   person is on the other side of the thread. */
+function markHumanThread() {
+  if (!CHAT_HUMAN) {
+    RCDA.showToast('A human is now in your chat — new replies appear here automatically.', 'info');
+  }
+  CHAT_HUMAN = true;
+  chatSub('Our admin team replies right here in this chat.');
+}
+
+/* While the widget is open, watch for admin replies arriving from the other
+   side (the admin panel pushes nothing — this light polling is the delivery). */
+function chatStartPoll() {
+  if (CHAT_POLL_TIMER) return;
+  CHAT_POLL_TIMER = setInterval(chatPoll, 5000);
+}
+
+function chatStopPoll() {
+  if (CHAT_POLL_TIMER) { clearInterval(CHAT_POLL_TIMER); CHAT_POLL_TIMER = null; }
+}
+
+async function chatPoll() {
+  const panel = document.getElementById('chatPanel');
+  if (!panel || panel.style.display === 'none') { chatStopPoll(); return; }
+  const { ok, data } = await RCDA.safeFetch(STUD_API() + '/student/chat');
+  if (!ok || !data) return;
+  (data.messages || []).forEach(m => {
+    const id = Number(m.id) || 0;
+    if (id <= CHAT_LAST_ID) return;
+    CHAT_LAST_ID = id;
+    if (m.sender !== 'student') chatBubble(m.sender, m.body);
+  });
+  if (data.human_thread && !CHAT_HUMAN) markHumanThread();
+}
+
+/* "Talk to a human" chip — pushes the request through the bot so the
+   escalation (and the thread) lands in the admin's chat inbox. */
+function requestHuman() {
+  const input = document.getElementById('chatText');
+  if (!input) return;
+  input.value = 'I want to talk to a human.';
+  sendChat();
 }
 
 /* ---- KYC IDENTITY (dashboard reminder banner) ---- */

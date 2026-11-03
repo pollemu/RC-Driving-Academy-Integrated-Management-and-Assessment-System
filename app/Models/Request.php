@@ -21,6 +21,7 @@ class Request extends Model
     public const TYPE_RESCHEDULE = 'reschedule';
     public const TYPE_INSTRUCTOR_PREFERENCE = 'instructor_preference';
     public const TYPE_BOOKING = 'booking';
+    public const TYPE_RETAKE = 'retake';
 
     public const STATUS_PENDING = 'pending';
     public const STATUS_ACCEPTED = 'accepted';

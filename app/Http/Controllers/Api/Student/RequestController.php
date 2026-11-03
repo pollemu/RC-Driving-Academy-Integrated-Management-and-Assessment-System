@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Student;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdminNotification;
+use App\Models\Assessment;
 use App\Models\Enrollment;
 use App\Models\Request as StudentRequest;
 use App\Models\Schedule;
@@ -211,6 +212,75 @@ class RequestController extends Controller
         );
 
         return response()->json(['request' => $this->shape($req)], 201);
+    }
+
+    /* Request a retake of a failed TDC exam. The student must have an actual
+       failed (passed = false) TDC assessment — written exam only — and may
+       hold one pending retake request at a time. The admin just accepts the
+       request (no extra action), which clears the way for the student to book
+       the academy's next TDC session. */
+    public function retake(Request $request)
+    {
+        $student = $request->user()->student;
+
+        $failed = Assessment::where('passed', false)
+            ->whereHas('feedback', function ($q) use ($student) {
+                $q->where('student_id', $student->id)
+                    ->whereHas('schedule.course', fn ($c) => $c->where('type', 'TDC'));
+            })
+            ->orderByDesc('id')
+            ->first();
+
+        if (! $failed) {
+            return response()->json([
+                'message' => 'You do not have a failed TDC exam on record yet. Retakes can only be requested after a failed attempt.',
+            ], 422);
+        }
+
+        // One pending retake request at a time; a previously accepted retake
+        // doesn't block, since the student may fail again and need a new one.
+        $pending = $student->requests()
+            ->where('type', StudentRequest::TYPE_RETAKE)
+            ->where('status', StudentRequest::STATUS_PENDING)
+            ->exists();
+        if ($pending) {
+            return response()->json([
+                'message' => 'You already have a pending retake request. Wait for the admin to respond.',
+            ], 422);
+        }
+
+        $failedAssessment = $failed;
+        $failedDate = $failedAssessment?->feedback?->schedule?->date;
+
+        $req = StudentRequest::create([
+            'type' => StudentRequest::TYPE_RETAKE,
+            'student_id' => $student->id,
+            'schedule_id' => $failedAssessment->feedback->schedule_id,
+            'note' => 'Retake requested for a failed TDC exam'
+                . ($failedAssessment->exam_score !== null ? ' (final score ' . (string) $failedAssessment->exam_score . '%' : '')
+                . ($failedDate ? ' taken on ' . date('M j, Y', strtotime((string) $failedDate)) : '') . ').',
+            'status' => StudentRequest::STATUS_PENDING,
+        ]);
+
+        $this->notify($req, 'Retake request filed for your failed TDC exam.');
+
+        $this->notifyAdmins(
+            'TDC retake request',
+            ($student->user?->name ?? 'A student')
+                . ' requested to retake the TDC exam (score '
+                . ($failedAssessment->exam_score !== null ? (string) $failedAssessment->exam_score : '—') . '%).',
+            [
+                'request_id' => $req->id,
+                'student_id' => $student->id,
+                'panel' => 'requests',
+            ],
+            $student->user_id
+        );
+
+        return response()->json([
+            'request' => $this->shape($req),
+            'message' => 'Retake request sent. Once the admin accepts it, book the next available TDC session.',
+        ], 201);
     }
 
     /* Cancel a pending request. */

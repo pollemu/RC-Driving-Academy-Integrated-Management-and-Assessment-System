@@ -89,7 +89,11 @@ class ChatController extends Controller
                 ];
             });
 
-        return response()->json(['messages' => $messages]);
+        return response()->json([
+            'messages' => $messages,
+            /* The admin has personally joined this thread at least once. */
+            'human_thread' => Message::adminReplied($student),
+        ]);
     }
 
     public function send(Request $request)
@@ -100,23 +104,35 @@ class ChatController extends Controller
 
         $student = $request->user()->student;
 
+        $shaped = fn (Message $m) => [
+            'id' => $m->id, 'sender' => $m->sender, 'body' => $m->body, 'created_at' => $m->created_at,
+        ];
+
+        /* The bot steps out of the way while a human admin is actively on the
+           thread: the newest admin reply must be newer than the newest bot
+           reply AND sent within the last 6 hours. This survives back-to-back
+           student messages (no alternation trap), and lets the bot take over
+           again once the hand-off goes stale. */
+        $lastAdminId = (int) (Message::where('student_id', $student->id)
+            ->where('sender', Message::SENDER_ADMIN)
+            ->latest('id')->value('id') ?? 0);
+        $lastBotId = (int) (Message::where('student_id', $student->id)
+            ->where('sender', Message::SENDER_BOT)
+            ->latest('id')->value('id') ?? 0);
+        $adminFresh = $lastAdminId > 0
+            && (Message::find($lastAdminId)?->created_at?->gt(now()->subHours(6)) ?? false);
+        $adminAttending = $adminFresh && $lastAdminId > $lastBotId;
+
         $userMessage = Message::create([
             'student_id' => $student->id,
             'sender' => Message::SENDER_STUDENT,
             'body' => $data['body'],
         ]);
 
-        $reply = $this->respond($data['body']);
-
-        $botMessage = Message::create([
-            'student_id' => $student->id,
-            'sender' => Message::SENDER_BOT,
-            'body' => $reply,
-        ]);
-
-        // "Talk to human" escalations land in the admin Chat tab. Collapse
-        // repeated asks from the same student while one is still unread.
-        if ($this->wantsHuman($data['body'])) {
+        // "Talk to human" escalations land in the admin Chat tab, and the
+        // escalated thread appears in the admin Chat panel. Collapse repeated
+        // asks from the same student while one is still unread.
+        if (! $adminAttending && $this->wantsHuman($data['body'])) {
             try {
                 $alreadyOpen = AdminNotification::where('category', AdminNotification::CATEGORY_CHAT)
                     ->whereNull('read_at')
@@ -125,7 +141,7 @@ class ChatController extends Controller
                     ->exists();
 
                 if (! $alreadyOpen) {
-                    AdminNotification::push(
+                    AdminNotification::record(
                         AdminNotification::CATEGORY_CHAT,
                         'Student wants to talk to a human',
                         ($student->user?->name ?? 'A student') . ': “' . Str::limit(trim($data['body']), 240) . '”',
@@ -138,11 +154,24 @@ class ChatController extends Controller
             }
         }
 
+        if ($adminAttending) {
+            return response()->json([
+                'messages' => [$shaped($userMessage)],
+                'human_thread' => true,
+            ]);
+        }
+
+        $reply = $this->respond($data['body']);
+
+        $botMessage = Message::create([
+            'student_id' => $student->id,
+            'sender' => Message::SENDER_BOT,
+            'body' => $reply,
+        ]);
+
         return response()->json([
-            'messages' => [
-                ['id' => $userMessage->id, 'sender' => $userMessage->sender, 'body' => $userMessage->body, 'created_at' => $userMessage->created_at],
-                ['id' => $botMessage->id, 'sender' => $botMessage->sender, 'body' => $botMessage->body, 'created_at' => $botMessage->created_at],
-            ],
+            'messages' => [$shaped($userMessage), $shaped($botMessage)],
+            'human_thread' => Message::adminReplied($student),
         ]);
     }
 
@@ -150,9 +179,15 @@ class ChatController extends Controller
     {
         $lower = strtolower($text);
 
-        return str_contains($lower, 'talk to human')
-            || str_contains($lower, 'speak to human')
-            || str_contains($lower, 'real person');
+        /* Match the natural phrasings students actually type — "talk to a
+           human", "speak with the human", "real person", etc. */
+        return (bool) preg_match(
+            '/(?:talk|speak|chat)(?:\s+to|\s+with)?\s+(?:a\s+|the\s+)?human\b'
+            . '|human\s+(?:agent|support|admin)'
+            . '|real\s+person'
+            . '|customer\s+service/',
+            $lower
+        );
     }
 
     protected function respond(string $text): string
@@ -160,7 +195,7 @@ class ChatController extends Controller
         $lower = strtolower($text);
 
         if ($this->wantsHuman($text)) {
-            return "Sure — I've flagged this for our admin team. They'll follow up via your registered email/SMS. In the meantime, feel free to keep asking me about enrollments, payments, or schedules.";
+            return "Got it — I've flagged this for our admin team. They will reply to you right here in this chat window, so no need to go anywhere. In the meantime, I can still help with enrollments, payments, or schedules.";
         }
 
         $best = null;

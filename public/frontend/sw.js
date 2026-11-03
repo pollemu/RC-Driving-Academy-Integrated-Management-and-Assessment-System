@@ -31,7 +31,7 @@ const SHELL = [
   '/frontend/js/error-handler.js?v=66',
   '/frontend/js/autosave.js?v=65',
   '/frontend/js/shared.js?v=78',
-  '/frontend/js/instructor.js?v=69',
+  '/frontend/js/instructor.js?v=70',
   '/frontend/js/profile-panel.js?v=70',
   '/frontend/js/profile.js?v=65',
 ];

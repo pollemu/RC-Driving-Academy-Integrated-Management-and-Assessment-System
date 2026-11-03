@@ -13,6 +13,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'gender', 'preferred_instructor_gender', 'document_path',
     'id_status', 'id_document_type', 'id_document_name', 'id_document_mime',
     'id_submitted_at', 'id_reviewed_at', 'id_reviewed_by', 'id_rejection_reason',
+    'tdc_source', 'tdc_issuer', 'tdc_completion_date', 'tdc_proof_path',
+    'tdc_verified', 'tdc_verified_by', 'tdc_verified_at',
+    'tdc_reviewed_by', 'tdc_rejection_reason', 'tdc_submitted_at',
 ])]
 class Student extends Model
 {
@@ -31,6 +34,10 @@ class Student extends Model
     {
         return [
             'birthdate' => 'date',
+            'tdc_completion_date' => 'date',
+            'tdc_verified' => 'boolean',
+            'tdc_verified_at' => 'datetime',
+            'tdc_submitted_at' => 'datetime',
             'id_submitted_at' => 'datetime',
             'id_reviewed_at' => 'datetime',
         ];

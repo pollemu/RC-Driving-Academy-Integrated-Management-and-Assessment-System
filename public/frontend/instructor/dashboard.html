@@ -218,7 +218,7 @@
           <div class="card-head">
             <div>
               <h3>Session Attendance</h3>
-              <p style="font-size:12.5px;color:var(--gray);margin-top:3px;">Select one of your sessions to mark your students present, late, or absent.</p>
+              <p style="font-size:12.5px;color:var(--gray);margin-top:3px;">Select one of your sessions to mark your students present, late, or absent. TDC sessions (tagged <b style="font-weight:700;">TDC</b>) are 2-day theory classes — mark attendance once per class day.</p>
             </div>
           </div>
           <div class="two-col">
@@ -322,14 +322,14 @@
         <div class="skill-rate-row" data-cat="parking"><label>Backing &amp; Precision Parking</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span></div></div>
         <div class="skill-rate-row" data-cat="traffic"><label>Traffic Rules &amp; Speed Management</label><div class="star-row"><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star lit" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span><span class="star" onclick="rateStar(this)">★</span></div></div>
       </div>
-      <p style="font-size:12px;color:var(--gray);margin-top:8px;">Tap a star to rate 1–5. All five categories are required for PDC.</p>
+      <p id="assessHintLine" style="font-size:12px;color:var(--gray);margin-top:8px;">Tap a star to rate 1–5. All five categories are required for PDC.</p>
 
       <div class="field" id="examField" style="display:none;margin-top:18px;">
         <label>Exam Score (%)</label>
         <input id="assessExam" type="number" min="0" max="100" placeholder="0–100" style="width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);">
       </div>
 
-      <div class="field" style="margin-top:18px;"><label>Qualitative Feedback <span style="font-weight:400;color:var(--gray);">— English or Filipino, both work</span></label><textarea id="nlpInput2" rows="4" placeholder="e.g. Magaling siya mag-shift ng gears pero sobra ang bilis kapag highway. He is smooth at turning but has poor parking calculations." style="width:100%;padding:13px 15px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);resize:vertical;"></textarea></div>
+      <div class="field" style="margin-top:18px;"><label>Qualitative Feedback <span style="font-weight:400;color:var(--gray);">— English or Filipino, both work</span></label><textarea id="nlpInput2" rows="4" placeholder="e.g. Magaling siya mag-shift ng gears pero sobra ang bilis kapag highway. He is smooth at turning but has poor parking calculations." data-placeholder-pdc="e.g. Magaling siya mag-shift ng gears pero sobra ang bilis kapag highway. He is smooth at turning but has poor parking calculations." data-placeholder-tdc="e.g. She reviewed every module and scored well on the written exam. Actively joined the class discussions — naipaliwanag niya nang malinaw ang right-of-way rules, pero kailangan pang balikan ang traffic signs and signals." style="width:100%;padding:13px 15px;border-radius:11px;border:1.5px solid var(--gray-light);font-size:14px;background:var(--cream);resize:vertical;"></textarea></div>
       <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:12px;" onclick="saveAssessment()">Save Assessment ➜</button>
     </div>
   </div>
@@ -340,6 +340,6 @@
 <script src="../js/shared.js?v=78"></script>
 <script src="../js/profile-panel.js?v=70"></script>
 <script src="../js/profile.js?v=65"></script>
-<script src="../js/instructor.js?v=69"></script>
+<script src="../js/instructor.js?v=70"></script>
 </body>
 </html>
